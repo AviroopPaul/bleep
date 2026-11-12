@@ -44,7 +44,7 @@ jobs:
   rust:
     name: Rust (cargo test)
     # The core uses AppKit and the macOS Keychain, so it builds on macOS only.
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
