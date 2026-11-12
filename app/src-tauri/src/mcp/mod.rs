@@ -1,6 +1,6 @@
 //! In-app MCP server: streamable HTTP on 127.0.0.1, random port, bearer token (build plan 8.2).
 //! Stateless with plain JSON replies: every request stands alone, no SSE.
-pub mod tools;
+pub mod host;
 
 use axum::extract::{Request, State};
 use axum::http::StatusCode;
@@ -21,7 +21,7 @@ pub fn new_token() -> String {
 }
 
 #[derive(Clone)]
-struct BleepTools;
+struct BleepTools(Arc<host::ToolHost>);
 
 impl ServerHandler for BleepTools {
     fn get_info(&self) -> ServerConfig {
@@ -29,23 +29,13 @@ impl ServerHandler for BleepTools {
     }
 
     async fn list_tools(&self, _r: Option<PaginatedRequestParams>, _c: RequestContext<RoleServer>) -> Result<ListToolsResult, ErrorData> {
-        let tools = tools::registry()
-            .into_iter()
-            .filter(|t| t.risk != tools::Risk::Never)
-            .map(|t| Tool::new(t.name, t.description, Arc::new(t.schema.as_object().cloned().unwrap_or_default())))
-            .collect();
+        let tools = self.0.specs().into_iter().map(|t| Tool::new(t.name, t.description, Arc::new(t.schema.as_object().cloned().unwrap_or_default()))).collect();
         Ok(ListToolsResult::with_all_items(tools))
     }
 
     async fn call_tool(&self, req: CallToolRequestParams, _c: RequestContext<RoleServer>) -> Result<CallToolResponse, ErrorData> {
-        let Some(spec) = tools::registry().into_iter().find(|t| t.name == req.name) else {
-            return Err(ErrorData::invalid_params(format!("Unknown tool: {}", req.name), None));
-        };
-        if let Err(why) = tools::gate(&spec) {
-            return Ok(CallToolResult::error(vec![ContentBlock::text(why)]).into());
-        }
         let args = serde_json::Value::Object(req.arguments.clone().unwrap_or_default());
-        Ok(match tools::run(spec.name, &args) {
+        Ok(match self.0.call(&req.name, args).await {
             Ok(v) => CallToolResult::success(vec![ContentBlock::text(v.to_string())]),
             Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
         }
@@ -75,14 +65,14 @@ pub struct McpServer {
 }
 
 impl McpServer {
-    pub async fn start(token: String) -> anyhow::Result<McpServer> {
+    pub async fn start(token: String, host: Arc<host::ToolHost>) -> anyhow::Result<McpServer> {
         let stop = CancellationToken::new();
         let config = StreamableHttpServerConfig::default()
             .with_legacy_session_mode(false)
             .with_json_response(true)
             .with_sse_keep_alive(None)
             .with_cancellation_token(stop.child_token());
-        let service: StreamableHttpService<BleepTools, LocalSessionManager> = StreamableHttpService::new(|| Ok(BleepTools), Default::default(), config);
+        let service: StreamableHttpService<BleepTools, LocalSessionManager> = StreamableHttpService::new(move || Ok(BleepTools(host.clone())), Default::default(), config);
         let router = axum::Router::new()
             .nest_service("/mcp", service)
             .layer(middleware::from_fn_with_state(Arc::new(token.clone()), require_bearer));
@@ -116,6 +106,11 @@ mod tests {
     use super::*;
     use serde_json::{json, Value};
 
+    async fn start(token: &str) -> McpServer {
+        let h = host::ToolHost::new(vec![Arc::new(crate::connectors::bleep::BleepConnector)], host::tests::FakeGate::new(host::Decision::Declined), Default::default());
+        McpServer::start(token.into(), h).await.unwrap()
+    }
+
     async fn rpc(srv: &McpServer, token: Option<&str>, body: Value) -> reqwest::Response {
         let mut r = reqwest::Client::new()
             .post(srv.url())
@@ -134,7 +129,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_missing_token() {
-        let srv = McpServer::start("secret".into()).await.unwrap();
+        let srv = start("secret").await;
         let r = rpc(&srv, None, call(1, "tools/list", json!({}))).await;
         assert_eq!(r.status(), 401);
         let r = rpc(&srv, Some("wrong"), call(1, "tools/list", json!({}))).await;
@@ -143,7 +138,7 @@ mod tests {
 
     #[tokio::test]
     async fn binds_loopback_only() {
-        let srv = McpServer::start("secret".into()).await.unwrap();
+        let srv = start("secret").await;
         assert!(srv.url().starts_with("http://127.0.0.1:"), "{}", srv.url());
         assert!(srv.url().ends_with("/mcp"));
         assert_eq!(srv.token(), "secret");
@@ -151,7 +146,7 @@ mod tests {
 
     #[tokio::test]
     async fn lists_bleep_now() {
-        let srv = McpServer::start("secret".into()).await.unwrap();
+        let srv = start("secret").await;
         let r = rpc(&srv, Some("secret"), call(1, "tools/list", json!({}))).await;
         assert_eq!(r.status(), 200);
         let v: Value = r.json().await.unwrap();
@@ -161,7 +156,7 @@ mod tests {
 
     #[tokio::test]
     async fn bleep_now_has_timezone() {
-        let srv = McpServer::start("secret".into()).await.unwrap();
+        let srv = start("secret").await;
         let v: Value = rpc(&srv, Some("secret"), call(2, "tools/call", json!({"name": "bleep_now", "arguments": {}}))).await.json().await.unwrap();
         let text = v["result"]["content"][0]["text"].as_str().unwrap_or_else(|| panic!("{v}"));
         let now: Value = serde_json::from_str(text).unwrap();
@@ -175,7 +170,7 @@ mod tests {
 
     #[tokio::test]
     async fn unknown_tool_is_an_error() {
-        let srv = McpServer::start("secret".into()).await.unwrap();
+        let srv = start("secret").await;
         let v: Value = rpc(&srv, Some("secret"), call(3, "tools/call", json!({"name": "gmail_send", "arguments": {}}))).await.json().await.unwrap();
         assert!(v.get("error").is_some() || v["result"]["isError"] == true, "{v}");
     }

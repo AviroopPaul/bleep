@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { DROID_FULL } from "./droidSvg";
-import { api, onChatEvent } from "../ipc";
+import { api, onChatEvent, onDroidMood } from "../ipc";
 
 type Mood = "idle" | "thinking" | "alert" | "happy";
 const DRAG_PX = 4;
@@ -26,7 +26,15 @@ export function Droid() {
       } else if (event.type === "error" || event.type === "rate_limited") brief("alert", 2000);
       else if (event.type === "done") setMood((m) => (m === "alert" ? m : "happy")), (timer.current = window.setTimeout(() => setMood("idle"), 2000));
     });
-    return () => void un.then((f) => f());
+    // A meeting bar on screen keeps the antenna light on until it goes away.
+    const unMood = onDroidMood((m) => {
+      window.clearTimeout(timer.current);
+      setMood(m === "alert" ? "alert" : "idle");
+    });
+    return () => {
+      void un.then((f) => f());
+      void unMood.then((f) => f());
+    };
   }, []);
 
   const onPointerDown = (e: React.PointerEvent) => {

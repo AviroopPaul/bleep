@@ -1,19 +1,35 @@
-import type { AgentEvent, Message } from "../ipc";
+import type { AgentEvent, Approval, Message } from "../ipc";
 
 export interface ChatState {
   messages: Message[];
   streamingId: number | null;
   rateLimitedUntil: number | null;
+  /** Cards whose turn is not on screen yet. */
+  loose: Approval[];
 }
 
 export type ChatAction =
   | { type: "history"; messages: Message[]; mode?: "replace" | "prepend" }
   | { type: "sent"; user: Message; assistantId: number }
-  | { type: "event"; messageId: number; event: AgentEvent };
+  | { type: "event"; messageId: number; event: AgentEvent }
+  | { type: "approval"; approval: Approval };
 
-export const emptyChat: ChatState = { messages: [], streamingId: null, rateLimitedUntil: null };
+export const emptyChat: ChatState = { messages: [], streamingId: null, rateLimitedUntil: null, loose: [] };
 
-const STEP_LABELS: Record<string, string> = { bleep_now: "Checked the time" };
+const STEP_LABELS: Record<string, string> = {
+  bleep_now: "Checked the time",
+  calendar_list: "Checked your calendar",
+  calendar_next: "Checked what is next",
+  calendar_free: "Looked for free time",
+  calendar_create: "Adding to your calendar",
+  calendar_update: "Changing an event",
+  calendar_delete: "Deleting an event",
+  calendar_respond: "Replying to an invite",
+  gmail_search: "Searched your mail",
+  gmail_read_thread: "Read an email thread",
+  gmail_draft: "Saved a draft",
+  gmail_send: "Sending an email",
+};
 export const stepLabel = (name: string) => STEP_LABELS[name] ?? name;
 
 export function formatBackAt(until: number, timeZone?: string): string {
@@ -29,6 +45,11 @@ function byId(list: Message[]): Message[] {
   const seen = new Map<number, Message>();
   for (const m of list) if (!seen.has(m.id)) seen.set(m.id, m);
   return [...seen.values()].sort((a, b) => a.id - b.id);
+}
+
+function upsert(list: Approval[] | undefined, a: Approval): Approval[] {
+  const rest = (list ?? []).filter((x) => x.id !== a.id);
+  return [...rest, a].sort((x, y) => x.id - y.id);
 }
 
 function applyEvent(m: Message, ev: AgentEvent): Message {
@@ -68,10 +89,18 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const base = exists ? state.messages : byId([...state.messages, blankAssistant(messageId)]);
       const messages = base.map((m) => (m.id === messageId ? applyEvent(m, event) : m));
       return {
+        ...state,
         messages,
         streamingId: event.type === "done" ? null : event.type === "rate_limited" ? state.streamingId : messageId,
         rateLimitedUntil: event.type === "rate_limited" ? event.until : state.rateLimitedUntil,
       };
+    }
+    case "approval": {
+      const a = action.approval;
+      const loose = state.loose.filter((x) => x.id !== a.id);
+      if (!state.messages.some((m) => m.id === a.turn_message_id)) return { ...state, loose: upsert(loose, a) };
+      const messages = state.messages.map((m) => (m.id === a.turn_message_id ? { ...m, approvals: upsert(m.approvals, a) } : m));
+      return { ...state, messages, loose };
     }
   }
 }

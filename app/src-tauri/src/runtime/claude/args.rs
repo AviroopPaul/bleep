@@ -9,6 +9,7 @@ pub const ALLOWED_TOOLS: &str = "mcp__bleep";
 pub const MIN_VERSION: (u64, u64, u64) = (2, 1, 0);
 /// Env vars that must never reach bleep's Claude: an API key would bill per token
 /// instead of using the subscription, and the CLAUDECODE markers come from a parent session.
+pub const MCP_TOOL_TIMEOUT_MS: &str = "660000";
 pub const SCRUBBED_ENV: &[&str] = &["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"];
 
 pub struct RunFiles {
@@ -50,13 +51,23 @@ pub fn one_shot_args(prompt: &str, schema: &serde_json::Value, model: &str) -> V
     a
 }
 
+/// The `--mcp-config` body for bleep's server.
+/// `timeout` lifts Claude Code's 300 s limit on a silent tool call for this server only:
+/// a write tool waits up to 10 minutes on an approval card.
+pub fn mcp_config_json(mcp: &crate::runtime::McpEndpoint) -> serde_json::Value {
+    serde_json::json!({"mcpServers": {"bleep": {
+        "type": "http",
+        "url": mcp.url,
+        "headers": {"Authorization": format!("Bearer {}", mcp.token)},
+        "timeout": MCP_TOOL_TIMEOUT_MS.parse::<u64>().expect("number"),
+    }}})
+}
+
 pub fn write_run_files(paths: &BleepPaths, cfg: &SessionConfig) -> anyhow::Result<RunFiles> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
     let mcp_config = paths.run.join("mcp.json");
-    let body = serde_json::json!({"mcpServers": {"bleep": {
-        "type": "http", "url": cfg.mcp.url, "headers": {"Authorization": format!("Bearer {}", cfg.mcp.token)}
-    }}});
+    let body = mcp_config_json(&cfg.mcp);
     let _ = std::fs::remove_file(&mcp_config);
     std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&mcp_config)?.write_all(body.to_string().as_bytes())?;
     let system_prompt = paths.run.join("system-prompt.md");
@@ -86,6 +97,8 @@ pub fn version_ok(v: &str) -> bool {
 pub fn base_command(bin: &Path, paths: &BleepPaths) -> tokio::process::Command {
     let mut c = tokio::process::Command::new(bin);
     c.env("CLAUDE_CONFIG_DIR", &paths.claude_home).current_dir(&paths.claude_work);
+    // An approval card may wait up to 10 minutes; the MCP call must outlive it.
+    c.env("MCP_TOOL_TIMEOUT", MCP_TOOL_TIMEOUT_MS);
     for k in SCRUBBED_ENV {
         c.env_remove(k);
     }
@@ -95,6 +108,15 @@ pub fn base_command(bin: &Path, paths: &BleepPaths) -> tokio::process::Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn child_env_sets_mcp_tool_timeout() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = crate::paths::BleepPaths::from_root(dir.path().into());
+        let c = base_command(Path::new("/bin/echo"), &paths);
+        let envs: Vec<_> = c.as_std().get_envs().map(|(k, v)| (k.to_os_string(), v.map(|v| v.to_os_string()))).collect();
+        assert!(envs.contains(&("MCP_TOOL_TIMEOUT".into(), Some("660000".into()))), "{envs:?}");
+    }
     use crate::config::Tiers;
     use crate::paths::BleepPaths;
     use crate::runtime::{McpEndpoint, SessionConfig, Tier};
@@ -165,6 +187,10 @@ mod tests {
         assert_eq!(mcp["mcpServers"]["bleep"]["type"], "http");
         assert_eq!(mcp["mcpServers"]["bleep"]["url"], "http://127.0.0.1:5555/mcp");
         assert_eq!(mcp["mcpServers"]["bleep"]["headers"]["Authorization"], "Bearer tok");
+        // Claude Code drops a silent tool call after 300 s unless the server sets its own
+        // timeout; an approval card may wait 10 minutes.
+        assert_eq!(mcp["mcpServers"]["bleep"]["timeout"], 660_000);
+        assert_eq!(mcp, mcp_config_json(&cfg(None).mcp));
         assert_eq!(std::fs::metadata(&f.mcp_config).unwrap().permissions().mode() & 0o777, 0o600);
         assert_eq!(std::fs::read_to_string(&f.system_prompt).unwrap(), "You are bleep.");
     }

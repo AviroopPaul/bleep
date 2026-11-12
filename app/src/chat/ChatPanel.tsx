@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, healthOk, onChatEvent, type Message, type RuntimeHealth } from "../ipc";
+import { api, healthOk, onApproval, onChatEvent, onNotice, type Message, type RuntimeHealth } from "../ipc";
 import { chatReducer, emptyChat, formatBackAt } from "./chatReducer";
 import { ToolSteps } from "./ToolSteps";
+import { ApprovalCard } from "./ApprovalCard";
+import { Markdown } from "./Markdown";
 import { DROID_HEAD } from "../droid/droidSvg";
 
 const PAGE = 50;
@@ -10,15 +12,17 @@ const SUGGESTIONS = ["What time is it in Tokyo?", "What day is it today?"];
 
 function Bubble({ m }: { m: Message }) {
   if (m.role === "system") return <div className="msg sys">{m.content}</div>;
+  if (m.role === "user" && m.kind === "scheduled") return <div className="msg sched"><span className="tag">scheduled</span>{m.content}</div>;
   if (m.role === "user") return <div className="msg me">{m.content}</div>;
   const waiting = m.status === "streaming" && !m.content && !m.tool_steps.length;
   return (
     <div className={`msg bot ${m.status === "error" ? "error" : ""}`}>
       <ToolSteps steps={m.tool_steps} />
+      {m.approvals?.map((a) => <ApprovalCard key={a.id} a={a} />)}
       {waiting ? (
         <span className="typing" aria-label="bleep is thinking"><i /><i /><i /></span>
       ) : (
-        <span className="text">{m.content}</span>
+        <span className="text"><Markdown text={m.content} /></span>
       )}
       {m.status === "interrupted" && <span className="note">Interrupted</span>}
     </div>
@@ -32,6 +36,7 @@ export function ChatPanel() {
   const [sending, setSending] = useState(false);
   const [noMore, setNoMore] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -46,6 +51,8 @@ export function ChatPanel() {
     });
     void checkHealth();
     const un = onChatEvent(({ message_id, event }) => dispatch({ type: "event", messageId: message_id, event }));
+    const unApproval = onApproval((approval) => dispatch({ type: "approval", approval }));
+    const unNotice = onNotice(setNotice);
     const unFocus = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
       if (focused) {
         input.current?.focus();
@@ -56,6 +63,8 @@ export function ChatPanel() {
     window.addEventListener("keydown", onKey);
     return () => {
       void un.then((f) => f());
+      void unApproval.then((f) => f());
+      void unNotice.then((f) => f());
       void unFocus.then((f) => f());
       window.removeEventListener("keydown", onKey);
     };
@@ -102,6 +111,7 @@ export function ChatPanel() {
       dispatch({ type: "sent", user, assistantId });
       setDraft("");
       setSendError(null);
+      setNotice(null);
     } catch (e) {
       const msg = String(e);
       if (msg !== "busy") {
@@ -150,8 +160,10 @@ export function ChatPanel() {
 
       <div className="log" ref={log} onScroll={onScroll} aria-live="polite">
         {state.messages.map((m) => <Bubble key={m.id} m={m} />)}
+        {state.loose.map((a) => <ApprovalCard key={a.id} a={a} />)}
         {limited && <div className="msg sys">{formatBackAt(state.rateLimitedUntil!)}</div>}
         {sendError && <div className="msg sys err" role="alert">{sendError}</div>}
+        {notice && <div className="msg sys" role="status">{notice}</div>}
       </div>
 
       {ok && state.messages.length === 0 && (

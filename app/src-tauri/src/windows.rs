@@ -10,6 +10,8 @@ use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, Webvie
 
 pub const DROID: Size = Size { w: 132.0, h: 132.0 };
 pub const CHAT: Size = Size { w: 400.0, h: 600.0 };
+pub const BAR: Size = Size { w: 560.0, h: 64.0 };
+pub const BUBBLE: Size = Size { w: 240.0, h: 72.0 };
 /// Gap between the droid and the chat panel.
 pub const GAP: f64 = 8.0;
 /// Space kept between a window and the screen edge.
@@ -63,6 +65,19 @@ pub fn tuck_pos(droid: Rect, screen: Rect) -> Point {
     Point { x, y: droid.y }
 }
 
+/// Top center of the work area, just under the menu bar.
+pub fn bar_pos(work: Rect, bar: Size) -> Point {
+    Point { x: work.x + (work.w - bar.w) / 2.0, y: work.y + 6.0 }
+}
+
+/// Centered above the droid; below it when there is no room above; kept on screen.
+pub fn bubble_pos(droid: Rect, screen: Rect, b: Size) -> Point {
+    let above = droid.y - GAP - b.h;
+    let y = if above >= screen.y + MARGIN { above } else { droid.y + droid.h + GAP };
+    let x = droid.x + droid.w / 2.0 - b.w / 2.0;
+    Point { x: clamp(x, screen.x + MARGIN, screen.x + screen.w - MARGIN - b.w), y }
+}
+
 pub fn center_pos(screen: Rect, chat: Size) -> Point {
     Point { x: screen.x + (screen.w - chat.w) / 2.0, y: screen.y + (screen.h - chat.h) / 2.0 }
 }
@@ -83,7 +98,8 @@ pub fn restore_pos(saved: Option<(f64, f64)>, screens: &[Rect], droid: Size) -> 
 pub struct UiState {
     /// Where the droid was before it was tucked.
     pub tucked: Mutex<Option<Point>>,
-    pub paused: AtomicBool,
+    /// Shared with the scheduler: on means no proactive output.
+    pub paused: std::sync::Arc<AtomicBool>,
     save_gen: AtomicU64,
 }
 
@@ -95,7 +111,7 @@ pub enum Anchor {
 }
 
 /// Logical work areas of all screens, primary first.
-fn screens(app: &AppHandle) -> Vec<Rect> {
+pub(crate) fn screens(app: &AppHandle) -> Vec<Rect> {
     let to_rect = |m: &tauri::Monitor| {
         let s = m.scale_factor();
         let wa = m.work_area();
@@ -117,14 +133,14 @@ fn screens(app: &AppHandle) -> Vec<Rect> {
     out
 }
 
-fn rect_of(w: &WebviewWindow) -> Option<Rect> {
+pub(crate) fn rect_of(w: &WebviewWindow) -> Option<Rect> {
     let s = w.scale_factor().ok()?;
     let p = w.outer_position().ok()?.to_logical::<f64>(s);
     let z = w.outer_size().ok()?.to_logical::<f64>(s);
     Some(Rect { x: p.x, y: p.y, w: z.width, h: z.height })
 }
 
-fn screen_of(app: &AppHandle, r: Rect) -> Rect {
+pub(crate) fn screen_of(app: &AppHandle, r: Rect) -> Rect {
     let all = screens(app);
     all.iter().copied().find(|s| s.contains(r.x + r.w / 2.0, r.y + r.h / 2.0)).unwrap_or(all[0])
 }
@@ -183,6 +199,24 @@ pub fn create_windows(app: &AppHandle, cfg: &Config) -> tauri::Result<()> {
         )
         .build()?;
     float_everywhere(&chat);
+    for (label, size) in [("bar", BAR), ("bubble", BUBBLE)] {
+        let w = WebviewWindowBuilder::new(app, label, WebviewUrl::App(format!("index.html#{label}").into()))
+            .title("bleep")
+            .inner_size(size.w, size.h)
+            .transparent(true)
+            .decorations(false)
+            .shadow(false)
+            .resizable(false)
+            .always_on_top(true)
+            .visible_on_all_workspaces(true)
+            .skip_taskbar(true)
+            .visible(false)
+            .focused(false)
+            .focusable(false)
+            .accept_first_mouse(true)
+            .build()?;
+        float_everywhere(&w);
+    }
     Ok(())
 }
 
@@ -265,8 +299,9 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     };
     // A dev build must never register itself at login, so the item is greyed out there.
     let login = CheckMenuItem::with_id(app, "login", "Launch at login", crate::startup::IS_RELEASE, login_on, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit bleep", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&toggle, &open, &pause, &login, &PredefinedMenuItem::separator(app)?, &quit])?;
+    let menu = Menu::with_items(app, &[&toggle, &open, &pause, &login, &settings, &PredefinedMenuItem::separator(app)?, &quit])?;
     let mut tray = TrayIconBuilder::with_id("bleep").tooltip("bleep").menu(&menu).show_menu_on_left_click(true);
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
@@ -296,6 +331,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             }
             let _ = login.set_checked(al.is_enabled().unwrap_or(false));
         }
+        "settings" => crate::settings::open_settings(app),
         "quit" => app.exit(0),
         _ => {}
     })
@@ -312,6 +348,28 @@ mod tests {
 
     fn droid(x: f64, y: f64) -> Rect {
         Rect { x, y, w: 132.0, h: 132.0 }
+    }
+
+    #[test]
+    fn bar_is_centered_under_the_menu_bar() {
+        let p = bar_pos(SCREEN, BAR);
+        assert_eq!(p, Point { x: (1440.0 - 560.0) / 2.0, y: 25.0 + 6.0 });
+        let second = Rect { x: 1440.0, y: 0.0, w: 1920.0, h: 1055.0 };
+        assert_eq!(bar_pos(second, BAR).x, 1440.0 + (1920.0 - 560.0) / 2.0);
+    }
+
+    #[test]
+    fn bubble_sits_above_droid_or_below_at_top_edge() {
+        let p = bubble_pos(droid(600.0, 600.0), SCREEN, BUBBLE);
+        assert_eq!(p, Point { x: 600.0 + 66.0 - 120.0, y: 600.0 - GAP - 72.0 });
+        let p = bubble_pos(droid(600.0, 40.0), SCREEN, BUBBLE);
+        assert_eq!(p.y, 40.0 + 132.0 + GAP);
+    }
+
+    #[test]
+    fn bubble_stays_on_screen_at_side_edges() {
+        assert_eq!(bubble_pos(droid(0.0, 600.0), SCREEN, BUBBLE).x, MARGIN);
+        assert_eq!(bubble_pos(droid(1440.0 - 132.0, 600.0), SCREEN, BUBBLE).x, 1440.0 - MARGIN - 240.0);
     }
 
     #[test]

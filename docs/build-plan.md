@@ -2,7 +2,7 @@
 
 Status: draft for approval · 12 Nov 2026 · owner: Aviroop
 
-bleep is a small droid that floats on my MacBook. It reads my mail and calendar, tells me what matters before I ask, and does small jobs after I say yes. The landing page is live at https://bleep-omega.vercel.app. This plan covers the app itself.
+bleep is a small droid that floats on my MacBook. It reads my mail and calendar, watches my Claude Code and Codex sessions, tells me what matters before I ask, and does small jobs after I say yes. The landing page is live at https://bleep-omega.vercel.app. This plan covers the app itself.
 
 Prior work: `~/Documents/code/valet/docs/architecture.html` (9 Nov). It has the competitor study, the Claude Code headless research, the triage funnel and the threat model. Reuse its ideas. This plan replaces its shape (Python daemon + Telegram) with a native desktop app in Rust.
 
@@ -11,6 +11,7 @@ Prior work: `~/Documents/code/valet/docs/architecture.html` (9 Nov). It has the 
 ## 1. Why
 
 - **The moment:** I miss things that sit in my mail and calendar. A meeting starts and I am not ready. A bill is due today and I forget. A reply waits for two days.
+- **The other moment:** I run several Claude Code and Codex sessions at once. Half of them sit idle, waiting for me to type "yes" to `npm test` or to look at a screenshot. I find out when I come back.
 - **The fix:** a companion that watches those sources for me and taps me at the right moment, in a small bar I can read at a glance.
 - **Why a droid:** it should feel like a buddy on the screen, not a dashboard. Cute matters.
 - **Why now:** proactive assistants (ChatGPT Dots, Grok Bot, minimi) shipped in the last three months. None of them runs on my own Mac with the AI plan I already pay for.
@@ -26,6 +27,7 @@ Prior work: `~/Documents/code/valet/docs/architecture.html` (9 Nov). It has the 
 - **G6. Connectors:** Gmail and Google Calendar first. New sources plug in through one interface.
 - **G7. Memory:** it learns how I work and I can read and edit what it knows.
 - **G8. Light:** idle CPU near zero, low RAM, no battery drain.
+- **G9. Unblock my coding agents:** bleep sees every Claude Code and Codex session that waits on me. It approves the safe asks my rules allow (tests, lint, reads, a screenshot that matches the ask), and puts everything else on my list with a short summary.
 
 ## 3. Non-goals (for now)
 
@@ -40,16 +42,17 @@ Prior work: `~/Documents/code/valet/docs/architecture.html` (9 Nov). It has the 
 
 - **Nagging:** if it pings so often that I hide it, it failed. Silence is the default.
 - **Acting without asking:** sending mail, creating or moving events, or changing anything outside the Mac without my tap.
+- **A bad auto-approve:** one approved `git push --force`, deploy, delete or secret read is a failure, even if every other call was right.
 - **Burning my plan:** I am on the $20 Claude Pro plan and I share its limits with my own coding. bleep must not eat that budget.
 - **Heavy:** an Electron-sized app, a spinning fan, or a slow summon.
 - **Leaky:** my mail going anywhere except Google and the AI vendor I picked, through my own login.
 
 ## 5. Constraints
 
-- **Personal use only, for now.** Anthropic's and OpenAI's terms allow my own subscription login in a tool I run for myself. If bleep is ever shared, other people use their own API key (Phase 8) or their own CLI login.
+- **Personal use only, for now.** Anthropic's and OpenAI's terms allow my own subscription login in a tool I run for myself. If bleep is ever shared, other people use their own API key (Phase 9) or their own CLI login.
 - **macOS 15+ on Apple Silicon.** Test machine: my M1 MacBook.
 - **At least one agent CLI installed and signed in.** Tested here: Claude Code 2.1.319, Codex CLI 0.164.0. bleep checks the version at start and shows a clear message if the chosen one is missing or signed out.
-- **My own Google Cloud project** for Gmail and Calendar access. One-time setup, about 15 minutes (section 8.4).
+- **bleep's own Google Cloud app** for Gmail and Calendar access, built into the app. A user only signs in with their Google account. Using your own Cloud app stays possible in settings (section 8.4).
 - **Data stays local.** Everything on disk under `~/.bleep/`. Secrets in the macOS Keychain.
 - **No em dashes in any user-facing copy**, including prompts that write copy.
 
@@ -69,6 +72,8 @@ Prior work: `~/Documents/code/valet/docs/architecture.html` (9 Nov). It has the 
 | D8 | **SQLite + Markdown** | Postgres, vector DB | One user, small data. FTS5 search is enough. |
 | D9 | **Own compaction** at a set token count | Each CLI's built-in compact | Same behaviour under every runtime. Facts saved to memory first, and a visible marker in the chat. |
 | D10 | **Rules first, small model second, main model last** | One big model for everything | Protects my plan. Most events are noise and cost nothing. |
+| D11 | **Watch coding agents through their own hooks and protocols:** Claude Code hooks, the Codex app-server | Reading the screen, typing into terminals | Both tools expose "waiting on you" as data. Approvals go back through the same channel the tool already trusts. No screen automation (non-goal). |
+| D12 | **Agent approvals are decided by rules in code.** The model may only make a call stricter | Letting the model decide | The ask text comes from an agent that may have read untrusted pages. A model can be talked into "yes". A rule cannot. |
 
 Considered and dropped on 12 Nov 2026: using Google's official Gmail and Calendar MCP servers through my claude.ai connectors. They work in headless Claude Code today, but only Claude can reach them, so they fail G5.
 
@@ -89,6 +94,8 @@ bleep.app (Tauri, one process)
 │   │                                         and calls the connector registry directly
 │   ├── MCP server (in-process, 127.0.0.1) ── tools from connectors, through the approval gate
 │   ├── Connectors: Gmail, Google Calendar (later Dayblocks, others)
+│   ├── Agent watch: Claude Code hooks ◀── bleep-hook ◀── my claude sessions
+│   │                Codex app-server  ◀── JSON-RPC client ── my codex sessions
 │   ├── Watchers + scheduler ── events ── triage ── notifier
 │   ├── Store: SQLite (~/.bleep/bleep.db) + memory files (~/.bleep/memory/)
 │   └── Keychain: Google refresh token, MCP bearer token
@@ -111,6 +118,8 @@ Menu bar icon (tray): show or hide droid, open chat, pause bleep (stops all proa
     RULES.md           # VIPs, muted senders, my rules
     MEMORY.md          # learned facts, approved by me
     daily/2026-11-12.md
+  agent-rules.toml     # what bleep may auto-approve in my coding agents, and what always asks
+  bleep.sock           # local socket the bleep-hook binary talks to
   claude-home/         # CLAUDE_CONFIG_DIR for bleep's Claude Code (separate from ~/.claude)
   codex-home/          # CODEX_HOME for bleep's Codex (separate from ~/.codex)
   logs/bleep.log
@@ -122,7 +131,8 @@ Menu bar icon (tray): show or hide droid, open chat, pause bleep (stops all proa
 bleep/
   landing/             # the live landing page (keep as is)
   app/
-    src-tauri/         # Rust: main.rs, runtime/, mcp/, connectors/, proactive/, store/, policy/, hotkey/
+    src-tauri/         # Rust: main.rs, runtime/, mcp/, connectors/, proactive/, store/, policy/, hotkey/, agentwatch/
+    bleep-hook/        # tiny binary that Claude Code hooks call; forwards to ~/.bleep/bleep.sock
     src/               # React: droid/, chat/, bar/, settings/
   docs/build-plan.md   # this file
 ```
@@ -169,9 +179,10 @@ pub trait AgentRuntime: Send + Sync {
 - **Keep it warm:** one child process stays alive for the main chat. Each new message is one JSON line on stdin. If the child dies, restart it with `--resume`.
 - **One-shots:** a separate `claude -p --output-format json --json-schema ... --model haiku --tools "" --no-session-persistence`. About 2.6 s per call (measured in the Valet doc).
 - **Tested on 12 Nov 2026:** `--strict-mcp-config` with `--setting-sources ""` runs fine headless and loads no other servers.
+- **Learned in Phase 2:** Claude Code 2.1.319 aborts an MCP tool call that sends nothing for 300 s, and `MCP_TOOL_TIMEOUT` does not lift that. A per-server `"timeout": 660000` in the MCP config does: a live probe held a write call on an approval card for 371 s and the answer reached the model.
 - **Learned in Phase 1:** a stale `--resume` id fails within about 0.5 s with no input, so `start_session` waits up to 1.5 s when resuming. `ANTHROPIC_API_KEY` and the `CLAUDECODE` markers are removed from the child's env so it always uses the subscription. bleep's MCP server runs stateless with plain JSON replies, and Claude Code accepts that.
 
-#### Codex backend (Phase 5)
+#### Codex backend (Phase 6)
 
 - **Chat:** Codex's `app-server` mode, a long-lived JSON-RPC process over stdio (the same API the Codex IDE extensions use). Start a thread, send turns, read streamed events, resume a thread by id.
 - **Tools:** add bleep's MCP server as a streamable HTTP server with a bearer token (Codex config supports `url` plus `bearer_token_env_var`), passed through `-c` config overrides so I do not touch my own `~/.codex/config.toml`.
@@ -180,7 +191,7 @@ pub trait AgentRuntime: Send + Sync {
 - **One-shots:** `codex exec --json --output-schema <file>` (flag confirmed in the source).
 - **Source to read:** the Codex repo is cloned at `~/Documents/code/codex` (`codex-rs/app-server-protocol`, `codex-rs/exec`). The app-server protocol crate is Rust and may be usable directly.
 
-#### API backend, bring your own key (Phase 8)
+#### API backend, bring your own key (Phase 9)
 
 - **No CLI.** bleep runs the agent loop itself: send messages and tool specs, stream the reply, run tool calls through the same registry and approval gate, send results back, repeat (max 8 steps).
 - **Providers:** Anthropic, OpenAI, Google Gemini, OpenRouter, and any OpenAI-compatible endpoint (Ollama, LM Studio, Groq and others). Two wire formats cover most of them: Anthropic Messages and OpenAI Chat Completions. Pick a maintained multi-provider Rust crate at build time, or write thin clients for those two formats.
@@ -229,12 +240,15 @@ pub trait Connector: Send + Sync {
 
 ### 8.4 Google sign-in (shared by Calendar and Gmail)
 
-- **One-time setup (me, about 15 min):** create a Google Cloud project, enable the Gmail API and the Calendar API, create an OAuth client of type "Desktop app", and set the consent screen to "In production". "Testing" status expires refresh tokens every 7 days. Unverified is fine for one user. The settings screen links to these steps.
+- **bleep's own client (decided 12 Nov 2026):** one OAuth client of type "Desktop app" in my Google Cloud project, compiled into the app from `BLEEP_GOOGLE_CLIENT_ID` and `BLEEP_GOOGLE_CLIENT_SECRET` (kept in my shell secrets, never in git). Google treats a desktop client's secret as public; PKCE protects each sign-in. No auth server: it would add a dependency that must stay up and put every user's tokens through it, for no security gain.
+- **For users:** open Settings, press Connect Google, sign in. Nothing else.
+- **One-time setup (me, about 15 min):** enable the Gmail API and the Calendar API, create the Desktop app client, set the consent screen to "In production". "Testing" expires refresh tokens every 7 days.
+- **Own client (advanced):** settings can hold a user's own client ID and secret, which win over the built-in one. Changing the client forgets the sign-in, because a refresh token only works with the client that issued it.
 - **Sign-in:** loopback redirect with PKCE (the `oauth2` crate). bleep opens the Google consent page in my default browser once.
 - **Scopes:** `calendar.events`, `gmail.readonly`, `gmail.compose`. Never the full `mail.google.com` scope.
-- **Storage:** client id and secret in `config.toml`, refresh token in the Keychain (`keyring` crate), access token in memory only.
+- **Storage:** an own client in `config.toml` (mode 600), refresh token in the Keychain (`keyring` crate), access token in memory only.
 - **HTTP:** plain `reqwest` calls to the REST APIs. Skip the heavy generated Google crates.
-- **If shared later:** a public app that reads Gmail needs Google's restricted-scope security review. Out of scope while bleep is personal.
+- **Google's review:** until the app is verified, Google shows an "unverified app" warning and allows at most 100 users. The Gmail scopes are restricted: a public launch needs Google's verification plus a yearly paid security assessment. Calendar alone needs only the lighter, free verification.
 
 ### 8.5 Proactive engine
 
@@ -269,8 +283,8 @@ Where proactive output shows up:
   2. A `main` one-shot writes a summary of the session (target about 3K tokens): open loops, decisions, people, pending approvals.
   3. bleep starts a new session. Its first message holds the summary plus the last 10 turns.
   4. The chat shows a divider: "Compacted 250K into a 3K summary. Facts saved to memory."
-- **Context window:** the threshold only works if the model's window is larger than it. In Phase 4, check the window each runtime actually gets on my plan. If it is 200K, the threshold becomes 80% of the window (160K) and settings says so.
-- **Built-in compact:** both CLIs may compact on their own near their limit. Check this in Phase 4 and turn it off for bleep's sessions where a setting exists, so only bleep's compaction runs.
+- **Context window:** the threshold only works if the model's window is larger than it. In Phase 5, check the window each runtime actually gets on my plan. If it is 200K, the threshold becomes 80% of the window (160K) and settings says so.
+- **Built-in compact:** both CLIs may compact on their own near their limit. Check this in Phase 5 and turn it off for bleep's sessions where a setting exists, so only bleep's compaction runs.
 
 ### 8.7 Memory
 
@@ -302,16 +316,41 @@ mail_cache    thread_id, from, subject, snippet, labels, triage, amount, due, la
 pings         id, kind, ref_id, sent_at, feedback
 llm_calls     id, runtime, tier, purpose, tokens_in, tokens_out, created_at
 cursors       connector, value
+agent_sessions id, tool (claude|codex), project, transcript_path, state (running|waiting|done), last_ask, updated
+agent_asks    id, session_id, kind (permission|question), payload, checks, decision (auto|approved|denied|queued|expired), rule, decided_at
 mem_fts       FTS5 over memory/*.md and messages
 ```
 
 ### 8.10 Security
 
+- **Prompt injection through coding agents:** an agent's ask and transcript can carry text from web pages or files it read. Rules decide every auto-approve (D12). Transcripts go to the model labelled as untrusted. The model can move an ask to "needs you", never to "approved".
 - **Prompt injection in mail** is the main risk. Mail text goes to the model wrapped and labelled as untrusted. There is no forward tool. Every send needs my tap on a card that shows the real recipient and body. A new recipient gets a red warning on the card.
 - **No other way out:** each runtime runs with its built-in tools off (or locked down, section 8.1). Only bleep's MCP tools.
 - **Local only:** MCP server binds to `127.0.0.1` with a bearer token. No other port opens.
 - **Secrets:** Keychain only. Never in logs, never in prompts.
 - **Audit:** every tool call, approval and model call is in SQLite and visible in a settings "Activity" tab.
+
+### 8.11 Agent watch (Claude Code and Codex sessions)
+
+This is about my own coding sessions, not bleep's brain. bleep's own runtime (8.1) runs with `--setting-sources ""`, so it never triggers these hooks.
+
+**Seeing who waits**
+- **Claude Code:** bleep installs hooks in my user settings (`~/.claude/settings.json`), with my consent and a one-click remove. `Notification` fires when a session waits for permission or sits idle. `Stop` fires when a turn ends. Each hook runs a tiny `bleep-hook` binary that sends the hook JSON to `~/.bleep/bleep.sock`.
+- **Codex:** my Codex sessions share one local app-server daemon (`codex agents` lists them). bleep connects as one more JSON-RPC client and receives approval requests for commands and patches. Codex's `notify` setting already points at Codex Computer Use, so bleep chains after it and never replaces it.
+- **Context:** transcripts are JSONL (`~/.claude/projects/`, `~/.codex/sessions/`). bleep reads the last turn, the ask, test output and any screenshot. Read-only.
+
+**Deciding**
+- **Rules first:** `agent-rules.toml` has two lists: `auto` (tests, lint, typecheck, file reads, git status and diff, screenshot checks) and `ask` (push, deploy, delete, `rm`, secrets and `.env`, network installs, payments, anything outside the repo). Anything on neither list asks.
+- **Checks before an auto-approve:** the command matches an `auto` rule exactly, runs inside the session's repo, and touches no `ask` pattern. For "looks right?" questions with a screenshot, a `small` one-shot compares the image with the original ask and answers yes or no with a reason. A "no" or a low-confidence "yes" goes to me.
+- **The model can only make it stricter** (D12).
+
+**Acting**
+- **Permission prompts (clean):** the `PreToolUse` or `PermissionRequest` hook waits for bleep's answer and returns allow or deny. Codex approvals are answered over the app-server.
+- **Fail closed to me:** if bleep is not running, slow (over 20 s), or unsure, the hook returns no decision and the normal prompt shows in the terminal. bleep never approves by default.
+- **Idle questions (harder):** a live terminal has no API for typing a reply. The `Stop` hook can return a reason that continues the session, but only at that moment. Later replies go through `claude --resume` or the Codex app-server, or wait for me.
+- **Everything else:** goes on my list with a one-line summary, and shows in the chat, the droid bubble and the next check-in ("2 agents need you").
+
+**Where it shows up:** an "Agents" view in the chat panel (waiting, handled, needs you), approval cards for queued asks, and a log of every auto-approve with the rule that allowed it.
 
 ---
 
@@ -338,7 +377,7 @@ Done when: I can double-tap ⌥ anywhere, ask "what time is it in Tokyo", see th
 ### Phase 2. Calendar and the meeting bar
 
 Deliverables:
-- Google sign-in (section 8.4), connect from settings, with the setup steps linked.
+- Google sign-in (section 8.4) with bleep's built-in client: Connect Google in settings. Own client as an advanced option.
 - Calendar connector: `calendar_list`, `calendar_next`, `calendar_free` (read), `calendar_create`, `calendar_update`, `calendar_delete`, `calendar_respond` (write).
 - Approval cards in the chat and the waiting write gate (section 8.2).
 - Calendar watcher + cache + scheduler timers.
@@ -351,6 +390,7 @@ Done when: the bar shows up 1 hour before a real meeting on my calendar, "Prep m
 
 Deliverables:
 - Gmail connector: `gmail_search`, `gmail_read_thread` (read), `gmail_draft` (safe), `gmail_send` (write).
+  - **Built early (12 Nov 2026, with Phase 2):** all four tools. `gmail_send` shows a card with the exact email, warns about recipients I have never mailed, and stops after 10 sends a day. Replies keep the thread (`In-Reply-To`, `References`). The rest of Phase 3 (watcher, triage, check-ins) is still to do.
 - Gmail watcher (history polling) + rules triage in Rust + `small` one-shot for unclear mail.
 - Scheduled turns: morning brief 9:00, check-ins 13:00 and 18:00 (times in settings).
 - Bill and due-date detection, with an offer to add a calendar reminder.
@@ -360,7 +400,20 @@ Deliverables:
 
 Done when: a real bill mail leads to a reminder offer at the next check-in, a draft reply lands in Gmail drafts, the send happens only after I approve the card, and a promo mail never pings me.
 
-### Phase 4. Memory and compaction
+### Phase 4. Agent watch: Claude Code and Codex
+
+Deliverables:
+- `bleep-hook` binary and the local socket. Install and remove the Claude Code hooks from settings, with a clear consent screen.
+- Codex app-server client for my own sessions, chained after the existing `notify` program.
+- Session list from hooks and transcripts: waiting, running, done. An "Agents" view in the chat panel.
+- Step 1, read-only: waiting sessions go on my list with a summary. Droid bubble and check-ins say "N agents need you". No approvals yet.
+- Step 2, approvals: `agent-rules.toml`, the checks, allow or deny through the hook and the app-server, fail closed to the normal prompt.
+- Screenshot check with a `small` one-shot.
+- Log of every auto-approve and denial in the Activity tab.
+
+Done when: I leave four sessions running and walk away. When I come back, `npm test` was approved and passed, a matching screenshot got "go on", a `git push --force` is waiting for me with a summary, and the terminal still shows the normal prompt for anything bleep was not sure about.
+
+### Phase 5. Memory and compaction
 
 Deliverables:
 - `~/.bleep/memory/` files, loaded into the system prompt.
@@ -371,7 +424,7 @@ Deliverables:
 
 Done when: I can tell it "Sync means my 1:1 with Priya" and it uses that a week later, and a forced compaction (threshold set low for testing) keeps the chat working with no lost open loops.
 
-### Phase 5. Codex runtime
+### Phase 6. Codex runtime
 
 Deliverables:
 - Codex backend for `AgentRuntime` (section 8.1): app-server for chat, `codex exec --json` for one-shots, bleep's MCP server passed in by config override.
@@ -381,7 +434,7 @@ Deliverables:
 
 Done when: I switch to Codex in settings, the chat carries on with context, the 13:00 check-in runs on Codex, and an email send still shows the same approval card.
 
-### Phase 6. More connectors
+### Phase 7. More connectors
 
 Deliverables:
 - Dayblocks connector: `dayblocks_tasks` (read), `dayblocks_add`, `dayblocks_update`, `dayblocks_move` (write). Uses the REST API at `dayblocks.vercel.app`.
@@ -391,7 +444,7 @@ Deliverables:
 
 Done when: the 18:00 check-in lists my open Dayblocks tasks and moves them to tomorrow after I approve.
 
-### Phase 7. 3D droid
+### Phase 8. 3D droid
 
 Deliverables:
 - A 3D droid model (GLB) with idle, think, alert and happy animations, rendered with three.js in the droid window.
@@ -400,7 +453,7 @@ Deliverables:
 
 Done when: the 3D droid idles at under 3% CPU on my M1 and reacts to every state the 2D droid has.
 
-### Phase 8. Bring your own key
+### Phase 9. Bring your own key
 
 Deliverables:
 - API backend for `AgentRuntime` (section 8.1): bleep's own tool loop, Anthropic and OpenAI-compatible formats first, then Gemini.
@@ -418,20 +471,24 @@ Later, if bleep is shared with other people (not planned): each user needs their
 - **Rust unit tests:** each runtime's stream parser (recorded CLI output as fixtures), the normalised event mapping, policy gate, triage rules, scheduler timing, compaction trigger.
 - **Runtime contract tests:** one test suite that every `AgentRuntime` backend must pass against recorded fixtures (stream a reply, call `bleep_now`, report usage, report a rate limit).
 - **Connector tests:** recorded Google API responses as fixtures. No live calls in tests.
+- **Agent watch tests:** recorded hook payloads and Codex app-server messages as fixtures. A rule test suite with known-bad asks (force push, `rm -rf`, `.env` reads, commands outside the repo) that must never auto-approve.
 - **UI tests:** Playwright with headless Chromium against the Vite dev server. Never open my own browser.
 - **Manual check per phase:** the "done when" line above, on my real accounts.
+- **Where tests run (decided 12 Nov 2026):** locally, run only the tests for the feature being changed (for example `cargo test --lib connectors::gmail`, `npx vitest run src/chat/approvalView.test.ts`, `npx playwright test e2e/approval.spec.ts`). The full suites run in CI on every pull request (`.github/workflows/ci.yml`). A red PR check is fixed on the branch before merge.
 
 ## 11. Risks
 
 - **CLI flags and protocols change.** Both CLIs update often. Mitigation: version check at start, flags in one place per backend, a smoke test that runs one turn, contract tests.
 - **Plan limits.** bleep shares them with my coding. Mitigation: rules first, the `small` tier for background work, max 20 model calls an hour, pause on limit.
-- **Google setup friction.** The OAuth client and the "In production" switch are manual. Mitigation: a short guided checklist in settings with the exact clicks.
+- **Google review.** Unverified, the app warns users and caps at 100 of them; Gmail scopes need a paid yearly assessment to go public. Mitigation: decide before a public launch whether Gmail ships in the public build.
 - **Input Monitoring prompt.** macOS may reset it after each rebuild if the app is not signed with a stable identity. Mitigation: sign local builds with my local signing identity (worked for ScreenRecz).
 - **See-through windows on macOS.** Tauri needs `macOSPrivateApi` for transparency. Fine for a personal app that never goes to the App Store.
 - **Sleep.** Nothing runs while the Mac sleeps. Mitigation: catch up on wake; skip reminders for meetings that already ended; say "Back online" if the gap was over 2 hours.
 - **API spend (BYOK).** Unlike subscriptions, API calls cost money per token. Mitigation: cost meter, daily cap, `small` tier for background work.
-- **Codex built-in tools.** If the off switches do not work on the installed version, the shell tool stays in a read-only, no-network sandbox. Mitigation: verify first in Phase 5; if it is not safe enough, Codex stays off.
+- **Codex built-in tools.** If the off switches do not work on the installed version, the shell tool stays in a read-only, no-network sandbox. Mitigation: verify first in Phase 6; if it is not safe enough, Codex stays off.
 - **Prompt injection.** See 8.10. No send without my tap.
+- **Hooks and the Codex protocol change.** Mitigation: version check, a smoke test per release, and fail closed to the normal prompt.
+- **A wrong auto-approve.** Mitigation: short `auto` list by default, rules decide, the known-bad test suite, and a log I can read.
 
 ## 12. Left to the builder
 

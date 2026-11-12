@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chatReducer, emptyChat, formatBackAt, stepLabel, type ChatState } from "./chatReducer";
-import type { Message } from "../ipc";
+import type { Approval, Message } from "../ipc";
 
 const user = (id: number, content: string): Message => ({
   id, role: "user", kind: "chat", content, tool_steps: [], tokens: null, status: "done", session_id: 1, created_at: "",
@@ -69,6 +69,47 @@ describe("chatReducer", () => {
 describe("stepLabel", () => {
   it("names bleep_now in plain words and falls back to the tool name", () => {
     expect(stepLabel("bleep_now")).toBe("Checked the time");
-    expect(stepLabel("gmail_search")).toBe("gmail_search");
+    expect(stepLabel("dayblocks_tasks")).toBe("dayblocks_tasks");
+  });
+});
+
+describe("approvals", () => {
+  const ap = (id: number, turn: number | null, status: Approval["status"] = "pending"): Approval => ({
+    id, tool: "calendar_create", payload: { title: "Pay rent" }, status, turn_message_id: turn, result: null, created_at: "", decided_at: null,
+  });
+
+  it("approval attaches to its turn message", () => {
+    const s = chatReducer(sent(), { type: "approval", approval: ap(9, 2) });
+    expect(s.messages[1].approvals?.map((a) => a.id)).toEqual([9]);
+    expect(s.loose).toEqual([]);
+  });
+
+  it("approval update replaces the pending copy", () => {
+    let s = chatReducer(sent(), { type: "approval", approval: ap(9, 2) });
+    s = chatReducer(s, { type: "approval", approval: ap(9, 2, "done") });
+    expect(s.messages[1].approvals).toHaveLength(1);
+    expect(s.messages[1].approvals?.[0].status).toBe("done");
+  });
+
+  it("approval with unknown turn goes to loose, and moves in when its turn shows up", () => {
+    let s = chatReducer(emptyChat, { type: "approval", approval: ap(9, 7) });
+    expect(s.loose.map((a) => a.id)).toEqual([9]);
+    s = chatReducer(s, { type: "approval", approval: ap(9, 7, "declined") });
+    expect(s.loose).toHaveLength(1);
+    expect(s.loose[0].status).toBe("declined");
+    s = chatReducer(s, { type: "event", messageId: 7, event: { type: "text_delta", text: "ok" } });
+    s = chatReducer(s, { type: "approval", approval: ap(9, 7, "declined") });
+    expect(s.loose).toEqual([]);
+    expect(s.messages.find((m) => m.id === 7)?.approvals?.[0].id).toBe(9);
+  });
+
+  it("calendar tools have step labels", () => {
+    expect(stepLabel("calendar_create")).toBe("Adding to your calendar");
+    expect(stepLabel("calendar_list")).toBe("Checked your calendar");
+    expect(stepLabel("calendar_respond")).toBe("Replying to an invite");
+    expect(stepLabel("gmail_search")).toBe("Searched your mail");
+    expect(stepLabel("gmail_read_thread")).toBe("Read an email thread");
+    expect(stepLabel("gmail_draft")).toBe("Saved a draft");
+    expect(stepLabel("gmail_send")).toBe("Sending an email");
   });
 });
