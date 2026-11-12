@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>bleep: a little droid for your Mac</title>
-<meta name="description" content="bleep floats on your Mac. It reads your mail and calendar, and tells you what matters before you ask.">
+<meta name="description" content="bleep floats on your Mac. It watches your Claude Code and Codex sessions, your mail and your calendar. It handles the small asks and tells you what needs you.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -156,7 +156,7 @@ section{padding:84px 0}
 .mailw .ttl i, .calw .ttl i{width:15px; height:15px; display:block}
 .mailw .ttl i svg, .calw .ttl i svg{width:100%; height:100%; display:block}
 .mailw{left:3.5%; top:62px; width:340px}
-.mailw .cnt{font:600 10.5px var(--mono); color:#fff; background:var(--blue); border-radius:99px; padding:2px 6px}
+.mailw .cnt, .agw .cnt{font:600 10.5px var(--mono); color:#fff; background:var(--blue); border-radius:99px; padding:2px 6px}
 .mrow{display:grid; grid-template-columns:8px 1fr auto; column-gap:9px; padding:9px 13px 9px 11px; border-bottom:1px solid var(--line); cursor:pointer; font-size:13px; transition:background .15s, opacity .2s}
 .mrow:last-child{border-bottom:0}
 .mrow:hover{background:rgba(255,255,255,.55)}
@@ -198,6 +198,53 @@ section{padding:84px 0}
 .appr .mono{font-size:11px; color:#7E5612}
 .appr small{color:var(--muted)}
 .msg.bot p.note{font:500 11px var(--mono); color:var(--muted)}
+.msg.bot code{font:500 12px var(--mono); background:rgba(27,31,36,.06); padding:1px 5px; border-radius:5px}
+
+/* agent sessions window */
+.agw{left:3.5%; top:62px; width:624px; z-index:12; background:rgba(250,250,248,.8); border:1px solid var(--glass-line); backdrop-filter:blur(26px) saturate(1.3); -webkit-backdrop-filter:blur(26px) saturate(1.3); box-shadow:0 30px 70px -30px rgba(27,31,36,.55); transition:opacity .3s, transform .35s cubic-bezier(.2,1.2,.4,1)}
+.win.min{opacity:0; transform:translateY(40px) scale(.94); pointer-events:none}
+.mailw, .calw{transition:opacity .3s, transform .35s cubic-bezier(.2,1.2,.4,1)}
+.agw .tb{border-bottom:1px solid var(--line)}
+.agw .ttl{display:flex; align-items:center; justify-content:center; gap:7px}
+.agw .ttl i{width:15px; height:15px; display:block; border-radius:4px; overflow:hidden}
+.agw .ttl i svg{width:100%; height:100%; display:block}
+.agsum{display:flex; gap:8px; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--line); font:500 11px var(--mono); color:var(--muted)}
+.agsum span{padding:4px 8px; border-radius:7px; background:rgba(27,31,36,.05)}
+.agsum span b{color:var(--ink); font-weight:600}
+.sess{display:grid; grid-template-columns:28px minmax(0,1fr) auto; gap:11px; padding:9px 14px; border-bottom:1px solid var(--line); font-size:13px; align-items:start; transition:background .3s}
+.sess .lg{width:28px; height:28px; border-radius:8px; overflow:hidden; display:block}
+.sess .lg svg{width:100%; height:100%; display:block}
+.sess .hd{display:flex; gap:8px; align-items:baseline}
+.sess .hd b{font-weight:800}
+.sess .hd span{font:500 10.5px var(--mono); color:var(--muted)}
+.sess .ask{display:inline-block; max-width:100%; margin-top:4px; font:500 11.5px/1.35 var(--mono); color:var(--ink-2); background:rgba(27,31,36,.05); padding:4px 8px; border-radius:7px}
+.sess .nt{margin-top:5px; font:500 11px var(--mono); color:var(--sage)}
+.sess.you .nt{color:var(--rust)}
+.sess.deny .nt, .sess.run .nt{color:var(--muted)}
+.sess.check{background:rgba(76,125,184,.1)}
+.sess.you{background:rgba(236,111,85,.08)}
+.st{font:600 10.5px var(--mono); padding:4px 8px; border-radius:99px; white-space:nowrap; letter-spacing:.02em}
+.st.wait{background:rgba(200,144,46,.18); color:#7E5612}
+.st.check{background:rgba(47,92,147,.14); color:var(--blue)}
+.st.ok{background:rgba(95,122,90,.16); color:var(--sage)}
+.st.you{background:var(--db-coral); color:#fff}
+.st.deny, .st.run{background:rgba(27,31,36,.07); color:var(--muted)}
+.agrules{padding:9px 14px 11px; font:500 10.5px/1.5 var(--mono); color:var(--muted)}
+.agrules b{color:var(--sage); font-weight:600} .agrules em{font-style:normal; color:var(--rust); font-weight:600}
+.src.cc, .src.cx{padding:0}
+
+/* scene strip: a carousel over one demo */
+.scenebar{display:flex; align-items:center; gap:8px; margin-bottom:14px}
+.scenebar .arr{flex:none; width:38px; height:38px; border-radius:11px; border:1px solid var(--glass-line); background:rgba(255,255,255,.6); cursor:pointer; font:600 18px/1 var(--sans); color:var(--ink)}
+.scenebar .arr:hover{background:#fff}
+.scenetabs{flex:1; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; padding:2px}
+.scenetabs::-webkit-scrollbar{display:none}
+.scenetabs button{flex:1 0 auto; display:flex; align-items:center; gap:8px; justify-content:center; font:600 13.5px var(--sans); padding:10px 14px; border-radius:11px; border:1px solid var(--glass-line); background:rgba(255,255,255,.45); color:var(--ink-2); cursor:pointer; transition:background .2s, color .2s}
+.scenetabs button i{font:500 10.5px var(--mono); font-style:normal; color:var(--muted)}
+.scenetabs button:hover{background:rgba(255,255,255,.8)}
+.scenetabs button.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+.scenetabs button.on i{color:#B9BEC6}
+.scenetabs button.new::after{content:"new"; font:600 9.5px var(--mono); color:#fff; background:var(--db-coral); padding:2px 5px; border-radius:5px; letter-spacing:.04em}
 .flash{animation:flash 1s ease-out}
 @keyframes flash{0%{box-shadow:0 0 0 3px var(--blue-2), 0 26px 60px -28px rgba(27,31,36,.5)}100%{box-shadow:0 0 0 0 transparent, 0 26px 60px -28px rgba(27,31,36,.5)}}
 
@@ -299,7 +346,8 @@ section{padding:84px 0}
 @media (hover:none){ .fab{display:flex; position:fixed; right:16px; bottom:16px; z-index:85; width:58px; height:58px; border-radius:50%; align-items:center; justify-content:center; padding:6px} .toast{display:none} }
 
 /* ---------- use cases ---------- */
-.cases{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+.cases{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+.case.wide{grid-column:span 2}
 .case{border-radius:18px; padding:20px; display:flex; flex-direction:column; gap:12px; min-height:300px}
 .case .num{font:500 11px var(--mono); color:var(--muted); letter-spacing:.12em}
 .case h3{font:700 22px/1.1 var(--display); letter-spacing:-.01em; margin:0}
@@ -310,7 +358,7 @@ section{padding:84px 0}
 .mini .row{display:flex; align-items:center; gap:8px; padding:4px 0}
 .mini .sw{width:10px; height:10px; border-radius:3px; flex:none}
 @media (max-width:1000px){ .cases{grid-template-columns:1fr 1fr} }
-@media (max-width:620px){ .cases{grid-template-columns:1fr} }
+@media (max-width:620px){ .cases{grid-template-columns:1fr} .case.wide{grid-column:auto} }
 
 /* ---------- loop ---------- */
 .loop{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; position:relative; border-radius:22px; padding:10px}
@@ -326,7 +374,8 @@ section{padding:84px 0}
 @media (max-width:860px){ .loop{grid-template-columns:1fr} .loop .step + .step{border-left:0; border-top:1px dashed rgba(27,31,36,.15)} }
 
 /* ---------- connectors ---------- */
-.plugs{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+.plugs{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+@media (max-width:1100px){ .plugs{grid-template-columns:1fr 1fr} }
 .plug{border-radius:18px; padding:20px; display:flex; gap:14px; align-items:flex-start}
 .plug .lg{width:44px; height:44px; border-radius:12px; display:grid; place-items:center; overflow:hidden; flex:none}
 .plug .lg svg{width:100%; height:100%; display:block}
@@ -405,7 +454,9 @@ footer a{color:var(--ink-2)}
   .win .tb{cursor:default}
   .chat{height:500px; order:3}
   .chat:not(.open){opacity:1; transform:none; pointer-events:auto}
-  .mailw{order:2} .calw{order:2}
+  .mailw{order:2} .calw{order:2} .agw{order:2}
+  .win.min{display:none}
+  .sess{grid-template-columns:24px minmax(0,1fr)} .sess .st{grid-column:2; justify-self:start}
   .notch{transform:none; opacity:1; display:none; white-space:normal; order:1}
   .notch.show{display:flex; transform:none}
   .ddroid{width:76px; align-self:center; order:4}
@@ -436,7 +487,7 @@ footer a{color:var(--ink-2)}
   <header class="hero">
     <div>
       <h1 class="rv">A little droid that <span class="bl">bleeps</span> at the right moment.</h1>
-      <p class="lede rv">bleep floats on your Mac. It reads your mail and calendar. It tells you what matters before you ask, and it does the small jobs when you say yes.</p>
+      <p class="lede rv">bleep floats on your Mac. It watches your Claude Code and Codex sessions, your mail and your calendar. It handles the small asks, and it tells you what needs you.</p>
       <div class="ctas rv">
         <a class="btn primary" href="#demo">Try the demo</a>
         <a class="btn ghost" href="#cases">See what it does</a>
@@ -446,7 +497,7 @@ footer a{color:var(--ink-2)}
     <div class="stage rv">
       <div class="ring"></div><div class="ring r2"></div>
       <div class="hero-bubble" id="heroBubble">bleep bloop.</div>
-      <div class="sticker s1 glass"><span class="ic white" data-icon="ca"></span><div><b>Design review</b><span>in 60 min · with Priya</span></div></div>
+      <div class="sticker s1 glass"><span class="ic" data-icon="cc"></span><div><b>Tests passed. Approved.</b><span>Claude Code · 2 asks need you</span></div></div>
       <div class="sticker s2 glass"><span class="ic white" data-icon="gm"></span><div><b>Bill due today</b><span>City Power · ₹2,340</span></div></div>
       <div class="sticker s3 glass"><span class="ic" data-icon="me"></span><div><b>Remembered</b><span>you prep 1 hour before</span></div></div>
       <div class="droid hero-droid" id="heroDroid" data-droid="full" title="Poke me"></div>
@@ -462,6 +513,17 @@ footer a{color:var(--ink-2)}
     </div>
 
     <div class="demo-shell rv">
+      <div class="scenebar">
+        <button class="arr" id="prevScene" aria-label="Previous scene">‹</button>
+        <div class="scenetabs" id="sceneTabs">
+          <button data-go="agents" class="new"><i>01</i>Agents need you</button>
+          <button data-go="brief"><i>02</i>Morning brief</button>
+          <button data-go="checkin"><i>03</i>Inbox check</button>
+          <button data-go="meeting"><i>04</i>Meeting prep</button>
+          <button data-go="wrap"><i>05</i>Wrap-up</button>
+        </div>
+        <button class="arr" id="nextScene" aria-label="Next scene">›</button>
+      </div>
       <div class="mac" id="mac">
         <div class="wall">
           <svg viewBox="0 0 1200 660" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -485,16 +547,24 @@ footer a{color:var(--ink-2)}
         </div>
 
         <!-- Inbox window -->
-        <div class="win mailw" id="mailWin">
+        <div class="win mailw min" id="mailWin">
           <div class="tb"><span class="lights"><i></i><i></i><i></i></span><span class="ttl"><i data-icon="gm"></i>Inbox <span class="cnt" id="unreadN">0</span></span></div>
           <div id="mailList"></div>
         </div>
 
         <!-- Calendar window -->
-        <div class="win calw" id="calWin">
+        <div class="win calw min" id="calWin">
           <div class="tb"><span class="lights"><i></i><i></i><i></i></span><span class="ttl"><i data-icon="ca"></i>Calendar</span></div>
           <div class="day"><b>Today</b><span>Thu 12 Nov</span></div>
           <div id="calList"></div>
+        </div>
+
+        <!-- Agent sessions window: Claude Code + Codex sessions bleep can see -->
+        <div class="win agw" id="agWin">
+          <div class="tb"><span class="lights"><i></i><i></i><i></i></span><span class="ttl"><i data-icon="cc"></i>Agent sessions <span class="cnt" id="agN">4</span></span></div>
+          <div class="agsum" id="agSum"></div>
+          <div id="agList"></div>
+          <div class="agrules"><b>auto-approve:</b> tests · lint · reads · screenshots that match the ask &nbsp;·&nbsp; <em>always ask:</em> push · deploy · delete · secrets · money</div>
         </div>
 
         <!-- Chat window: one continuous chat -->
@@ -506,7 +576,7 @@ footer a{color:var(--ink-2)}
           <div class="ctxbar"><span>context</span><div class="blade" id="blade"><i></i></div><span id="ctxNum">212K / 250K</span></div>
           <div class="log" id="log" aria-live="polite"></div>
           <div class="sugs" id="sugs">
-            <button>Any bills due?</button><button>When is my next meeting?</button><button>Any mail from Priya?</button><button>Remind me to call mom at 7 pm</button><button>What do you remember about me?</button>
+            <button>Which agents need me?</button><button>Any bills due?</button><button>When is my next meeting?</button><button>Any mail from Priya?</button><button>Remind me to call mom at 7 pm</button><button>What do you remember about me?</button>
           </div>
           <form class="composer" id="composer"><input id="inp" placeholder="Ask bleep anything" autocomplete="off"><button>Send</button></form>
         </div>
@@ -533,9 +603,19 @@ footer a{color:var(--ink-2)}
 <section id="cases">
   <div class="wrap">
     <div class="sec-head rv">
-      <div><h2>Four jobs it does well.</h2></div>
+      <div><h2>Five jobs it does well.</h2></div>
     </div>
     <div class="cases">
+      <article class="case glass rv wide">
+        <h3>Unblocks your coding agents</h3>
+        <p>Claude Code and Codex stop to ask you things. bleep reads each ask. If it is safe and the checks pass, it approves. If not, it puts it on your list and tells you when you are back.</p>
+        <div class="mini mono" style="font-size:11px">
+          <div class="row"><span class="src cc" data-icon="cc"></span>bleep · npm test <span style="margin-left:auto;color:var(--sage)">approved · 42 passed</span></div>
+          <div class="row"><span class="src cc" data-icon="cc"></span>portfolio · mobile screenshot <span style="margin-left:auto;color:var(--sage)">matches · go on</span></div>
+          <div class="row"><span class="src cx" data-icon="cx"></span>api · git push --force <span style="margin-left:auto;color:var(--rust)">needs you</span></div>
+        </div>
+        <button class="play" data-scene="agents">▶ Play in demo</button>
+      </article>
       <article class="case glass rv">
         <h3>Catches bills and due dates</h3>
         <p>It spots bills in your mail. It puts a reminder on your calendar after you say yes.</p>
@@ -580,7 +660,7 @@ footer a{color:var(--ink-2)}
     </div>
     <div class="loop glass rv">
       <div class="wire"><i></i></div>
-      <div class="step"><h3>Watch</h3><p>Watchers check Gmail and Calendar for changes. A scheduler wakes bleep for check-ins.</p><div class="tags"><span>new mail</span><span>event soon</span><span>bill due</span></div></div>
+      <div class="step"><h3>Watch</h3><p>Watchers check Gmail and Calendar for changes. A scheduler wakes bleep for check-ins.</p><div class="tags"><span>agent waiting</span><span>new mail</span><span>event soon</span><span>bill due</span></div></div>
       <div class="step"><h3>Plan</h3><p>Cheap rules drop the noise first. Claude plans the rest, calls tools, and joins the results.</p><div class="tags"><span>rules first</span><span>Claude</span><span>tool calls</span></div></div>
       <div class="step"><h3>Ask</h3><p>A bar, a bleep or a chat message. Anything that sends or changes things as you waits for your yes.</p><div class="tags"><span>meeting bar</span><span>chat</span><span>approve in one tap</span></div></div>
     </div>
@@ -592,9 +672,10 @@ footer a{color:var(--ink-2)}
   <div class="wrap">
     <div class="sec-head rv">
       <div><h2>Works with.</h2></div>
-      <p>Gmail and Google Calendar today. More apps are on the way.</p>
+      <p>Your coding agents, Gmail and Google Calendar. More apps are on the way.</p>
     </div>
     <div class="plugs rv">
+      <div class="plug glass"><span class="lg" data-icon="cc"></span><div><b>Claude Code and Codex</b><p>Sees every session that waits on you. Approves safe asks after the checks pass.</p></div></div>
       <div class="plug glass"><span class="lg white" data-icon="gm"></span><div><b>Gmail</b><p>Reads, sorts and drafts mail. Sends only after you say yes.</p></div></div>
       <div class="plug glass"><span class="lg white" data-icon="ca"></span><div><b>Google Calendar</b><p>Knows your day. Adds reminders and events after you say yes.</p></div></div>
       <div class="plug add"><span class="lg plus">+</span><div><b>More soon</b><p>Each new app plugs in the same way.</p></div></div>
@@ -636,7 +717,7 @@ footer a{color:var(--ink-2)}
     <div class="trio">
       <div class="panel glass rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div><h3>Runs locally</h3><p>A small Rust core on your Mac. Light on memory and battery. Your data stays on disk.</p></div>
       <div class="panel glass rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.6 5.6L20 9.5l-4 4 1 5.8L12 16.6 7 19.3l1-5.8-4-4 5.4-.9z"/></svg></div><h3>Thinks with Claude</h3><p>It uses Claude through Claude Code on your Mac. No new API key. No extra bill.</p></div>
-      <div class="panel glass rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Asks before it acts</h3><p>It never sends mail or changes your calendar without a tap. You see exactly what will go out.</p></div>
+      <div class="panel glass rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Asks before it acts</h3><p>It never sends mail or changes your calendar without a tap. For coding agents, it approves only what your rules allow, and it logs each one.</p></div>
     </div>
   </div>
 </section>
@@ -647,6 +728,7 @@ footer a{color:var(--ink-2)}
     <div class="sec-head rv"><div><h2>Questions.</h2></div></div>
     <div class="faq rv">
       <details open><summary>Can I download it?</summary><p>Not yet. bleep is still being built. The demo on this page shows how it will work.</p></details>
+      <details><summary>Can it approve things in Claude Code or Codex for me?</summary><p>Only what your rules allow. Out of the box that is tests, lint, file reads, and screenshots it can check against the ask. Push, deploy, delete, secrets and money always wait for you. Every approval goes in a log you can read.</p></details>
       <details><summary>Which AI does it use?</summary><p>Claude. bleep talks to Claude through Claude Code on your Mac, so it needs no new API key.</p></details>
       <details><summary>Will it ping me all day?</summary><p>No. Rules filter the noise first. It has quiet hours and a limit on pings per hour. Most checks end with it saying nothing.</p></details>
       <details><summary>Can it send email as me?</summary><p>Only after you tap yes on the exact message. Reading is free. Sending, moving events and deleting always ask first.</p></details>
@@ -726,6 +808,8 @@ const ICONS = {
   gm: '<svg viewBox="0 0 24 24"><path d="M2.5 19.5H6V11L1 7.2V18a1.5 1.5 0 0 0 1.5 1.5z" fill="#4285F4"/><path d="M18 19.5h3.5A1.5 1.5 0 0 0 23 18V7.2L18 11z" fill="#34A853"/><path d="M18 5v6l5-3.8V5.6c0-1.8-2-2.8-3.4-1.7z" fill="#FBBC04"/><path d="M6 11V5l6 4.5L18 5v6l-6 4.5z" fill="#EA4335"/><path d="M1 5.6v1.6L6 11V5L4.4 3.9C3 2.8 1 3.8 1 5.6z" fill="#C5221F"/></svg>',
   ca: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="4" fill="#4285F4"/><rect x="5" y="5" width="14" height="14" rx="1.5" fill="#fff"/><path d="M17 22h1a4 4 0 0 0 4-4v-1h-5z" fill="#EA4335"/><text x="12" y="16.2" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="8.5" fill="#4285F4">31</text></svg>',
   me: '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#5F7A5A"/><path d="M8 6h8v12l-4-3-4 3z" fill="#fff"/></svg>',
+  cc: '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#D97757"/><g stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13M7.4 7.4l9.2 9.2M16.6 7.4l-9.2 9.2"/></g></svg>',
+  cx: '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#1F2227"/><path d="M7 8.5l3.5 3.5L7 15.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.5 16h5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
 };
 document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = ICONS[el.dataset.icon]; });
 
@@ -757,7 +841,7 @@ function droidState(d, cls, ms) {
 }
 
 /* hero droid pokes */
-const heroLines = ['bleep bloop.', 'Design review in 60 min.', 'Your power bill is due today.', 'I drafted your reply to Arjun.', 'Beep. All quiet. Nothing to report.', 'Double-tap ⌥ and I come running.'];
+const heroLines = ['bleep bloop.', 'Your tests passed. I approved it.', 'Codex wants to force push. Up to you.','Design review in 60 min.', 'Your power bill is due today.', 'I drafted your reply to Arjun.', 'Beep. All quiet. Nothing to report.', 'Double-tap ⌥ and I come running.'];
 let heroI = 0, heroT;
 $('#heroDroid').addEventListener('click', () => {
   const b = $('#heroBubble'); b.textContent = heroLines[heroI++ % heroLines.length];
@@ -804,8 +888,8 @@ function renderMail() {
   $('#unreadN').textContent = S.mails.filter(x => x.unread && !x.muted).length;
 }
 function selectMail(id) { const x = mailById(id); x.unread = false; S.sel = S.sel === id ? null : id; renderMail(); }
-function markDraft(ids) { ids.forEach(id => { const x = mailById(id); x.draft = true; x.unread = false; }); renderMail(); flash('#mailWin'); }
-function markSent(ids) { ids.forEach(id => { const x = mailById(id); x.draft = false; x.replied = true; }); renderMail(); flash('#mailWin'); }
+function markDraft(ids) { ids.forEach(id => { const x = mailById(id); x.draft = true; x.unread = false; }); renderMail(); openWin('#mailWin'); closeWin('#mailWin', 3200); }
+function markSent(ids) { ids.forEach(id => { const x = mailById(id); x.draft = false; x.replied = true; }); renderMail(); openWin('#mailWin'); closeWin('#mailWin', 3200); }
 
 function renderCal(newId) {
   const list = $('#calList'); list.innerHTML = '';
@@ -825,7 +909,7 @@ function renderCal(newId) {
 }
 function addEvent(h, m, t, sub) {
   const e = { id: S.nextId++, h, m, t, sub, c: 'var(--ochre)' };
-  S.events.push(e); renderCal(e.id); flash('#calWin'); droidState($('#ddroid'), 'happy', 700);
+  S.events.push(e); renderCal(e.id); openWin('#calWin'); closeWin('#calWin', 3600); droidState($('#ddroid'), 'happy', 700);
 }
 function flash(sel) { const e = $(sel); e.classList.remove('flash'); void e.offsetWidth; e.classList.add('flash'); }
 
@@ -836,6 +920,43 @@ function setClock(h, m) {
   renderCal();
 }
 renderMail(); renderCal();
+
+/* agent sessions: what bleep sees in Claude Code and Codex */
+const AG_START = [
+  { id: 'a1', ag: 'cc', pj: 'bleep', tm: 'waiting 2h', ask: 'Allow Bash: npm test?', st: 'wait', notes: { ok: '✓ approved by bleep · rule: tests · 42 passed' } },
+  { id: 'a2', ag: 'cc', pj: 'portfolio', tm: 'waiting 40m', ask: '"Mobile hero fixed. Screenshot attached. Go on to the footer?"', st: 'wait', notes: { ok: '✓ screenshot checked at 375px · told it to go on' } },
+  { id: 'a3', ag: 'cx', pj: 'api', tm: 'waiting 25m', ask: 'Run: git push --force origin main?', st: 'wait', notes: { you: '! never auto: rewrites history on main', deny: 'denied by you · it will push normally' } },
+  { id: 'a4', ag: 'cc', pj: 'jobs', tm: 'waiting 1h', ask: '"Neon or Supabase for the job queue?"', st: 'wait', notes: { you: '! a choice only you can make', ok: '✓ you replied: use Neon' } },
+];
+let AG = [];
+const ST_LABEL = { wait: 'waiting', check: 'checking', ok: 'handled', you: 'needs you', deny: 'denied', run: 'running' };
+function resetAg() { AG = AG_START.map(a => ({ ...a })); renderAg(); }
+function setAg(id, st) { AG.find(a => a.id === id).st = st; renderAg(); }
+function renderAg() {
+  $('#agList').innerHTML = AG.map(a => {
+    const note = a.notes[a.st];
+    return `<div class="sess ${a.st}"><span class="lg">${ICONS[a.ag]}</span><div><div class="hd"><b>${a.pj}</b><span>${a.ag === 'cc' ? 'Claude Code' : 'Codex'} · ${a.tm}</span></div><span class="ask">${a.ask}</span>${note ? `<div class="nt">${note}</div>` : ''}</div><span class="st ${a.st}">${ST_LABEL[a.st]}</span></div>`;
+  }).join('');
+  const n = st => AG.filter(a => a.st === st).length;
+  $('#agSum').innerHTML = `<span><b>${n('wait') + n('check')}</b> waiting</span><span><b>${n('ok')}</b> handled</span><span><b>${n('you')}</b> need you</span><span><b>2</b> running · nothing to do</span>`;
+  $('#agN').textContent = AG.filter(a => ['wait', 'check', 'you'].includes(a.st)).length;
+}
+/* tool windows open while bleep uses them, then close */
+const WIN_OF = { gm: '#mailWin', ca: '#calWin', cc: '#agWin', cx: '#agWin' };
+const winT = {};
+function openWin(sel) {
+  clearTimeout(winT[sel]); const w = $(sel);
+  if (w.classList.contains('min')) { w.classList.remove('min'); flash(sel); }
+  front(w);
+}
+function closeWin(sel, ms = 0) {
+  clearTimeout(winT[sel]);
+  winT[sel] = setTimeout(() => $(sel).classList.add('min'), ms);
+}
+const inAgentScene = () => DAY[dayI - 1] === 'agents' || dayI === 0;
+function showAgents() { openWin('#agWin'); }
+function hideAgents() { closeWin('#agWin'); }
+resetAg();
 
 /* context meter (the glowing blade) */
 function addCtx(n) {
@@ -865,15 +986,19 @@ async function bot({ steps = [], html, actions = [], mem = false, tokens = 7000 
   const d = $('#ddroid');
   const m = document.createElement('div'); m.className = 'msg bot';
   log.appendChild(m);
+  const used = new Set();
   if (steps.length) {
     droidState(d, 'thinking');
     const ul = document.createElement('ul'); ul.className = 'trace'; m.appendChild(ul);
-    for (const [src, call, res] of steps) {
+    for (const [src, call, res, after, before] of steps) {
+      if (WIN_OF[src]) { used.add(WIN_OF[src]); openWin(WIN_OF[src]); }
       const li = document.createElement('li');
       li.innerHTML = `<span class="src ${src}">${SRC[src]}</span><span>${call.replace(/([(.,])/g, '$1<wbr>')}</span><span class="spin"></span>`;
       ul.appendChild(li); scrollLog();
+      if (before) before();
       await sleep(520 + Math.random() * 380);
       li.querySelector('.spin').outerHTML = `<span class="res">${res}</span>`;
+      if (after) after();
     }
   }
   const body = document.createElement('div');
@@ -891,6 +1016,7 @@ async function bot({ steps = [], html, actions = [], mem = false, tokens = 7000 
     m.appendChild(a);
   }
   scrollLog(); addCtx(tokens);
+  used.forEach(sel => { if (!(sel === '#agWin' && inAgentScene())) closeWin(sel, 3200); });
 }
 
 /* every write asks first */
@@ -917,11 +1043,72 @@ function bleep(text = 'bleep!') {
 function openChat() { $('#chat').classList.add('open'); }
 
 /* ================= scenes ================= */
-const DAY = ['brief', 'checkin', 'meeting', 'wrap'];
+const DAY = ['agents', 'brief', 'checkin', 'meeting', 'wrap'];
 let dayI = 0;
-function markTL(name) { const i = DAY.indexOf(name); if (i > -1) dayI = i + 1; }
+function setTab(name) { document.querySelectorAll('#sceneTabs button').forEach(b => b.classList.toggle('on', b.dataset.go === name)); }
+function markTL(name) {
+  const i = DAY.indexOf(name); if (i < 0) return;
+  dayI = i + 1; setTab(name);
+  if (name !== 'agents') hideAgents();
+  closeWin('#mailWin'); closeWin('#calWin');
+}
+setTab('agents');
 
 const scenes = {
+  async agents() {
+    markTL('agents'); setClock(8, 52); hideNotch(); resetAg(); showAgents(); bleep('4 agents wait'); openChat();
+    sys('08:52 · you are back · 4 agent sessions wait on you');
+    await bot({
+      steps: [
+        ['cc', 'claude.sessions(waiting)', '3 waiting'],
+        ['cx', 'codex.sessions(waiting)', '1 waiting'],
+        ['cc', 'bleep: read ask', 'npm test', null, () => setAg('a1', 'check')],
+        ['cc', 'approve("npm test") · rule: tests', '42 passed', () => setAg('a1', 'ok')],
+        ['cc', 'portfolio: view screenshot', 'fits 375px', null, () => setAg('a2', 'check')],
+        ['cc', 'reply("Looks good. Go on.")', 'sent', () => setAg('a2', 'ok')],
+        ['cx', 'api: read ask', 'force push', () => setAg('a3', 'you'), () => setAg('a3', 'check')],
+        ['cc', 'jobs: read ask', 'a choice', () => setAg('a4', 'you'), () => setAg('a4', 'check')],
+      ],
+      html: `<p><b>Welcome back.</b> 4 agents waited on you. I handled 2:</p><ul><li><b>bleep</b> asked to run <code>npm test</code>. Tests are safe, so I approved. 42 passed.</li><li><b>portfolio</b> sent a mobile screenshot. It matches what you asked for, so I told it to go on.</li></ul><p><b>2 need you:</b> a force push on <b>api</b>, and a database pick on <b>jobs</b>.</p>`,
+      actions: [['Show me now', () => scenes.agentAsks(), true], ['Remind me at 9:30', () => askToAdd(9, 30, 'Review 2 agent asks', 'api: force push · jobs: pick a DB')]],
+      tokens: 9000,
+    });
+  },
+  async agentAsks() {
+    showAgents();
+    if (AG.find(a => a.id === 'a3').st !== 'you') return scenes.agentDb();
+    await bot({
+      steps: [['cx', 'codex.diff(api, origin/main)', '3 commits differ']],
+      html: '<p><b>api</b> · Codex wants to run <code>git push --force origin main</code>. It would drop 3 commits on main that are not in its branch.</p><p>I suggest you deny it. Codex will rebase and push normally.</p>',
+      actions: [['Deny the push', async () => {
+        await bot({ steps: [['cx', 'deny("git push --force")', 'denied', () => setAg('a3', 'deny')]], html: 'Denied. Codex got your answer.', tokens: 500 });
+        await scenes.agentDb();
+      }, true], ['Later', async () => bot({ html: 'Okay. It stays on your list.', tokens: 300 })]],
+      tokens: 2500,
+    });
+  },
+  async agentDb() {
+    if (AG.find(a => a.id === 'a4').st !== 'you') return bot({ html: 'Nothing else waits on you. All agents are moving.', tokens: 300 });
+    await bot({
+      steps: [['me', 'memory.search("database")', '1 match']],
+      mem: true,
+      html: '<p><b>jobs</b> · Claude asks: Neon or Supabase for the job queue?</p><p>You use Neon on the free tier for your other apps.</p>',
+      actions: [['Reply: use Neon', async () => bot({ steps: [['cc', 'reply("Use Neon.")', 'sent', () => setAg('a4', 'ok')]], html: 'Sent. All agents are moving again.', tokens: 600 }), true], ['I will answer myself', async () => bot({ html: 'Okay. I left it for you.', tokens: 300 })]],
+      tokens: 2000,
+    });
+  },
+  async agentStatus() {
+    showAgents();
+    const you = AG.filter(a => a.st === 'you' || a.st === 'wait'), ok = AG.filter(a => a.st === 'ok');
+    await bot({
+      steps: [['cc', 'claude.sessions(all)', `${AG.filter(a => a.ag === 'cc').length} sessions`], ['cx', 'codex.sessions(all)', `${AG.filter(a => a.ag === 'cx').length} sessions`]],
+      html: you.length
+        ? `<p>${you.length} session${you.length > 1 ? 's' : ''} wait${you.length > 1 ? '' : 's'} on you: ${you.map(a => `<b>${a.pj}</b>`).join(', ')}.</p>${ok.length ? `<p>I handled ${ok.length}.</p>` : ''}`
+        : '<p>No agent waits on you. Two are still running.</p>',
+      actions: you.some(a => a.st === 'wait') ? [['Triage them', () => scenes.agents(), true]] : you.length ? [['Show me', () => scenes.agentAsks(), true]] : [],
+      tokens: 2500,
+    });
+  },
   async brief() {
     markTL('brief'); setClock(9, 0); hideNotch(); bleep('Morning!'); openChat();
     sys('09:00 · scheduled: morning brief');
@@ -959,7 +1146,7 @@ const scenes = {
     await bot({
       steps: [['ca', 'calendar.get("Design review")', '3 guests'], ['gm', 'gmail.search(from:priya newer_than:7d)', '2 threads'], ['gm', 'gmail.search(from:arjun newer_than:7d)', '1 thread']],
       html: `<p><b>Prep for Design review, 3 PM.</b></p><ul><li>Priya changed the onboarding flow. Deck v3, slides 6 to 9 are new.</li><li>${arjun.replied ? 'You told Arjun about the API change. Expect a follow-up.' : "Arjun's question on the API change is still unanswered."}</li><li>Sync with Priya at 5 PM. Park smaller items there.</li></ul>`,
-      actions: [["Open Priya's mail", async () => { S.sel = null; selectMail(1); flash('#mailWin'); await bot({ html: 'Opened it in your inbox.', tokens: 300 }); }, true]],
+      actions: [["Open Priya's mail", async () => { S.sel = null; selectMail(1); openWin('#mailWin'); await bot({ html: 'Opened it in your inbox.', tokens: 300 }); }, true]],
     });
   },
   async wrap() {
@@ -1007,6 +1194,24 @@ function runScene(name) {
   enqueue(() => scenes[name]());
 }
 
+/* scene strip: tabs + arrows over the one demo */
+function goScene(i) {
+  stopAuto();
+  const idx = (i + DAY.length) % DAY.length, name = DAY[idx];
+  dayI = idx + 1; setTab(name); runScene(name);
+}
+const curScene = () => Math.max(0, dayI - 1);
+$('#sceneTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) goScene(DAY.indexOf(b.dataset.go)); });
+$('#prevScene').onclick = () => goScene(curScene() - 1);
+$('#nextScene').onclick = () => goScene(dayI === 0 ? 0 : curScene() + 1);
+let demoInView = false;
+new IntersectionObserver(es => { demoInView = es[0].isIntersecting; }, { threshold: .3 }).observe($('#mac'));
+addEventListener('keydown', e => {
+  if (!demoInView || summoned || e.target.closest('input,textarea')) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); $('#nextScene').click(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); $('#prevScene').click(); }
+});
+
 /* meeting bar */
 function showNotch() { $('#notch').classList.add('show'); }
 function hideNotch() { $('#notch').classList.remove('show'); }
@@ -1027,13 +1232,13 @@ async function playDay() {
   while (autoOn && dayI < DAY.length) {
     const s = DAY[dayI];
     await enqueue(() => scenes[s]());
-    await chain; await sleep(s === 'meeting' ? 4200 : 3600);
+    await chain; await sleep(s === 'agents' ? 5200 : s === 'meeting' ? 4200 : 3600);
   }
   autoOn = false;
 }
 new IntersectionObserver((es, o) => {
   if (es[0].isIntersecting && !autoStarted) { autoStarted = true; o.disconnect(); setTimeout(playDay, 900); }
-}, { threshold: .45 }).observe($('#mac'));
+}, { threshold: .2 }).observe($('#mac'));
 $('#mac').addEventListener('pointerdown', stopAuto);
 $('#clock').addEventListener('click', () => { stopAuto(); runScene(DAY[dayI % DAY.length]); });
 
@@ -1048,6 +1253,7 @@ function respond(q) {
     const title = m[1].charAt(0).toUpperCase() + m[1].slice(1);
     return askToAdd(Math.min(h, 23), mm, title, 'reminder from chat');
   }
+  if (/agent|claude|codex|session/.test(s)) return scenes.agentStatus();
   if (/bill|pay|due/.test(s)) return scenes.bills();
   if (/remember|memory|know about me/.test(s)) return scenes.memory();
   if (/mail|email|inbox|priya/.test(s)) return scenes.mail();
@@ -1098,6 +1304,7 @@ function makeDrag(handle, target, { onClick, onDbl } = {}) {
 }
 makeDrag($('#mailWin .tb'), $('#mailWin'));
 makeDrag($('#calWin .tb'), $('#calWin'));
+makeDrag($('#agWin .tb'), $('#agWin'));
 makeDrag($('#chat .tb'), $('#chat'));
 let clickT;
 makeDrag($('#ddroid'), $('#ddroid'), {
@@ -1171,8 +1378,9 @@ function front(el) { document.querySelectorAll('#mac .win').forEach(w => w.style
 document.querySelectorAll('#dock .app').forEach(a => a.addEventListener('click', () => {
   a.classList.remove('bounce'); void a.offsetWidth; a.classList.add('bounce');
   const k = a.dataset.app;
-  if (k === 'mail') { front($('#mailWin')); flash('#mailWin'); }
-  else if (k === 'cal') { front($('#calWin')); flash('#calWin'); }
+  if (k === 'mail') openWin('#mailWin');
+  else if (k === 'cal') openWin('#calWin');
+  else if (k === 'term') openWin('#agWin');
   else if (k === 'bleep') { showDroid(); openChat(); front($('#chat')); droidState($('#ddroid'), 'happy', 700); }
 }));
 
