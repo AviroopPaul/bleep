@@ -367,19 +367,6 @@ section{padding:84px 0}
 @media (max-width:1000px){ .cases{grid-template-columns:1fr 1fr} }
 @media (max-width:620px){ .cases{grid-template-columns:1fr} .case.wide{grid-column:auto} }
 
-/* ---------- loop ---------- */
-.loop{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; position:relative; border-radius:22px; padding:10px}
-.loop .step{padding:26px 24px; position:relative}
-.loop .step + .step{border-left:1px dashed rgba(27,31,36,.15)}
-.loop .step h3{font:700 30px/1 var(--display); margin:12px 0 10px; letter-spacing:-.01em}
-.loop .step p{color:var(--ink-2); margin:0 0 14px; font-size:15px}
-.loop .tags{display:flex; flex-wrap:wrap; gap:6px}
-.loop .tags span{font:500 11.5px var(--mono); padding:5px 8px; border-radius:7px; background:rgba(255,255,255,.7); border:1px solid rgba(27,31,36,.08)}
-.wire{position:absolute; left:6%; right:6%; top:0; height:3px; border-radius:3px; overflow:hidden; background:rgba(27,31,36,.06)}
-.wire i{position:absolute; top:0; width:80px; height:3px; background:linear-gradient(90deg,transparent,var(--blue-2),transparent); animation:wire 3.2s linear infinite}
-@keyframes wire{from{left:-80px}to{left:100%}}
-@media (max-width:860px){ .loop{grid-template-columns:1fr} .loop .step + .step{border-left:0; border-top:1px dashed rgba(27,31,36,.15)} }
-
 /* ---------- connectors ---------- */
 .plugs{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
 @media (max-width:1100px){ .plugs{grid-template-columns:1fr 1fr} }
@@ -654,22 +641,6 @@ footer a{color:var(--ink-2)}
         <div class="mini"><span class="memtag">FROM MEMORY</span><div>You pay bills the evening they are due.</div></div>
         <button class="play" data-scene="memory">▶ Play in demo</button>
       </article>
-    </div>
-  </div>
-</section>
-
-<!-- ============ HOW IT THINKS ============ -->
-<section id="how">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <div><h2>It does the legwork, then asks.</h2></div>
-      <p>A small loop runs all day on your Mac. Most of the time it decides to stay quiet. That is the point.</p>
-    </div>
-    <div class="loop glass rv">
-      <div class="wire"><i></i></div>
-      <div class="step"><h3>Watch</h3><p>Watchers check Gmail and Calendar for changes. A scheduler wakes bleep for check-ins.</p><div class="tags"><span>agent waiting</span><span>new mail</span><span>event soon</span><span>bill due</span></div></div>
-      <div class="step"><h3>Plan</h3><p>Cheap rules drop the noise first. Claude plans the rest, calls tools, and joins the results.</p><div class="tags"><span>rules first</span><span>Claude</span><span>tool calls</span></div></div>
-      <div class="step"><h3>Ask</h3><p>A bar, a bleep or a chat message. Anything that sends or changes things as you waits for your yes.</p><div class="tags"><span>meeting bar</span><span>chat</span><span>approve in one tap</span></div></div>
     </div>
   </div>
 </section>
