@@ -2,3 +2,10 @@
 .DS_Store
 node_modules
 .env*
+.superpowers/
+app/node_modules
+app/dist
+app/src-tauri/target
+app/src-tauri/gen
+app/test-results
+app/playwright-report

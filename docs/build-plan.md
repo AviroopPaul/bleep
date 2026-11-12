@@ -1,0 +1,441 @@
+# bleep: build plan
+
+Status: draft for approval · 12 Nov 2026 · owner: Aviroop
+
+bleep is a small droid that floats on my MacBook. It reads my mail and calendar, tells me what matters before I ask, and does small jobs after I say yes. The landing page is live at https://bleep-omega.vercel.app. This plan covers the app itself.
+
+Prior work: `~/Documents/code/valet/docs/architecture.html` (9 Nov). It has the competitor study, the Claude Code headless research, the triage funnel and the threat model. Reuse its ideas. This plan replaces its shape (Python daemon + Telegram) with a native desktop app in Rust.
+
+---
+
+## 1. Why
+
+- **The moment:** I miss things that sit in my mail and calendar. A meeting starts and I am not ready. A bill is due today and I forget. A reply waits for two days.
+- **The fix:** a companion that watches those sources for me and taps me at the right moment, in a small bar I can read at a glance.
+- **Why a droid:** it should feel like a buddy on the screen, not a dashboard. Cute matters.
+- **Why now:** proactive assistants (ChatGPT Dots, Grok Bot, minimi) shipped in the last three months. None of them runs on my own Mac with the AI plan I already pay for.
+
+## 2. Goals
+
+- **G1. Always there:** a floating droid on every Space. I can drag it, hide it, and summon it with a double-tap of ⌥ (Option).
+- **G2. One chat:** one continuous conversation. No threads, no "new chat". History never disappears from view.
+- **G3. Proactive:** it speaks first when something matters. Meeting in 1 hour. Bill due today. Mail that waits on me.
+- **G4. Uses the plan I already pay for:** model calls go through a coding agent CLI I have installed and signed in: Claude Code first, Codex later. No API key, no extra bill.
+- **G5. Not locked to one AI:** bleep owns its tools. Switching from Claude to Codex, or to an API key from any provider, is a setting, not a rewrite.
+- **G5b. Bring your own key (later):** someone with no Claude or ChatGPT plan can paste an API key from any provider (Anthropic, OpenAI, Google, OpenRouter, or any OpenAI-compatible endpoint such as Ollama).
+- **G6. Connectors:** Gmail and Google Calendar first. New sources plug in through one interface.
+- **G7. Memory:** it learns how I work and I can read and edit what it knows.
+- **G8. Light:** idle CPU near zero, low RAM, no battery drain.
+
+## 3. Non-goals (for now)
+
+- **Other people:** single user, my Mac only. No accounts, no sync, no server.
+- **Other platforms:** no Windows, no Linux, no phone app.
+- **Browser or screen automation:** no clicking around websites, no reading the screen.
+- **Payments:** it reminds me about bills. It never pays them.
+- **Voice:** no speech in or out.
+- **Plugin marketplace:** connectors are first-party code only.
+
+## 4. Anti-goals (fail even if it works)
+
+- **Nagging:** if it pings so often that I hide it, it failed. Silence is the default.
+- **Acting without asking:** sending mail, creating or moving events, or changing anything outside the Mac without my tap.
+- **Burning my plan:** I am on the $20 Claude Pro plan and I share its limits with my own coding. bleep must not eat that budget.
+- **Heavy:** an Electron-sized app, a spinning fan, or a slow summon.
+- **Leaky:** my mail going anywhere except Google and the AI vendor I picked, through my own login.
+
+## 5. Constraints
+
+- **Personal use only, for now.** Anthropic's and OpenAI's terms allow my own subscription login in a tool I run for myself. If bleep is ever shared, other people use their own API key (Phase 8) or their own CLI login.
+- **macOS 15+ on Apple Silicon.** Test machine: my M1 MacBook.
+- **At least one agent CLI installed and signed in.** Tested here: Claude Code 2.1.319, Codex CLI 0.164.0. bleep checks the version at start and shows a clear message if the chosen one is missing or signed out.
+- **My own Google Cloud project** for Gmail and Calendar access. One-time setup, about 15 minutes (section 8.4).
+- **Data stays local.** Everything on disk under `~/.bleep/`. Secrets in the macOS Keychain.
+- **No em dashes in any user-facing copy**, including prompts that write copy.
+
+---
+
+## 6. Decisions
+
+| # | Decision | Instead of | Why |
+|---|---|---|---|
+| D1 | **Tauri 2** app: Rust core, web views for UI | Native Swift, Electron | Rust as asked. See-through windows on top of the desktop. Reuses the landing page look. 3D later is three.js in the same view. Small binary. |
+| D2 | **React + TypeScript + Vite** for the web views | Vanilla JS | My default stack. Chat, cards and settings get complex. |
+| D3 | **Swappable agent runtime.** One Rust trait, three backends: Claude Code CLI (now), Codex CLI (later), API key from any provider (later) | One vendor's SDK or API | Uses the subscription I already have. Codex for someone who only has ChatGPT. An API key for someone with neither. |
+| D4 | **bleep owns every tool.** Gmail, Calendar, memory and more are served by an MCP server inside the app (HTTP on `127.0.0.1`, random port, bearer token) | claude.ai connectors, ChatGPT apps | Any runtime that speaks MCP gets the same tools. Nothing depends on one vendor's connector catalogue. |
+| D5 | **Approval gate inside bleep's tool handlers** | The CLI's permission hooks, rules in the prompt | Works the same under every runtime. The model can ask for anything. Code decides. A write tool waits until I tap yes or no. |
+| D6 | **Direct Google APIs** with my own OAuth client | Google's official MCP servers via claude.ai | Works with any runtime. Rust can poll for free, so new mail shows in about 2 minutes with no model call. |
+| D7 | **Poll Google APIs**, no push | Gmail Pub/Sub push | Push needs a public URL. Polling with `historyId` and `syncToken` is cheap and catches up after sleep. |
+| D8 | **SQLite + Markdown** | Postgres, vector DB | One user, small data. FTS5 search is enough. |
+| D9 | **Own compaction** at a set token count | Each CLI's built-in compact | Same behaviour under every runtime. Facts saved to memory first, and a visible marker in the chat. |
+| D10 | **Rules first, small model second, main model last** | One big model for everything | Protects my plan. Most events are noise and cost nothing. |
+
+Considered and dropped on 12 Nov 2026: using Google's official Gmail and Calendar MCP servers through my claude.ai connectors. They work in headless Claude Code today, but only Claude can reach them, so they fail G5.
+
+---
+
+## 7. Architecture
+
+### 7.1 Processes
+
+```
+bleep.app (Tauri, one process)
+├── Rust core (tokio)
+│   ├── Agent runtime (trait)
+│   │     ├── Claude Code backend ──spawns──▶ claude CLI  ─┐
+│   │     ├── Codex backend       ──spawns──▶ codex CLI   ─┤  (one active at a time)
+│   │     │                                               └──HTTP──▶ bleep MCP server
+│   │     └── API backend (BYOK)  ──HTTPS──▶ provider API; bleep runs the tool loop itself
+│   │                                         and calls the connector registry directly
+│   ├── MCP server (in-process, 127.0.0.1) ── tools from connectors, through the approval gate
+│   ├── Connectors: Gmail, Google Calendar (later Dayblocks, others)
+│   ├── Watchers + scheduler ── events ── triage ── notifier
+│   ├── Store: SQLite (~/.bleep/bleep.db) + memory files (~/.bleep/memory/)
+│   └── Keychain: Google refresh token, MCP bearer token
+└── Web views (React)
+    ├── droid window    (see-through, always on top, draggable)
+    ├── chat panel      (opens next to the droid, or from ⌥⌥)
+    └── meeting bar     (top center, under the menu bar)
+```
+
+Menu bar icon (tray): show or hide droid, open chat, pause bleep (stops all proactive pings), settings, quit.
+
+### 7.2 Folder layout on disk
+
+```
+~/.bleep/
+  config.toml          # runtime choice, models, check-in times, quiet hours, ping budget, compaction threshold
+  bleep.db             # SQLite, WAL mode
+  memory/
+    USER.md            # who I am, key people
+    RULES.md           # VIPs, muted senders, my rules
+    MEMORY.md          # learned facts, approved by me
+    daily/2026-11-12.md
+  claude-home/         # CLAUDE_CONFIG_DIR for bleep's Claude Code (separate from ~/.claude)
+  codex-home/          # CODEX_HOME for bleep's Codex (separate from ~/.codex)
+  logs/bleep.log
+```
+
+### 7.3 Repo layout
+
+```
+bleep/
+  landing/             # the live landing page (keep as is)
+  app/
+    src-tauri/         # Rust: main.rs, runtime/, mcp/, connectors/, proactive/, store/, policy/, hotkey/
+    src/               # React: droid/, chat/, bar/, settings/
+  docs/build-plan.md   # this file
+```
+
+`vercel.json` keeps pointing at `landing/`. The app never deploys anywhere.
+
+---
+
+## 8. Core parts
+
+### 8.1 Agent runtime
+
+One trait. Everything above it (chat, scheduler, compaction) never knows which vendor runs.
+
+```rust
+#[async_trait]
+pub trait AgentRuntime: Send + Sync {
+    fn id(&self) -> &'static str;                          // "claude", "codex"
+    async fn health(&self) -> RuntimeHealth;               // installed, version, signed in
+    async fn start_session(&self, cfg: SessionConfig) -> Result<SessionHandle>; // or resume
+    async fn send(&self, s: &SessionHandle, msg: UserMessage) -> Result<EventStream>;
+    async fn one_shot(&self, req: OneShot) -> Result<Value>; // no tools, JSON schema answer
+}
+// EventStream yields: TextDelta, ToolStart{name,args}, ToolResult, Usage{in,out}, RateLimited{until}, Done, Error
+```
+
+- **SessionConfig** holds: system prompt (persona + memory files + date and time), bleep MCP server URL and token, model tier (`main` or `small`), and a resume id.
+- **Model tiers, not names:** `main` for chat and drafts, `small` for triage, summaries and fact extraction. `config.toml` maps them per runtime (Claude: Sonnet and Haiku).
+- **Normalised events:** each backend parses its own stream into the same events. The chat UI shows tool calls as steps, like the landing page demo.
+- **Usage:** every turn reports input and output tokens. They feed the context meter and the compaction trigger.
+- **Plan limits:** a `RateLimited` event shows in the chat ("Limit reached, back at 4:10 PM") and pauses proactive model work until the reset. Rules-only reminders keep working.
+- **Switching:** settings has a runtime picker. Switching starts a fresh session seeded with the latest compaction summary plus the last 10 turns (the same path as compaction, section 8.6). The visible chat history does not change.
+
+#### Claude Code backend (Phase 1)
+
+- **Chat:** spawn `claude` with `--print --input-format stream-json --output-format stream-json --verbose`, plus:
+  - `--model sonnet` (from the `main` tier),
+  - `--mcp-config <temp json>` that points at bleep's MCP server, and `--strict-mcp-config` so none of my other MCP servers or claude.ai connectors load,
+  - `--tools ""` so Bash, Edit, WebFetch and every other built-in tool are off, and `--allowedTools mcp__bleep` (server-level allow; confirmed on 12 Nov 2026: no permission denials, and the session sees only `mcp__bleep__*` tools) so bleep's tools run without CLI prompts, because bleep's own gate decides,
+  - `--setting-sources ""` so my hooks, plugins and global CLAUDE.md never load,
+  - `--append-system-prompt-file <file>` with the system prompt,
+  - `--resume <session-id>` when a session exists.
+- **Env:** `CLAUDE_CONFIG_DIR=~/.bleep/claude-home`. Working dir: an empty folder. I sign in once with `CLAUDE_CONFIG_DIR=~/.bleep/claude-home claude auth login`; settings has a button that opens this in Terminal.
+- **Keep it warm:** one child process stays alive for the main chat. Each new message is one JSON line on stdin. If the child dies, restart it with `--resume`.
+- **One-shots:** a separate `claude -p --output-format json --json-schema ... --model haiku --tools "" --no-session-persistence`. About 2.6 s per call (measured in the Valet doc).
+- **Tested on 12 Nov 2026:** `--strict-mcp-config` with `--setting-sources ""` runs fine headless and loads no other servers.
+- **Learned in Phase 1:** a stale `--resume` id fails within about 0.5 s with no input, so `start_session` waits up to 1.5 s when resuming. `ANTHROPIC_API_KEY` and the `CLAUDECODE` markers are removed from the child's env so it always uses the subscription. bleep's MCP server runs stateless with plain JSON replies, and Claude Code accepts that.
+
+#### Codex backend (Phase 5)
+
+- **Chat:** Codex's `app-server` mode, a long-lived JSON-RPC process over stdio (the same API the Codex IDE extensions use). Start a thread, send turns, read streamed events, resume a thread by id.
+- **Tools:** add bleep's MCP server as a streamable HTTP server with a bearer token (Codex config supports `url` plus `bearer_token_env_var`), passed through `-c` config overrides so I do not touch my own `~/.codex/config.toml`.
+- **Env:** `CODEX_HOME=~/.bleep/codex-home`, signed in once with my ChatGPT account. Working dir: an empty folder.
+- **Built-in tools:** Codex has its own shell and patch tools. The source (as of March 2026) has a `shell_tool` feature flag and an `include_apply_patch_tool` setting, so pass overrides that turn both off (exact keys to confirm on the installed version). Belt and braces: read-only sandbox, no network, empty working dir.
+- **One-shots:** `codex exec --json --output-schema <file>` (flag confirmed in the source).
+- **Source to read:** the Codex repo is cloned at `~/Documents/code/codex` (`codex-rs/app-server-protocol`, `codex-rs/exec`). The app-server protocol crate is Rust and may be usable directly.
+
+#### API backend, bring your own key (Phase 8)
+
+- **No CLI.** bleep runs the agent loop itself: send messages and tool specs, stream the reply, run tool calls through the same registry and approval gate, send results back, repeat (max 8 steps).
+- **Providers:** Anthropic, OpenAI, Google Gemini, OpenRouter, and any OpenAI-compatible endpoint (Ollama, LM Studio, Groq and others). Two wire formats cover most of them: Anthropic Messages and OpenAI Chat Completions. Pick a maintained multi-provider Rust crate at build time, or write thin clients for those two formats.
+- **Keys:** pasted in settings, stored in the Keychain, never in `config.toml` or logs. Base URL field for OpenAI-compatible endpoints.
+- **Tiers:** settings maps `main` and `small` to the provider's models. A local model through Ollama is allowed but must support tool calls.
+- **Session:** there is no CLI session to resume. bleep keeps the message list in SQLite and sends it each turn. Use prompt caching where the provider supports it.
+- **Real money:** API calls are billed. Show a running cost estimate in the Activity tab, and a daily spend cap in settings (default $1) that pauses proactive work when hit.
+
+#### Phase 1 rule for all of this
+
+The `AgentRuntime` trait must not assume a child process or a CLI-owned session. `start_session` may just create a row in SQLite. The contract tests (section 10) run against every backend.
+
+### 8.2 MCP server and the approval gate
+
+- **Server:** Rust MCP server (the `rmcp` crate) on `127.0.0.1:<random port>`, streamable HTTP, bearer token stored in the Keychain and handed to the runtime at start.
+- **Tool names:** `snake_case` with a connector prefix, for example `gmail_search`. No dots, because some model APIs reject them in tool names.
+- **Every tool has a risk level:**
+
+| Level | What happens | Tools |
+|---|---|---|
+| `read` | runs at once | `gmail_search`, `gmail_read_thread`, `calendar_list`, `calendar_next`, `calendar_free`, `memory_search`, `bleep_now` |
+| `safe` | runs at once; nothing leaves my account and it is easy to undo | `gmail_draft` (save or update a draft), `memory_note` (write to today's daily note) |
+| `write` | asks me first | `gmail_send` (new mail or reply, from a draft or direct), `calendar_create`, `calendar_update`, `calendar_delete`, `calendar_respond`, `memory_promote` (add a fact to `MEMORY.md`) |
+| `never` | not built | forward mail, trash or delete mail, labels, payments, shell, web fetch |
+
+- **Asking:** a `write` tool call puts an approval card in the chat with the exact payload (recipient, subject, body, event time). The tool handler waits for my answer for up to 10 minutes. Approve runs the API call and returns the result. Decline or timeout returns "declined by user" to the model. The payload I saw is the payload that runs; any change makes a new card.
+- **Limits:** max 8 tool steps per turn, max 10 sends per day, 120 s per turn excluding time spent waiting on me.
+
+### 8.3 Connector interface
+
+Internal Rust trait. Not shown on the landing page.
+
+```rust
+#[async_trait]
+pub trait Connector: Send + Sync {
+    fn id(&self) -> &'static str;                 // "gmail", "calendar"
+    fn tools(&self) -> Vec<ToolSpec>;             // name, description, JSON schema, risk level
+    async fn call(&self, tool: &str, args: Value) -> Result<Value>;
+    async fn changes(&self, since: Cursor) -> Result<(Vec<Event>, Cursor)>; // feeds proactivity, no model
+    fn status(&self) -> ConnectorStatus;          // connected, needs sign-in, error
+}
+```
+
+- A registry holds the connectors. The MCP server lists all their tools and routes calls through the approval gate. The watcher loop calls `changes()` on a timer per connector.
+- Adding a source means one new module that implements the trait, plus a settings row to connect it.
+
+### 8.4 Google sign-in (shared by Calendar and Gmail)
+
+- **One-time setup (me, about 15 min):** create a Google Cloud project, enable the Gmail API and the Calendar API, create an OAuth client of type "Desktop app", and set the consent screen to "In production". "Testing" status expires refresh tokens every 7 days. Unverified is fine for one user. The settings screen links to these steps.
+- **Sign-in:** loopback redirect with PKCE (the `oauth2` crate). bleep opens the Google consent page in my default browser once.
+- **Scopes:** `calendar.events`, `gmail.readonly`, `gmail.compose`. Never the full `mail.google.com` scope.
+- **Storage:** client id and secret in `config.toml`, refresh token in the Keychain (`keyring` crate), access token in memory only.
+- **HTTP:** plain `reqwest` calls to the REST APIs. Skip the heavy generated Google crates.
+- **If shared later:** a public app that reads Gmail needs Google's restricted-scope security review. Out of scope while bleep is personal.
+
+### 8.5 Proactive engine
+
+Three triggers feed one funnel:
+
+1. **Watchers (no model):** Calendar every 5 min (`events.list` with `syncToken`), Gmail every 2 min (`history.list` from the last `historyId`). After sleep, one call catches up.
+2. **Scheduler:** fixed jobs from `config.toml` (morning brief 9:00, check-ins 13:00 and 18:00) and timers set from the calendar cache (meeting bar at 60 and 10 min before each event).
+3. **Open-loop check:** every 30 min in active hours. Code first; it calls a model only when something new exists.
+
+The funnel: **rules in Rust** (free: `RULES.md` VIPs and muted senders, Gmail categories, known bill senders) → **`small` one-shot** (only for unclear mail, batched up to 10 per call) → **main chat turn** (only for `needs_reply`, `bill`, and scheduled check-ins).
+
+Mail labels from triage: `ignore`, `fyi`, `important`, `needs_reply`, `bill` (with amount and due date).
+
+Calm rules:
+- **Quiet hours:** 23:00 to 08:00. Held items go into the morning brief.
+- **Ping budget:** max 4 pings an hour. Extra items merge into the next one.
+- **Dedup:** one ping per thread or event per 6 hours.
+- **Pause:** one click in the tray stops all proactive output.
+- **Feedback:** each ping has "not useful". Three of those for one sender proposes a rule for `RULES.md`.
+
+Where proactive output shows up:
+- **Meeting bar:** no model call. Built from the calendar cache. Buttons: "Prep me" (runs a chat turn), "Snooze" (until 10 min before), "Join" (opens the meeting link if the event has one).
+- **Droid bubble:** a short line over the droid, plus the antenna light. Clicking it opens the chat.
+- **Chat:** check-ins and briefs are turns in the one continuous chat. The scheduler sends a tagged prompt (for example `[scheduled 13:00 check-in]`) into the main session. The chat shows a small "scheduled" label and bleep's reply, not the raw prompt.
+
+### 8.6 One chat and compaction
+
+- **What I see:** every message ever, loaded from SQLite in pages as I scroll up. Compaction never removes anything from view.
+- **What the model sees:** one runtime session, resumed across restarts.
+- **Trigger:** when the session's input tokens pass the threshold (default 250K, setting allows 200K to 300K):
+  1. A `small` one-shot extracts durable facts. They go to today's daily note and become proposals for `MEMORY.md`.
+  2. A `main` one-shot writes a summary of the session (target about 3K tokens): open loops, decisions, people, pending approvals.
+  3. bleep starts a new session. Its first message holds the summary plus the last 10 turns.
+  4. The chat shows a divider: "Compacted 250K into a 3K summary. Facts saved to memory."
+- **Context window:** the threshold only works if the model's window is larger than it. In Phase 4, check the window each runtime actually gets on my plan. If it is 200K, the threshold becomes 80% of the window (160K) and settings says so.
+- **Built-in compact:** both CLIs may compact on their own near their limit. Check this in Phase 4 and turn it off for bleep's sessions where a setting exists, so only bleep's compaction runs.
+
+### 8.7 Memory
+
+- **Always in the prompt:** `USER.md`, `RULES.md`, `MEMORY.md`, kept under 3K tokens together.
+- **Searched on demand:** daily notes and old chat through `memory_search` (SQLite FTS5).
+- **Writing:** `memory_note` writes new facts to today's daily note freely. `memory_promote` into `MEMORY.md` needs my yes (an approval card, or a nightly batch of proposals).
+- **Patterns:** a nightly job (one `small` call) reads the day's events and decisions and proposes patterns, for example "You pay bills the evening they are due."
+- **Editing:** a memory view in settings lists facts with "forget". The files are plain Markdown and I can edit them in any editor.
+- **Runtime-neutral:** memory lives in bleep, not in either CLI. Switching runtimes keeps everything.
+
+### 8.8 UI
+
+- **Droid window:** small see-through window, always on top, visible on all Spaces and over full-screen apps, never steals focus. Drag to move; position saved. Click opens the chat. Double-click tucks it into the screen edge as a glowing tab. Phase 1 droid is the 2D SVG from the landing page with the same states: idle, thinking, alert, happy.
+- **⌥⌥ summon:** a global listener for two Option presses within 400 ms with no other key between. It needs the Input Monitoring permission; bleep asks for it on first run and explains why. Fallback if denied: a normal global shortcut (⌥Space by default).
+- **Chat panel:** frosted panel next to the droid (or centered when summoned). Streaming replies, tool steps, approval cards, suggestion chips, context meter, and a small label with the active runtime. Esc closes it.
+- **Meeting bar:** slim dark bar at the top center, under the menu bar. Slides in, stays until dismissed or the meeting starts.
+- **Look:** the landing page tokens: Fredoka + Nunito, muted blue and sand, frosted glass. Light and dark from the system.
+- **Launch at login:** on by default (Tauri autostart plugin).
+
+### 8.9 Storage (SQLite)
+
+```
+messages      id, role, kind (chat|scheduled|system|approval|divider), content, tool_steps, tokens, session_id, created_at
+sessions      id, runtime, runtime_session_id, started_at, ended_at, summary, tokens_at_end
+approvals     id, tool, payload, status (pending|approved|declined|expired|done|failed), created_at, decided_at
+events        id, source, kind, payload, status, idem_key, created_at
+cal_cache     event_id, start, end, title, attendees, meet_link, updated
+mail_cache    thread_id, from, subject, snippet, labels, triage, amount, due, last_seen
+pings         id, kind, ref_id, sent_at, feedback
+llm_calls     id, runtime, tier, purpose, tokens_in, tokens_out, created_at
+cursors       connector, value
+mem_fts       FTS5 over memory/*.md and messages
+```
+
+### 8.10 Security
+
+- **Prompt injection in mail** is the main risk. Mail text goes to the model wrapped and labelled as untrusted. There is no forward tool. Every send needs my tap on a card that shows the real recipient and body. A new recipient gets a red warning on the card.
+- **No other way out:** each runtime runs with its built-in tools off (or locked down, section 8.1). Only bleep's MCP tools.
+- **Local only:** MCP server binds to `127.0.0.1` with a bearer token. No other port opens.
+- **Secrets:** Keychain only. Never in logs, never in prompts.
+- **Audit:** every tool call, approval and model call is in SQLite and visible in a settings "Activity" tab.
+
+---
+
+## 9. Phases
+
+Each phase ends with something I run every day. Each later phase needs the one before it.
+
+### Phase 1. Droid and chat
+
+Deliverables:
+- Tauri 2 app scaffold in `app/`, builds and runs with `cargo tauri dev`.
+- Droid window (see-through, on top, all Spaces, draggable, tuck to edge, position saved).
+- Tray menu (show or hide, open chat, pause, quit).
+- ⌥⌥ summon with the Input Monitoring prompt and the ⌥Space fallback.
+- `AgentRuntime` trait and the Claude Code backend (section 8.1).
+- Chat panel with streaming replies.
+- MCP server with one harmless tool (`bleep_now`: current date, time and time zone) to prove the tool path end to end.
+- SQLite store with `messages` and `sessions`. History survives restarts. The session resumes.
+- First-run check: CLI installed, signed in to `~/.bleep/claude-home`. Clear message if not.
+- Launch at login.
+
+Done when: I can double-tap ⌥ anywhere, ask "what time is it in Tokyo", see the `bleep_now` tool step, get an answer, quit the app, reopen it, and see the whole conversation still there.
+
+### Phase 2. Calendar and the meeting bar
+
+Deliverables:
+- Google sign-in (section 8.4), connect from settings, with the setup steps linked.
+- Calendar connector: `calendar_list`, `calendar_next`, `calendar_free` (read), `calendar_create`, `calendar_update`, `calendar_delete`, `calendar_respond` (write).
+- Approval cards in the chat and the waiting write gate (section 8.2).
+- Calendar watcher + cache + scheduler timers.
+- Meeting bar at 60 and 10 min before, with Prep me, Snooze, Join.
+- Droid alert state and bubble when the bar appears.
+
+Done when: the bar shows up 1 hour before a real meeting on my calendar, "Prep me" answers with a short prep note, and "add a reminder to pay rent at 6 PM" shows an approval card and creates the event only after I approve.
+
+### Phase 3. Gmail and check-ins
+
+Deliverables:
+- Gmail connector: `gmail_search`, `gmail_read_thread` (read), `gmail_draft` (safe), `gmail_send` (write).
+- Gmail watcher (history polling) + rules triage in Rust + `small` one-shot for unclear mail.
+- Scheduled turns: morning brief 9:00, check-ins 13:00 and 18:00 (times in settings).
+- Bill and due-date detection, with an offer to add a calendar reminder.
+- "Waiting on me" detection (threads where the last message is to me and is over 24 hours old).
+- Calm rules: quiet hours, ping budget, dedup, pause, "not useful".
+- Activity tab (tool calls, approvals, model calls).
+
+Done when: a real bill mail leads to a reminder offer at the next check-in, a draft reply lands in Gmail drafts, the send happens only after I approve the card, and a promo mail never pings me.
+
+### Phase 4. Memory and compaction
+
+Deliverables:
+- `~/.bleep/memory/` files, loaded into the system prompt.
+- `memory_search` (read), `memory_note` (safe), `memory_promote` (write).
+- Nightly pattern proposals.
+- Memory view in settings with "forget".
+- Compaction (section 8.6) with the divider in the chat, and the context meter in the panel header.
+
+Done when: I can tell it "Sync means my 1:1 with Priya" and it uses that a week later, and a forced compaction (threshold set low for testing) keeps the chat working with no lost open loops.
+
+### Phase 5. Codex runtime
+
+Deliverables:
+- Codex backend for `AgentRuntime` (section 8.1): app-server for chat, `codex exec --json` for one-shots, bleep's MCP server passed in by config override.
+- Built-in Codex tools off or locked down.
+- Runtime picker in settings, with the switch path (summary plus last 10 turns into a fresh session).
+- Tier mapping for Codex models in `config.toml`.
+
+Done when: I switch to Codex in settings, the chat carries on with context, the 13:00 check-in runs on Codex, and an email send still shows the same approval card.
+
+### Phase 6. More connectors
+
+Deliverables:
+- Dayblocks connector: `dayblocks_tasks` (read), `dayblocks_add`, `dayblocks_update`, `dayblocks_move` (write). Uses the REST API at `dayblocks.vercel.app`.
+- Before connecting: add a token check to the Dayblocks API. Today it has no auth, so anyone with the URL can read and edit my tasks. This change is in the Dayblocks repo.
+- To-do check-ins: the 13:00 and 18:00 check-ins include open tasks and offer to move them to tomorrow.
+- Connector settings page that lists every connector with its status.
+
+Done when: the 18:00 check-in lists my open Dayblocks tasks and moves them to tomorrow after I approve.
+
+### Phase 7. 3D droid
+
+Deliverables:
+- A 3D droid model (GLB) with idle, think, alert and happy animations, rendered with three.js in the droid window.
+- Same behaviour as the 2D droid. The 2D droid stays as a low-power fallback (setting, and on battery under 20%).
+- Update the landing page with the 3D droid.
+
+Done when: the 3D droid idles at under 3% CPU on my M1 and reacts to every state the 2D droid has.
+
+### Phase 8. Bring your own key
+
+Deliverables:
+- API backend for `AgentRuntime` (section 8.1): bleep's own tool loop, Anthropic and OpenAI-compatible formats first, then Gemini.
+- Provider picker, key field (Keychain), base URL field, tier mapping, and a "test key" button in settings.
+- Cost estimate in the Activity tab and a daily spend cap.
+
+Done when: with Claude Code and Codex both signed out, I paste an OpenRouter key, pick a model, and the chat, the 13:00 check-in and an approved email send all work.
+
+Later, if bleep is shared with other people (not planned): each user needs their own Google sign-in through a Google-verified app (Gmail restricted-scope review), a signed and notarized build, and a first-run setup that does not assume my machine. BYOK is the runtime path that makes sharing possible, because subscription logins are for personal use only.
+
+---
+
+## 10. Testing
+
+- **Rust unit tests:** each runtime's stream parser (recorded CLI output as fixtures), the normalised event mapping, policy gate, triage rules, scheduler timing, compaction trigger.
+- **Runtime contract tests:** one test suite that every `AgentRuntime` backend must pass against recorded fixtures (stream a reply, call `bleep_now`, report usage, report a rate limit).
+- **Connector tests:** recorded Google API responses as fixtures. No live calls in tests.
+- **UI tests:** Playwright with headless Chromium against the Vite dev server. Never open my own browser.
+- **Manual check per phase:** the "done when" line above, on my real accounts.
+
+## 11. Risks
+
+- **CLI flags and protocols change.** Both CLIs update often. Mitigation: version check at start, flags in one place per backend, a smoke test that runs one turn, contract tests.
+- **Plan limits.** bleep shares them with my coding. Mitigation: rules first, the `small` tier for background work, max 20 model calls an hour, pause on limit.
+- **Google setup friction.** The OAuth client and the "In production" switch are manual. Mitigation: a short guided checklist in settings with the exact clicks.
+- **Input Monitoring prompt.** macOS may reset it after each rebuild if the app is not signed with a stable identity. Mitigation: sign local builds with my local signing identity (worked for ScreenRecz).
+- **See-through windows on macOS.** Tauri needs `macOSPrivateApi` for transparency. Fine for a personal app that never goes to the App Store.
+- **Sleep.** Nothing runs while the Mac sleeps. Mitigation: catch up on wake; skip reminders for meetings that already ended; say "Back online" if the gap was over 2 hours.
+- **API spend (BYOK).** Unlike subscriptions, API calls cost money per token. Mitigation: cost meter, daily cap, `small` tier for background work.
+- **Codex built-in tools.** If the off switches do not work on the installed version, the shell tool stays in a read-only, no-network sandbox. Mitigation: verify first in Phase 5; if it is not safe enough, Codex stays off.
+- **Prompt injection.** See 8.10. No send without my tap.
+
+## 12. Left to the builder
+
+- Exact crate versions, module split inside `src-tauri/`, and React state library.
+- Exact CLI flag spellings and protocol messages (verify against the installed `claude --help`, `codex --help` and the Codex source).
+- Window sizes, animation timings and copy inside the app, within the landing page style.
+- SQLite migration tool.
