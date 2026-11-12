@@ -84,9 +84,25 @@ nav.top .links a.btn.primary:hover{background:#000}
 nav.top .btn{margin-left:6px}
 @media (max-width:760px){ nav.top .links a.hide-m{display:none} }
 
+/* ---------- waitlist ---------- */
+.joinwrap{max-width:480px; width:100%}
+.join{position:relative; display:flex; gap:6px; padding:6px; border-radius:16px; background:rgba(255,255,255,.65); border:1px solid var(--glass-line); box-shadow:var(--shadow); transition:box-shadow .2s}
+.join:focus-within{box-shadow:0 0 0 3px rgba(47,92,147,.2), var(--shadow)}
+.join input[type=email]{flex:1; min-width:0; font:16px var(--sans); padding:11px 12px; border:0; background:transparent; outline:none; color:var(--ink)}
+.join .btn{flex:none}
+.join .btn:disabled{opacity:.6; cursor:default}
+.join .hp{position:absolute; left:-9999px; width:1px; height:1px; opacity:0}
+.join.done{justify-content:center; align-items:center; gap:10px; padding:14px 16px; font-weight:700}
+.join.done span{width:26px; flex:none}
+.joinnote{font-size:14px; color:var(--muted); margin:10px 2px 0}
+.joinnote a{color:var(--blue)}
+.joinnote.err{color:var(--red)}
+#join .joinnote{text-align:center}
+@media (max-width:420px){ .join .btn{padding:13px 12px} }
+
 /* ---------- hero ---------- */
 .hero{display:grid; grid-template-columns:1.05fr .95fr; gap:24px; align-items:center; min-height:calc(100vh - 90px); padding:40px 0 56px}
-.hero h1{font:600clamp(44px,6.4vw,84px)/.98 var(--display); letter-spacing:-.01em; margin:18px 0 22px}
+.hero h1{font:600 clamp(44px,6.4vw,84px)/.98 var(--display); letter-spacing:-.01em; margin:18px 0 22px}
 .hero h1 .bl{color:var(--blue); position:relative; white-space:nowrap}
 .hero h1 .bl::after{content:""; position:absolute; left:2%; right:2%; bottom:.04em; height:.09em; background:var(--blue); opacity:.18; border-radius:4px}
 .hero p.lede{font-size:19px; color:var(--ink-2); max-width:520px; margin:0 0 30px}
@@ -486,7 +502,7 @@ footer a{color:var(--ink-2)}
       <a href="#cases" class="hide-m">Use cases</a>
       <a href="#memory" class="hide-m">Memory</a>
       <a href="#faq" class="hide-m">FAQ</a>
-      <a class="btn sm primary" href="#demo">Try the demo</a>
+      <a class="btn sm primary" href="#join">Get early access</a>
     </div>
   </div>
 </nav>
@@ -498,10 +514,15 @@ footer a{color:var(--ink-2)}
     <div>
       <h1 class="rv">A little droid that <span class="bl">bleeps</span> at the right moment.</h1>
       <p class="lede rv">bleep floats on your Mac. It watches your Claude Code and Codex sessions, your mail and your calendar. It handles the small asks, and it tells you what needs you.</p>
-      <div class="ctas rv">
-        <a class="btn primary" href="#demo">Try the demo</a>
-        <a class="btn ghost" href="#cases">See what it does</a>
-        <span class="kbdhint">or double-tap <kbd>⌥</kbd><kbd>⌥</kbd></span>
+      <div class="rv">
+      <div class="joinwrap">
+        <form class="join" data-join novalidate>
+          <input type="email" name="email" placeholder="you@email.com" autocomplete="email" aria-label="Your email" required>
+          <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <button class="btn primary" type="submit">Get early access</button>
+        </form>
+        <p class="joinnote" role="status">Not out yet. One email when it ships. <a href="#demo">Or try the demo</a></p>
+      </div>
       </div>
     </div>
     <div class="stage rv">
@@ -721,7 +742,7 @@ footer a{color:var(--ink-2)}
   <div class="wrap">
     <div class="sec-head rv"><div><h2>Questions.</h2></div></div>
     <div class="faq rv">
-      <details open><summary>Can I download it?</summary><p>Not yet. bleep is still being built. The demo on this page shows how it will work.</p></details>
+      <details open><summary>Can I download it?</summary><p>Not yet. bleep is still being built. Join the waitlist and you get one email when it ships. Until then, the demo on this page shows how it will work.</p></details>
       <details><summary>Can it approve things in Claude Code or Codex for me?</summary><p>Only what your rules allow. Out of the box that is tests, lint, file reads, and screenshots it can check against the ask. Push, deploy, delete, secrets and money always wait for you. Every approval goes in a log you can read.</p></details>
       <details><summary>Which AI does it use?</summary><p>Claude. bleep talks to Claude through Claude Code on your Mac, so it needs no new API key.</p></details>
       <details><summary>Will it ping me all day?</summary><p>No. Rules filter the noise first. It has quiet hours and a limit on pings per hour. Most checks end with it saying nothing.</p></details>
@@ -734,8 +755,15 @@ footer a{color:var(--ink-2)}
 <div class="wrap closer rv">
   <div class="droid" data-droid="full"></div>
   <h2>An AI buddy for your MacBook.</h2>
-  <div class="ctas" style="justify-content:center;display:flex;gap:10px;flex-wrap:wrap">
-    <a class="btn primary" href="#demo">Try the demo</a>
+  <div id="join" style="display:flex;justify-content:center">
+    <div class="joinwrap">
+        <form class="join" data-join novalidate>
+          <input type="email" name="email" placeholder="you@email.com" autocomplete="email" aria-label="Your email" required>
+          <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <button class="btn primary" type="submit">Get early access</button>
+        </form>
+        <p class="joinnote" role="status">Be first to get it. No spam, one email when it ships.</p>
+      </div>
   </div>
 </div>
 </main>
@@ -1334,6 +1362,36 @@ $('#compactBtn').onclick = () => {
   compacted = !compacted; drawBars(compacted);
   $('#compactBtn').textContent = compacted ? 'Keep chatting' : 'Run a compaction';
 };
+
+/* ================= waitlist ================= */
+const REF = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get('ref'); if (q) return q;
+    const r = document.referrer ? new URL(document.referrer).hostname : '';
+    return r && r !== location.hostname ? r : null;
+  } catch { return null; }
+})();
+document.querySelectorAll('[data-join]').forEach(form => form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const note = form.parentNode.querySelector('.joinnote'), btn = form.querySelector('button');
+  const email = form.email.value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { note.textContent = 'Please enter a valid email.'; note.classList.add('err'); form.email.focus(); return; }
+  btn.disabled = true; btn.textContent = 'Adding…'; note.classList.remove('err');
+  try {
+    const r = await fetch('/api/waitlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, ref: REF, website: form.website.value }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Something went wrong. Please try again.');
+    document.querySelectorAll('[data-join]').forEach(f => {
+      f.classList.add('done'); f.innerHTML = `<span>${DROID_HEAD}</span>You're on the list. bleep will bleep when it ships.`;
+      f.parentNode.querySelector('.joinnote').textContent = '';
+    });
+    droidState($('#heroDroid'), 'happy', 700);
+    try { window.va && va('event', { name: 'waitlist_join', ref: REF || 'direct' }); } catch {}
+  } catch (err) {
+    note.textContent = err.message; note.classList.add('err');
+    btn.disabled = false; btn.textContent = 'Get early access';
+  }
+}));
 
 /* ================= ⌥⌥ summon ================= */
 const chatEl = $('#chat'), chatHome = { parent: chatEl.parentNode, next: chatEl.nextSibling };
