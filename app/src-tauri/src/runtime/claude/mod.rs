@@ -10,6 +10,7 @@ use parse::ClaudeParser;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -42,6 +43,8 @@ pub struct ClaudeRuntime {
     cfg: Mutex<Option<SessionConfig>>,
     last_sid: Arc<Mutex<Option<String>>>,
     idle: Duration,
+    /// Above zero while an approval card waits on the user; the idle timer pauses.
+    hold: Option<Arc<AtomicUsize>>,
 }
 
 /// Find `claude` the way a login shell does; a GUI app does not get the terminal PATH.
@@ -81,8 +84,13 @@ impl ClaudeRuntime {
         self
     }
 
+    pub fn with_hold(mut self, hold: Arc<AtomicUsize>) -> Self {
+        self.hold = Some(hold);
+        self
+    }
+
     pub fn new(paths: BleepPaths, tiers: Tiers, bin: PathBuf) -> Self {
-        Self { paths, tiers, bin, warm: Default::default(), cfg: Mutex::new(None), last_sid: Default::default(), idle: IDLE_TIMEOUT }
+        Self { paths, tiers, bin, warm: Default::default(), cfg: Mutex::new(None), last_sid: Default::default(), idle: IDLE_TIMEOUT, hold: None }
     }
 
     fn spawn(&self, cfg: &SessionConfig) -> anyhow::Result<Warm> {
@@ -224,9 +232,11 @@ impl AgentRuntime for ClaudeRuntime {
         }
         let last_sid = self.last_sid.clone();
         let idle = self.idle;
+        let hold = self.hold.clone();
         let turn = Turn { guard, parser: ClaudeParser::default(), pending: VecDeque::new(), done: false };
         Ok(Box::pin(futures::stream::unfold(turn, move |mut st| {
             let last_sid = last_sid.clone();
+            let hold = hold.clone();
             async move {
                 loop {
                     if let Some(e) = st.pending.pop_front() {
@@ -238,7 +248,13 @@ impl AgentRuntime for ClaudeRuntime {
                     let Some(w) = st.guard.as_mut() else { return None };
                     let next = match w.early.pop_front() {
                         Some(l) => Ok(Some(l)),
-                        None => tokio::time::timeout(idle, w.lines.recv()).await,
+                        // Silence while an approval card waits on the user is not a stall.
+                        None => loop {
+                            match tokio::time::timeout(idle, w.lines.recv()).await {
+                                Err(_) if hold.as_ref().is_some_and(|h| h.load(std::sync::atomic::Ordering::SeqCst) > 0) => continue,
+                                r => break r,
+                            }
+                        },
                     };
                     match next {
                         Err(_) => {
@@ -382,10 +398,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn held_turn_does_not_stall() {
+        use std::sync::atomic::Ordering;
+        let hold = Arc::new(AtomicUsize::new(1));
+        let (_d, rt) = rt(fixture_bin("hang_mid_turn.sh"));
+        let rt = rt.with_idle_timeout(std::time::Duration::from_millis(300)).with_hold(hold.clone());
+        let h = rt.start_session(cfg()).await.unwrap();
+        let mut s = rt.send(&h, UserMessage { text: "a".into() }).await.unwrap();
+        let mut seen = vec![];
+        let waited = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Some(e) = s.next().await {
+                seen.push(e);
+            }
+        })
+        .await;
+        assert!(waited.is_err(), "the turn ended while an approval was waiting: {seen:?}");
+        hold.store(0, Ordering::SeqCst);
+        let rest = collect(s).await;
+        assert!(rest.iter().any(|e| matches!(e, AgentEvent::Error { message, .. } if message.contains(STALLED))), "{rest:?}");
+    }
+
+    #[tokio::test]
     async fn dead_idle_child_is_respawned() {
         let (_d, rt) = rt(fixture_bin("die_once.sh"));
         let h = rt.start_session(cfg()).await.unwrap();
-        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        // Wait for the real exit, not a fixed time: a busy machine starts `sh` slowly.
+        for _ in 0..500 {
+            if rt.warm.lock().await.as_ref().is_some_and(|w| w.lines.is_closed()) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
         let ev = collect(rt.send(&h, UserMessage { text: "a".into() }).await.unwrap()).await;
         crate::runtime::contract::assert_text_turn(&ev, "hi there");
     }

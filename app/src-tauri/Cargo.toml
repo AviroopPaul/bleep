@@ -35,9 +35,13 @@ tauri-plugin-autostart = "2.7"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSResponder"] }
 rusqlite = { version = "0.42", features = ["bundled"] }
+oauth2 = { version = "5", default-features = false, features = ["reqwest", "rustls-tls"] }
+keyring = { version = "3", features = ["apple-native"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tauri-plugin-opener = "2"
+base64 = "0.22"
 
 [dev-dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["json"] }
 tempfile = "3"
 
 [profile.release]

@@ -14,6 +14,20 @@ impl Default for Tiers {
     }
 }
 
+/// Google OAuth client (Desktop app type) from my own Cloud project. Debug hides the secret.
+#[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GoogleConfig {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
+impl std::fmt::Debug for GoogleConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GoogleConfig").field("client_id", &self.client_id).field("client_secret", &"<hidden>").finish()
+    }
+}
+
 /// `~/.bleep/config.toml`. Unknown keys are ignored so later phases can add fields.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -24,6 +38,7 @@ pub struct Config {
     pub summon_fallback: String,
     pub autostart_set: bool,
     pub summon_note_shown: bool,
+    pub google: GoogleConfig,
 }
 
 impl Default for Config {
@@ -35,6 +50,7 @@ impl Default for Config {
             summon_fallback: "Alt+Space".into(),
             autostart_set: false,
             summon_note_shown: false,
+            google: GoogleConfig::default(),
         }
     }
 }
@@ -49,8 +65,14 @@ impl Config {
     }
 
     pub fn save(&self, path: &Path) -> anyhow::Result<()> {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
         let tmp = path.with_extension("toml.tmp");
-        std::fs::write(&tmp, toml::to_string_pretty(self)?)?;
+        // 0600: the file holds the Google client secret.
+        let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&tmp)?;
+        f.write_all(toml::to_string_pretty(self)?.as_bytes())?;
+        drop(f);
+        std::fs::set_permissions(&tmp, std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
         std::fs::rename(tmp, path)?;
         Ok(())
     }
@@ -99,6 +121,19 @@ mod tests {
         assert_eq!(p.claude_home, PathBuf::from("/tmp/x/claude-home"));
         assert_eq!(p.claude_work, PathBuf::from("/tmp/x/claude-work"));
         assert_eq!(p.config_file, PathBuf::from("/tmp/x/config.toml"));
+    }
+
+    #[test]
+    fn config_with_google_is_saved_0600() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("config.toml");
+        let mut c = Config::default();
+        c.google = GoogleConfig { client_id: "cid".into(), client_secret: "shh".into() };
+        c.save(&p).unwrap();
+        assert_eq!(std::fs::metadata(&p).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(Config::load(&p).unwrap().google, c.google);
+        assert!(!format!("{:?}", c).contains("shh"));
     }
 
     #[test]

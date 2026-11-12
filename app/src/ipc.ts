@@ -10,6 +10,48 @@ export interface ToolStep {
   preview: string | null;
 }
 
+export type ApprovalStatus = "pending" | "approved" | "declined" | "expired" | "done" | "failed";
+
+export interface Approval {
+  id: number;
+  tool: string;
+  payload: Record<string, unknown>;
+  status: ApprovalStatus;
+  turn_message_id: number | null;
+  result: string | null;
+  created_at: string;
+  decided_at: string | null;
+}
+
+export type ConnectorStatus =
+  | { state: "connected"; account: string }
+  | { state: "needs_setup" }
+  | { state: "needs_sign_in" }
+  | { state: "error"; message: string };
+
+export interface GoogleState {
+  client_id: string;
+  has_secret: boolean;
+  status: ConnectorStatus;
+  expired: boolean;
+  /** This build carries bleep's own Google app: users only sign in. */
+  builtin: boolean;
+  using_own: boolean;
+}
+
+export type LinkName = "console" | "calendar_api" | "gmail_api" | "consent" | "credentials";
+
+export interface BarCue {
+  key: string;
+  kind: "hour" | "ten_min";
+  event_id: string;
+  title: string;
+  start: string;
+  end: string;
+  meet_link: string | null;
+  attendees: string[];
+}
+
 export interface Message {
   id: number;
   role: Role;
@@ -20,6 +62,7 @@ export interface Message {
   status: MsgStatus;
   session_id: number | null;
   created_at: string;
+  approvals?: Approval[];
 }
 
 export type AgentEvent =
@@ -57,7 +100,37 @@ export const api = {
   openChat: (anchor: "droid" | "center") => invoke<void>("chat_open", { anchor }),
   hideChat: () => invoke<void>("chat_hide"),
   toggleTuck: () => invoke<void>("droid_toggle_tuck"),
+  decide: (id: number, approve: boolean) => invoke<void>("approval_decide", { id, approve }),
+  barCurrent: () => invoke<BarCue | null>("bar_current"),
+  barPrep: () => invoke<void>("bar_prep"),
+  barSnooze: () => invoke<void>("bar_snooze"),
+  barJoin: () => invoke<void>("bar_join"),
+  barDismiss: () => invoke<void>("bar_dismiss"),
+  bubbleClick: () => invoke<void>("bubble_click"),
+  googleState: () => invoke<GoogleState>("google_state"),
+  googleSaveClient: (clientId: string, clientSecret: string) => invoke<GoogleState>("google_save_client", { clientId, clientSecret }),
+  googleConnect: () => invoke<string>("google_connect"),
+  googleUseBuiltin: () => invoke<GoogleState>("google_use_builtin"),
+  googleDisconnect: () => invoke<void>("google_disconnect"),
+  openLink: (which: LinkName) => invoke<void>("open_link", { which }),
+  openSettings: () => invoke<void>("settings_open"),
+  openUrl: (url: string) => invoke<void>("open_url", { url }),
 };
+
+export const onGoogleStatus = (cb: (s: ConnectorStatus) => void): Promise<UnlistenFn> =>
+  listen<ConnectorStatus>("google://status", (e) => cb(e.payload));
+
+export const onBarCue = (cb: (c: BarCue) => void): Promise<UnlistenFn> => listen<BarCue>("bar://cue", (e) => cb(e.payload));
+export const onBarHide = (cb: () => void): Promise<UnlistenFn> => listen("bar://hide", () => cb());
+export const onBubbleText = (cb: (text: string) => void): Promise<UnlistenFn> =>
+  listen<{ text: string }>("bubble://text", (e) => cb(e.payload.text));
+export const onDroidMood = (cb: (mood: "alert" | "idle") => void): Promise<UnlistenFn> =>
+  listen<{ mood: "alert" | "idle" }>("droid://mood", (e) => cb(e.payload.mood));
+export const onNotice = (cb: (text: string) => void): Promise<UnlistenFn> =>
+  listen<{ text: string }>("chat://notice", (e) => cb(e.payload.text));
+
+export const onApproval = (cb: (a: Approval) => void): Promise<UnlistenFn> =>
+  listen<Approval>("approval://changed", (e) => cb(e.payload));
 
 export const onChatEvent = (cb: (e: ChatEmit) => void): Promise<UnlistenFn> =>
   listen<ChatEmit>("chat://event", (e) => cb(e.payload));
