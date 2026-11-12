@@ -384,20 +384,79 @@ section{padding:84px 0}
 .fab{display:none}
 @media (hover:none){ .fab{display:flex; position:fixed; right:16px; bottom:16px; z-index:85; width:58px; height:58px; border-radius:50%; align-items:center; justify-content:center; padding:6px} .toast{display:none} }
 
-/* ---------- use cases ---------- */
-.cases{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
-.case.wide{grid-column:span 2}
-.case{border-radius:18px; padding:20px; display:flex; flex-direction:column; gap:12px; min-height:300px}
-.case .num{font:500 11px var(--mono); color:var(--muted); letter-spacing:.12em}
-.case h3{font:700 22px/1.1 var(--display); letter-spacing:-.01em; margin:0}
-.case p{margin:0; color:var(--ink-2); font-size:14.5px}
-.case .mini{margin-top:auto; border-radius:12px; padding:10px; background:rgba(255,255,255,.65); border:1px solid rgba(27,31,36,.07); font-size:12.5px}
-.case .play{align-self:flex-start; font:600 12.5px var(--sans); border:0; background:transparent; color:var(--blue); cursor:pointer; padding:0}
-.case .play:hover{text-decoration:underline}
-.mini .row{display:flex; align-items:center; gap:8px; padding:4px 0}
-.mini .sw{width:10px; height:10px; border-radius:3px; flex:none}
-@media (max-width:1000px){ .cases{grid-template-columns:1fr 1fr} }
-@media (max-width:620px){ .cases{grid-template-columns:1fr} .case.wide{grid-column:auto} }
+/* ---------- what it can do: a stack of photos you flip through by scrolling ---------- */
+#cases{padding:0}
+.stackouter{position:relative; height:calc(100vh + 5.5 * 62vh)}
+.pin{position:sticky; top:0; height:100vh; display:flex; flex-direction:column; justify-content:center; overflow:hidden; padding-top:64px}
+.cando-head h2{font:700 clamp(34px,4.2vw,54px)/1.02 var(--display); letter-spacing:-.01em; margin:0}
+.cando-head p{margin:10px 0 0; color:var(--ink-2); font-size:17px}
+.stage{position:relative; height:min(540px, 64vh); margin-top:14px}
+.stage .pc{position:absolute; left:50%; top:50%; width:min(330px, 74vw, 46vh); transform:translate(-50%,-50%); will-change:transform, opacity}
+.pc{background:#FFFEFB; padding:12px 12px 0; border-radius:10px; box-shadow:0 2px 0 rgba(255,255,255,.8) inset, 0 28px 50px -24px rgba(27,31,36,.45), 0 3px 10px rgba(27,31,36,.08)}
+.stackmeta{display:flex; justify-content:center; align-items:center; gap:14px; margin-top:6px; font:500 12px var(--mono); color:var(--muted)}
+.stackdots{display:flex; gap:6px}
+.stackdots button{width:8px; height:8px; padding:0; border:0; border-radius:6px; background:rgba(27,31,36,.18); cursor:pointer; transition:width .25s, background .25s}
+.stackdots button.on{width:24px; background:var(--ink)}
+.stackhint{transition:opacity .3s}
+/* reduced motion: a plain grid, no pinning */
+#cases.flat{padding:84px 0}
+.flat .stackouter{height:auto} .flat .pin{position:static; height:auto; padding-top:0}
+.flat .stage{height:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:24px; margin-top:30px}
+.flat .stage .pc{position:static; width:auto; transform:none} .flat .stackmeta{display:none}
+.pc figcaption{padding:14px 6px 16px}
+.pc figcaption b{display:block; font:700 21px/1.15 var(--display); letter-spacing:-.005em}
+.pc figcaption span{display:block; margin-top:4px; font-size:14px; color:var(--muted); line-height:1.4}
+.pc figure{margin:0}
+.art{position:relative; aspect-ratio:1/1; border-radius:6px; overflow:hidden; container-type:inline-size}
+.art > *{position:absolute}
+.art .dr{width:34cqw}
+.art .dr svg{width:100%; display:block}
+.stk{display:flex; align-items:center; gap:2.4cqw; background:#fff; color:var(--ink); font:600 4.1cqw/1 var(--mono); padding:2.6cqw 3.4cqw; border-radius:3cqw; box-shadow:0 2cqw 5cqw -2cqw rgba(27,31,36,.45); white-space:nowrap}
+.stk .ck{width:5.4cqw; height:5.4cqw; border-radius:50%; display:grid; place-items:center; font:800 3.4cqw/1 var(--sans); color:#fff; background:var(--sage); flex:none}
+.stk.dark{background:var(--ink); color:#fff}
+.stk.dark .ck{background:var(--db-coral)}
+/* 1 agents */
+.a1{background:radial-gradient(70% 60% at 50% 70%, rgba(255,255,255,.35), transparent 70%), linear-gradient(160deg,#F08A70,#EC6F55 60%,#E05B44)}
+/* 2 meetings */
+.a2{background:radial-gradient(80% 60% at 50% 40%, rgba(255,255,255,.4), transparent 70%), linear-gradient(160deg,#9CD2F2,#67B7E6)}
+.clock{left:50%; top:9%; width:62cqw; height:62cqw; transform:translateX(-50%); border-radius:50%; background:#fff; box-shadow:0 3cqw 7cqw -3cqw rgba(27,31,36,.5), inset 0 0 0 2cqw #F3F1EA}
+.clock::before{content:""; position:absolute; inset:8cqw; border-radius:50%; background:conic-gradient(var(--db-coral) 0 25%, transparent 25%); opacity:.9}
+.clock::after{content:""; position:absolute; inset:13cqw; border-radius:50%; background:#fff}
+.clock i{position:absolute; left:50%; top:50%; z-index:2; transform-origin:50% 100%; border-radius:2cqw; background:var(--ink)}
+.clock i.h{width:2.2cqw; height:13cqw; margin:-13cqw 0 0 -1.1cqw; transform:rotate(-30deg)}
+.clock i.m{width:1.6cqw; height:19cqw; margin:-19cqw 0 0 -.8cqw; transform:rotate(0deg)}
+.clock em{position:absolute; left:50%; top:62%; transform:translateX(-50%); z-index:2; font:700 5.4cqw var(--display); font-style:normal; color:var(--db-coral)}
+.clock b{position:absolute; left:50%; top:50%; width:4cqw; height:4cqw; margin:-2cqw 0 0 -2cqw; border-radius:50%; background:var(--ink); z-index:3}
+.mbar{left:50%; bottom:8%; transform:translateX(-50%) rotate(-2deg); display:flex; align-items:center; gap:2.6cqw; padding:2.4cqw 2.4cqw 2.4cqw 3.6cqw; border-radius:4cqw; background:rgba(22,24,28,.92); color:#fff; font:700 4.3cqw/1 var(--sans); white-space:nowrap; box-shadow:0 3cqw 7cqw -3cqw rgba(0,0,0,.6)}
+.mbar .pu{width:2.6cqw; height:2.6cqw; border-radius:50%; background:var(--db-coral); box-shadow:0 0 0 1.4cqw rgba(236,111,85,.3)}
+.mbar em{font-style:normal; background:#fff; color:var(--ink); padding:2cqw 2.8cqw; border-radius:2.6cqw; font-size:3.9cqw}
+/* 3 bills */
+.a3{background:radial-gradient(70% 60% at 40% 40%, rgba(255,255,255,.35), transparent 70%), linear-gradient(160deg,#F4CB75,#E8A93B)}
+.bill{left:12%; top:9%; width:52cqw; padding:6cqw 5cqw 8cqw; background:#FFFDF8; transform:rotate(-6deg); box-shadow:0 3cqw 8cqw -3cqw rgba(27,31,36,.5); font:500 3.6cqw/1.5 var(--mono); color:var(--ink-2)}
+.bill::after{content:""; position:absolute; left:0; right:0; bottom:-2.4cqw; height:2.4cqw; background:radial-gradient(circle at 1.6cqw 0, transparent 1.6cqw, #FFFDF8 1.7cqw) 0 0/3.2cqw 2.4cqw repeat-x}
+.bill b{display:block; font:700 5.4cqw/1.1 var(--display); color:var(--ink); margin-bottom:3cqw}
+.bill .amt{display:block; font:700 9cqw/1 var(--display); color:var(--ink); margin:3cqw 0}
+.bill hr{border:0; border-top:.4cqw dashed #C9CED4; margin:2cqw 0}
+.due{right:7%; top:22%; width:30cqw; height:30cqw; border-radius:50%; border:1.4cqw solid var(--red); color:var(--red); display:grid; place-items:center; text-align:center; font:700 6cqw/1 var(--display); transform:rotate(14deg); background:rgba(255,255,255,.25)}
+.due small{display:block; font:600 3cqw var(--mono); margin-top:1cqw}
+.ctile{right:12%; bottom:7%; width:31cqw; border-radius:3.4cqw; overflow:hidden; background:#fff; box-shadow:0 3cqw 7cqw -3cqw rgba(27,31,36,.5); transform:rotate(5deg); text-align:center}
+.ctile b{display:block; background:#EA4335; color:#fff; font:700 3.6cqw/1 var(--sans); padding:2cqw 0; letter-spacing:.1em}
+.ctile strong{display:block; font:700 10cqw/1 var(--display); padding:2cqw 0 0}
+.ctile span{display:block; font:600 3.4cqw var(--sans); color:var(--muted); padding:0 2cqw 3cqw}
+/* 4 answers */
+.a4{background:radial-gradient(70% 60% at 50% 50%, rgba(255,255,255,.3), transparent 70%), linear-gradient(160deg,#C2B6F8,#A797F2)}
+.qb{right:8%; top:10%; max-width:64cqw; background:var(--ink); color:#fff; font:600 5cqw/1.3 var(--sans); padding:4cqw 5cqw; border-radius:5cqw 5cqw 1.4cqw 5cqw; transform:rotate(2deg); box-shadow:0 3cqw 7cqw -3cqw rgba(27,31,36,.5)}
+.ab{left:7%; bottom:12%; max-width:70cqw; background:#fff; font:600 5cqw/1.3 var(--sans); padding:4cqw 5cqw; border-radius:5cqw 5cqw 5cqw 1.4cqw; transform:rotate(-2.5deg); box-shadow:0 3cqw 7cqw -3cqw rgba(27,31,36,.5)}
+.ab .srcs{display:flex; gap:2cqw; margin-bottom:2.6cqw}
+.ab .srcs span{display:flex; align-items:center; gap:1.4cqw; font:500 3.2cqw var(--mono); color:var(--muted); background:rgba(27,31,36,.05); padding:1.4cqw 2cqw; border-radius:2cqw}
+.ab .srcs i{width:4cqw; height:4cqw; display:block} .ab .srcs i svg{width:100%; height:100%; display:block}
+/* 5 memory */
+.a5{background:radial-gradient(70% 60% at 50% 50%, rgba(255,255,255,.3), transparent 70%), linear-gradient(160deg,#B4CFAE,#8FB08A)}
+.note{width:40cqw; padding:5cqw 4.4cqw 6cqw; font:600 5cqw/1.25 var(--display); color:#4A3F1C; box-shadow:0 3cqw 6cqw -3cqw rgba(27,31,36,.45)}
+.note::before{content:""; position:absolute; left:50%; top:-1.6cqw; width:4.6cqw; height:4.6cqw; margin-left:-2.3cqw; border-radius:50%; background:radial-gradient(circle at 35% 35%, #ff8e7a, var(--red)); box-shadow:0 1cqw 1.4cqw rgba(0,0,0,.3)}
+.note.y{background:#FFE58A} .note.p{background:#FFC9D6} .note.b{background:#CFE6FA}
+.a5 .dr{width:26cqw; right:6%; bottom:4%}
+@media (max-height:700px){ .cando-head p{display:none} }
 
 /* ---------- connectors ---------- */
 .plugs{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
@@ -499,7 +558,7 @@ footer a{color:var(--ink-2)}
     <a class="brand" href="#top"><span data-droid="head"></span>bleep</a>
     <div class="links">
       <a href="#demo" class="hide-m">Demo</a>
-      <a href="#cases" class="hide-m">Use cases</a>
+      <a href="#cases" class="hide-m">What it does</a>
       <a href="#memory" class="hide-m">Memory</a>
       <a href="#faq" class="hide-m">FAQ</a>
       <a class="btn sm primary" href="#join">Get early access</a>
@@ -630,56 +689,66 @@ footer a{color:var(--ink-2)}
   </div>
 </section>
 
-<!-- ============ USE CASES ============ -->
+<!-- ============ WHAT IT CAN DO ============ -->
 <section id="cases">
+ <div class="stackouter" id="stackOuter">
+  <div class="pin">
   <div class="wrap">
-    <div class="sec-head rv">
-      <div><h2>Five jobs it does well.</h2></div>
-    </div>
-    <div class="cases">
-      <article class="case glass rv wide">
-        <h3>Unblocks your coding agents</h3>
-        <p>Claude Code and Codex stop to ask you things. bleep reads each ask. If it is safe and the checks pass, it approves. If not, it puts it on your list and tells you when you are back.</p>
-        <div class="mini mono" style="font-size:11px">
-          <div class="row"><span class="src cc" data-icon="cc"></span>bleep · npm test <span style="margin-left:auto;color:var(--sage)">approved · 42 passed</span></div>
-          <div class="row"><span class="src cc" data-icon="cc"></span>portfolio · mobile screenshot <span style="margin-left:auto;color:var(--sage)">matches · go on</span></div>
-          <div class="row"><span class="src cx" data-icon="cx"></span>api · git push --force <span style="margin-left:auto;color:var(--rust)">needs you</span></div>
-        </div>
-        <button class="play" data-scene="agents">▶ Play in demo</button>
-      </article>
-      <article class="case glass rv">
-        <h3>Catches bills and due dates</h3>
-        <p>It spots bills in your mail. It puts a reminder on your calendar after you say yes.</p>
-        <div class="mini">
-          <div class="row"><span class="src gm" data-icon="gm"></span>City Power · ₹2,340 <span class="mono" style="margin-left:auto;color:#7E5612;font-size:11px">due today</span></div>
-          <div class="row"><span class="src ca" data-icon="ca"></span>Pay bill · 6:00 PM <span class="mono" style="margin-left:auto;color:var(--sage);font-size:11px">added</span></div>
-        </div>
-        <button class="play" data-scene="wrap">▶ Play in demo</button>
-      </article>
-      <article class="case glass rv">
-        <h3>Taps you before meetings</h3>
-        <p>One hour before, a small bar slides in. Ask for prep. It pulls your last threads with each guest.</p>
-        <div class="mini" style="background:#16181C;color:#fff;border:0"><div class="row"><span class="sw" style="background:var(--db-coral);border-radius:50%"></span><b style="font-weight:600">Design review</b><span style="color:#9aa0a8;margin-left:auto;font-size:11px" class="mono">in 60 min</span></div></div>
-        <button class="play" data-scene="meeting">▶ Play in demo</button>
-      </article>
-      <article class="case glass rv">
-        <h3>Answers across your workbench</h3>
-        <p>Ask in plain words. bleep searches Gmail and Calendar, reads the threads, and joins it into one answer.</p>
-        <div class="mini mono" style="font-size:11px">
-          <div class="row"><span class="src gm" data-icon="gm"></span>gmail.search <span style="margin-left:auto;color:var(--muted)">2 threads</span></div>
-          <div class="row"><span class="src ca" data-icon="ca"></span>calendar.next <span style="margin-left:auto;color:var(--muted)">3 PM</span></div>
-          <div class="row"><span class="src gm" data-icon="gm"></span>gmail.read_thread <span style="margin-left:auto;color:var(--muted)">Meera</span></div>
-        </div>
-        <button class="play" data-scene="checkin">▶ Play in demo</button>
-      </article>
-      <article class="case glass rv">
-        <h3>Learns how you work</h3>
-        <p>It notices patterns, like when you pay bills. You can read and edit all of it.</p>
-        <div class="mini"><span class="memtag">FROM MEMORY</span><div>You pay bills the evening they are due.</div></div>
-        <button class="play" data-scene="memory">▶ Play in demo</button>
-      </article>
+    <div class="cando-head">
+      <h2>What it can do for you.</h2><p>Small jobs, done at the right moment.</p>
     </div>
   </div>
+  <div class="stage" id="stage">
+
+    <figure class="pc">
+      <div class="art a1" aria-hidden="true">
+        <div class="stk" style="left:7%;top:9%;transform:rotate(-7deg)"><span class="ck">✓</span>npm test · 42 passed</div>
+        <div class="stk" style="right:6%;top:27%;transform:rotate(6deg)"><span class="ck">✓</span>looks right · go on</div>
+        <div class="stk dark" style="left:6%;bottom:12%;transform:rotate(4deg)"><span class="ck">!</span>git push --force</div>
+        <div class="dr droid" data-droid="full" style="right:8%;bottom:4%"></div>
+      </div>
+      <figcaption><b>Unblocks your coding agents</b><span>Approves the safe asks in Claude Code and Codex. Saves the risky ones for you.</span></figcaption>
+    </figure>
+
+    <figure class="pc">
+      <div class="art a2" aria-hidden="true">
+        <div class="clock"><i class="h"></i><i class="m"></i><b></b><em>60 min</em></div>
+        <div class="mbar"><span class="pu"></span>Design review<em>Prep me</em></div>
+      </div>
+      <figcaption><b>Taps you before meetings</b><span>An hour before, with notes from your last threads with each guest.</span></figcaption>
+    </figure>
+
+    <figure class="pc">
+      <div class="art a3" aria-hidden="true">
+        <div class="bill"><b>City Power</b>Account 4471<hr><span class="amt">₹2,340</span>Pay by 11:59 PM</div>
+        <div class="due">DUE<small>today</small></div>
+        <div class="ctile"><b>THU</b><strong>6 PM</strong><span>Pay the bill</span></div>
+      </div>
+      <figcaption><b>Catches bills before they are late</b><span>Spots the bill, checks for a receipt, offers a reminder. It never pays.</span></figcaption>
+    </figure>
+
+    <figure class="pc">
+      <div class="art a4" aria-hidden="true">
+        <div class="qb">Is Meera's offsite on 4 to 6 Dec okay for me?</div>
+        <div class="ab"><div class="srcs"><span><i data-icon="gm"></i>2 threads</span><span><i data-icon="ca"></i>free</span></div>Yes. You are free all three days. Draft a yes?</div>
+      </div>
+      <figcaption><b>Answers from your mail and calendar</b><span>Ask in plain words. It reads the threads and shows every step.</span></figcaption>
+    </figure>
+
+    <figure class="pc">
+      <div class="art a5" aria-hidden="true">
+        <div class="note y" style="left:8%;top:9%;transform:rotate(-6deg)">pays bills the evening they are due</div>
+        <div class="note p" style="right:8%;top:16%;transform:rotate(5deg)">likes prep 1 hour before</div>
+        <div class="note b" style="left:12%;bottom:9%;transform:rotate(3deg)">"Sync" = 1:1 with Priya</div>
+        <div class="dr droid" data-droid="full"></div>
+      </div>
+      <figcaption><b>Learns how you work</b><span>Plain notes on your Mac. Read them, edit them, or tap forget.</span></figcaption>
+    </figure>
+
+  </div>
+  <div class="stackmeta"><span id="stackNum">1 / 5</span><div class="stackdots" id="stackDots"></div><span class="stackhint" id="stackHint">scroll to flip</span></div>
+  </div>
+ </div>
 </section>
 
 <!-- ============ WORKS WITH ============ -->
@@ -1245,6 +1314,58 @@ document.querySelectorAll('[data-scene]').forEach(b => b.addEventListener('click
   stopAuto(); $('#demo').scrollIntoView({ behavior: 'smooth' });
   setTimeout(() => runScene(b.dataset.scene), 600);
 }));
+
+/* what-it-can-do: the section pins, and scrolling flips through the photo stack */
+(() => {
+  const sec = $('#cases'), outer = $('#stackOuter'), cards = [...document.querySelectorAll('#stage .pc')], N = cards.length;
+  const dotsEl = $('#stackDots');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { sec.classList.add('flat'); return; }
+  const R = [-4, 3, -2.5, 4, -3];               // each photo's resting tilt
+  const ease = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+  const LEAD = .25, FOLD = .9, TAIL = .3;      // hold before the first flip, then the fold into one stack, then a hold
+  const U = N - 1 + LEAD + FOLD + TAIL;
+  const FINAL_R = [-3, 2.5, -1.5, 2, 0];       // tilts in the final neat stack; the last photo sits straight on top
+  const dots = cards.map((_, i) => { const b = document.createElement('button'); b.setAttribute('aria-label', `Photo ${i + 1}`); dotsEl.appendChild(b); return b; });
+  const total = () => outer.offsetHeight - innerHeight;
+  dots.forEach((b, i) => b.onclick = () => scrollTo({ top: outer.offsetTop + ((i + LEAD) / U) * total(), behavior: 'smooth' }));
+  let raf = 0;
+  function frame() {
+    raf = 0;
+    const t = Math.min(1, Math.max(0, -outer.getBoundingClientRect().top / total()));
+    const raw = t * U - LEAD;
+    const p = Math.min(N - 1, Math.max(0, raw));
+    const f = ease(Math.min(1, Math.max(0, (raw - (N - 1)) / FOLD)));  // 0 until the last flip is done, then 0 to 1
+    const W = cards[0].offsetWidth, narrow = innerWidth < 760;
+    const pileX = narrow ? -(innerWidth / 2 + W) : -Math.min(innerWidth * .3, 440);
+    cards.forEach((c, i) => {
+      const d = p - i; let x, y, r, s, z, o = 1;
+      if (d <= 0) {                              // still in the stack: deeper photos sit up and to the right
+        const k = -d;
+        x = k * 16; y = -k * 12; r = R[i]; s = 1 - k * .04; z = 100 - i; o = k > 3.3 ? 0 : 1;
+      } else if (d < 1) {                        // being flipped off the top
+        const e = ease(d);
+        x = pileX * e; y = -40 * Math.sin(Math.PI * d); r = R[i] - 16 * e; s = 1 - .1 * e; z = 200;
+      } else {                                   // on the seen pile
+        const age = Math.min(3, d - 1);
+        x = pileX - age * 12; y = age * 8; r = R[i] - 16 - age * 2; s = .9 - age * .02; z = 50 + i;
+        o = narrow ? 0 : Math.max(0, 1 - age * .3);
+      }
+      if (f > 0) {                               // fold everything into one tidy stack under the last photo
+        const j = N - 1 - i, L = (a, b) => a + (b - a) * f;
+        x = L(x, j * 5); y = L(y, -j * 5); r = L(r, FINAL_R[i]); s = L(s, 1); o = L(o, 1); z = 100 + i;
+      }
+      c.style.transform = `translate(-50%,-50%) translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${r.toFixed(2)}deg) scale(${s.toFixed(3)})`;
+      c.style.zIndex = z; c.style.opacity = o;
+    });
+    const cur = Math.round(p);
+    dots.forEach((b, i) => b.classList.toggle('on', i === cur));
+    $('#stackNum').textContent = `${cur + 1} / ${N}`;
+    $('#stackHint').style.opacity = p > .4 ? 0 : 1;
+  }
+  addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(frame); }, { passive: true });
+  addEventListener('resize', frame);
+  frame();
+})();
 
 /* the day runs on its own once the demo is in view; any click hands control to you */
 let autoOn = false, autoStarted = false;
