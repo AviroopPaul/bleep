@@ -30,7 +30,7 @@
 <script defer src="/_vercel/insights/script.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#1B1F24; --ink-2:#3A424C; --muted:#66707B; --line:rgba(27,31,36,.12);
@@ -107,31 +107,118 @@ nav.top .btn{margin-left:6px}
 #join .joinnote{text-align:center}
 @media (max-width:420px){ .join .btn{padding:13px 12px} }
 
-/* ---------- hero ---------- */
-.hero{display:grid; grid-template-columns:1.05fr .95fr; gap:24px; align-items:center; min-height:calc(100vh - 90px); padding:40px 0 56px}
-.hero h1{font:600 clamp(44px,6.4vw,84px)/.98 var(--display); letter-spacing:-.01em; margin:18px 0 22px}
-.hero h1 .bl{color:var(--blue); position:relative; white-space:nowrap}
-.hero h1 .bl::after{content:""; position:absolute; left:2%; right:2%; bottom:.04em; height:.09em; background:var(--blue); opacity:.18; border-radius:4px}
-.hero p.lede{font-size:19px; color:var(--ink-2); max-width:520px; margin:0 0 30px}
-.hero .ctas{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
 .kbdhint{display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); margin-left:6px}
 kbd{display:inline-grid; place-items:center; min-width:28px; height:28px; padding:0 7px; font:500 14px/1 var(--mono); color:var(--ink); background:linear-gradient(#fff,#ECEDEA); border:1px solid rgba(27,31,36,.18); border-bottom-width:2px; border-radius:7px}
 .chip{display:inline-flex; align-items:center; gap:8px; padding:7px 12px 7px 9px; border-radius:99px; font-size:13px; color:var(--ink-2)}
 .dot{width:8px; height:8px; border-radius:50%; background:var(--sage); box-shadow:0 0 0 3px rgba(95,122,90,.18)}
-.stage{position:relative; height:min(560px,70vh); display:grid; place-items:center}
-.stage .ring{position:absolute; width:78%; aspect-ratio:1; border-radius:50%; border:1px dashed rgba(47,92,147,.25)}
-.stage .ring.r2{width:56%; border-style:solid; border-color:rgba(27,31,36,.06); background:radial-gradient(circle, rgba(255,255,255,.55), transparent 70%)}
-.hero-droid{width:min(330px,62%); position:relative; z-index:2; cursor:pointer}
-.sticker{position:absolute; z-index:3; border-radius:14px; padding:10px 12px; font-size:13px; display:flex; gap:10px; align-items:center; animation:floaty 6s ease-in-out infinite}
-.sticker b{display:block; font-weight:600; font-size:13.5px; color:var(--ink)}
-.sticker span{color:var(--muted); font-size:12px}
-.sticker .ic{width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font:600 12px var(--mono); color:#fff}
-.sticker.s1{top:12%; left:0}
-.sticker.s2{top:44%; right:-2%; animation-delay:-2s}
-.sticker.s3{bottom:9%; left:6%; animation-delay:-4s}
-@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.hero-bubble{position:absolute; z-index:4; top:16%; right:18%; background:var(--ink); color:#fff; font:500 13px/1.3 var(--mono); padding:9px 12px; border-radius:12px 12px 12px 3px; opacity:0; transform:translateY(6px) scale(.96); transition:.25s; pointer-events:none; max-width:220px}
+/* ---------- hero: headline on top, cards in a semicircle around bleep ---------- */
+.hero{position:relative; padding:0 0 8px}
+.htop{display:flex; flex-direction:column; align-items:center; text-align:center; padding:40px 0 4px}
+.hero h1{font:600 clamp(38px,4.6vw,64px)/1.03 var(--display); letter-spacing:-.015em; margin:0 0 16px}
+.hero h1 span{color:#A2A7AD}
+.hero p.lede{font-size:17.5px; color:var(--ink-2); max-width:640px; margin:0 0 22px; text-wrap:balance}
+.hero .joinwrap{margin:0 auto}
+.hero .joinnote{text-align:center}
+.hfit{position:relative; margin-top:6px}
+.hstage{position:absolute; left:0; top:0; width:1132px; height:560px; transform:scale(var(--fs,1)); transform-origin:0 0}
+.arcs{position:absolute; inset:0; overflow:hidden; pointer-events:none; -webkit-mask-image:linear-gradient(#000 70%, transparent); mask-image:linear-gradient(#000 70%, transparent)}
+.arcs i{position:absolute; left:50%; border-radius:50%}
+.arcs i:nth-child(1){width:780px; height:780px; margin-left:-390px; top:170px; background:radial-gradient(closest-side, rgba(236,188,90,.5), rgba(236,188,90,.2) 55%, rgba(255,255,255,.55) 100%); box-shadow:0 0 0 1.5px rgba(255,255,255,.9), 0 -20px 60px -30px rgba(236,188,90,.5)}
+.arcs i:nth-child(2){width:1060px; height:1060px; margin-left:-530px; top:40px; border:1.5px solid rgba(27,31,36,.08)}
+.arcs i:nth-child(3){width:1340px; height:1340px; margin-left:-670px; top:-60px; border:1.5px dashed rgba(27,31,36,.06)}
+.hpad{position:absolute; left:50%; bottom:22px; width:150px; height:186px; margin-left:-75px}
+
+.hc, .hnote{position:absolute; z-index:2; transform:rotate(var(--r,0deg)); animation:drift 7s ease-in-out infinite}
+.hc{background:#fff; border-radius:18px; text-align:left;
+  box-shadow:0 1px 0 #fff inset, 0 0 0 1px rgba(27,31,36,.05), 0 34px 60px -30px rgba(27,31,36,.38), 0 10px 20px -12px rgba(27,31,36,.18)}
+@keyframes drift{0%,100%{translate:0 0}50%{translate:0 -7px}}
+.hcc{left:78px; top:24px; width:322px}
+.hcal{right:92px; top:18px; width:256px; padding:16px; animation-delay:-2.3s}
+.hmail{left:8px; top:342px; width:284px; padding:14px 14px 10px; animation-delay:-4.1s}
+.hnote{right:22px; top:316px; width:214px; animation-delay:-1.2s}
+.htile{position:absolute; width:62px; height:62px; border-radius:18px; display:grid; place-items:center; background:linear-gradient(#fff,#F1F1EE);
+  box-shadow:0 1px 0 #fff inset, 0 0 0 1px rgba(27,31,36,.06), 0 18px 30px -14px rgba(27,31,36,.4); transform:rotate(var(--tr,0deg))}
+.htile > span, .htile > svg{width:34px; height:34px; display:block} .htile > span svg{width:100%; height:100%; display:block}
+.htile .bd{position:absolute; top:-6px; right:-6px; min-width:20px; height:20px; border-radius:10px; background:var(--red); color:#fff; font:700 11px/20px var(--sans); font-style:normal; text-align:center; box-shadow:0 0 0 2px #fff}
+.hcc .htile{right:-30px; top:-20px; --tr:8deg}
+.hcal .htile{left:-40px; top:-24px; --tr:-10deg}
+.hh{display:flex; align-items:center; gap:8px; margin-bottom:10px}
+.hh .ic{width:20px; height:20px; display:block} .hh .ic svg{width:100%; height:100%; display:block}
+.hh b{font:600 16px/1 var(--display)} .hh small{margin-left:auto; font:500 11px var(--mono); color:var(--muted)}
+.hh .badge{margin-left:6px; background:var(--blue); color:#fff; border-radius:9px; padding:3px 7px; font:700 10.5px/1 var(--sans)}
+
+/* Claude Code, as it looks in a light terminal */
+.hcc .tbar{display:flex; align-items:center; gap:6px; padding:10px 12px; border-bottom:1px solid rgba(27,31,36,.07); font:500 11px var(--mono); color:var(--muted)}
+.hcc .tbar i{width:10px; height:10px; border-radius:50%; background:#FF5F57} .hcc .tbar i:nth-child(2){background:#FEBC2E} .hcc .tbar i:nth-child(3){background:#28C840}
+.hcc .tbar span{margin:0 auto; padding-right:38px}
+.term{padding:11px 13px 13px; font:400 10.8px/1.48 var(--mono); color:#1F2328}
+.term p{margin:0}
+.term .u{color:#57606A; margin-bottom:8px}
+.term .u b{color:#1F2328; font-weight:500}
+.term .tc b{font-weight:600}
+.term .dt{color:#8C959F; transition:color .3s} .hcc.done .term .dt{color:#1A7F37}
+.perm{margin-top:7px; border:1px solid #D97757; border-radius:8px; padding:8px 10px; overflow:hidden; max-height:180px; transition:max-height .35s ease, opacity .25s, margin .35s, padding .35s}
+.perm .pt{color:#D97757; font-weight:500}
+.perm .pc2{padding:5px 0 6px 12px} .perm .pc2 span{color:#8C959F}
+.perm .opt{padding:0 4px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#57606A}
+.perm .opt.sel{color:#2F6FEB; transition:background .15s}
+.hcc.press .perm .opt.sel{background:rgba(47,111,235,.14)}
+.term .out, .term .by{max-height:0; opacity:0; overflow:hidden; transition:max-height .35s ease .1s, opacity .3s .15s}
+.term .out{color:#57606A; padding-left:12px}
+.term .out em{font-style:normal; color:#1A7F37}
+.term .by{display:flex; align-items:center; gap:6px; margin-top:6px; color:var(--blue); font-weight:500}
+.term .by span{width:15px; display:block}
+.hcc.done .perm{max-height:0; opacity:0; margin-top:0; padding-top:0; padding-bottom:0; border-width:0}
+.hcc.done .out{max-height:40px; opacity:1} .hcc.done .by{max-height:40px; opacity:1}
+.term .nx{max-height:0; opacity:0; overflow:hidden; margin-top:0; color:#D97757; transition:max-height .35s ease .35s, opacity .3s .4s, margin .35s .35s}
+.term .nx b{display:inline-block; font-weight:400; animation:spin 2.4s linear infinite} .term .nx i{font-style:normal; color:#8C959F}
+.hcc.done .nx{max-height:40px; opacity:1; margin-top:8px}
+
+/* calendar */
+.hev{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid rgba(27,31,36,.06)}
+.hev > i{width:4px; align-self:stretch; border-radius:2px}
+.hev b{display:block; font:700 13.5px/1.2 var(--sans)} .hev span{font-size:12px; color:var(--muted)}
+.hev .tchip{margin-left:auto; font:600 10.5px/1 var(--mono); font-style:normal; color:var(--db-coral); background:rgba(236,111,85,.12); padding:5px 7px; border-radius:7px; white-space:nowrap}
+.hprep{display:flex; align-items:center; gap:8px; background:var(--ink); color:#fff; border-radius:11px; font:600 12px/1.2 var(--sans); padding:0 10px; max-height:0; opacity:0; overflow:hidden; transform:translateY(6px); transition:max-height .35s, opacity .3s, transform .35s, padding .35s, margin .35s}
+.hprep i{width:7px; height:7px; border-radius:50%; background:var(--db-coral); box-shadow:0 0 0 3px rgba(236,111,85,.3); flex:none}
+.hcal.done .hprep{max-height:50px; opacity:1; transform:none; padding:9px 10px; margin-top:6px}
+
+/* mail */
+.mr{position:relative; padding:7px 0 7px 12px; border-top:1px solid rgba(27,31,36,.06); font-size:12px; line-height:1.35}
+.mr::before{content:""; position:absolute; left:0; top:13px; width:6px; height:6px; border-radius:50%; background:var(--blue)}
+.mr.dim{color:var(--muted)} .mr.dim::before{display:none}
+.mr b{display:block; font-size:13px} .mr span{display:block; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:4px}
+.mr.dim span{color:var(--muted)}
+.mchip{position:absolute; right:0; top:7px; font:600 10px/1 var(--mono); font-style:normal; padding:4px 6px; border-radius:6px; color:#8A5A12; background:rgba(232,169,59,.2); opacity:0; transform:scale(.6); transition:.3s cubic-bezier(.3,1.6,.5,1)}
+.mchip.blue{color:var(--blue); background:var(--blue-soft)} .mchip.grey{color:var(--muted); background:rgba(27,31,36,.06); opacity:1; transform:none}
+.hmail.done .mchip{opacity:1; transform:none} .hmail.done .mr:nth-child(3) .mchip{transition-delay:.12s}
+.hmail.done .mr:not(.dim)::before{background:#C9CED4}
+
+/* memory note */
+.hnote{background:#FFE58A; padding:22px 18px 18px; border-radius:4px; font:600 19px/1.25 "Caveat", var(--display); color:#4A3F1C;
+  box-shadow:0 30px 40px -26px rgba(27,31,36,.45), 0 2px 6px rgba(27,31,36,.08); text-align:left}
+.hnote::before{content:""; position:absolute; left:50%; top:-7px; width:14px; height:14px; margin-left:-7px; border-radius:50%; background:radial-gradient(circle at 35% 35%,#FF8A7A,#D9483B); box-shadow:0 3px 4px rgba(0,0,0,.25)}
+.hnote p{margin:0 0 6px} .hnote small{display:block; font:500 10px var(--mono); letter-spacing:.12em; text-transform:uppercase; color:rgba(74,63,28,.6); margin-bottom:6px}
+.hnote .nl{max-height:0; opacity:0; overflow:hidden; transition:max-height .3s, opacity .3s .1s}
+.hnote .stamp{position:absolute; right:-12px; bottom:-14px; font:700 11px/1 var(--mono); font-style:normal; letter-spacing:.08em; text-transform:uppercase; color:var(--sage); background:#fff; padding:6px 8px; border-radius:8px; box-shadow:0 8px 16px -8px rgba(27,31,36,.4); opacity:0; transform:rotate(-8deg) scale(1.6); transition:.35s cubic-bezier(.3,1.6,.5,1)}
+.hnote.done .nl{max-height:30px; opacity:1} .hnote.done .stamp{opacity:1; transform:rotate(-8deg)}
+
+/* the flying droid */
+.hfly{position:absolute; left:0; top:0; z-index:5; width:88px; transform-origin:50% 50%; will-change:transform}
+.hfly .droid{cursor:pointer}
+.hero-bubble{position:absolute; left:50%; bottom:100%; translate:-50% -2px; background:var(--ink); color:#fff; font:600 11px/1.25 var(--sans); padding:7px 10px; border-radius:10px; white-space:nowrap; opacity:0; transform:translateY(6px) scale(.8); transform-origin:50% 100%; transition:.28s cubic-bezier(.3,1.5,.5,1); pointer-events:none; text-align:center}
+.hero-bubble small{display:block; font:500 9px var(--mono); color:rgba(255,255,255,.65); margin-top:3px}
 .hero-bubble.show{opacity:1; transform:none}
+
+.phone .htop{padding:30px 0 4px}
+.phone section{padding:56px 0}
+.phone .closer{padding-bottom:40px}
+.phone .hero p.lede{font-size:16.5px}
+.phone .hfit{margin:8px -12px 0}
+/* laptop-shaped scenes on phones: same layout as desktop, scaled to fit */
+[data-fit-all]{position:relative}
+.phone [data-fit]{position:relative}
+.phone [data-fit] > *{position:absolute; left:0; top:0; transform:scale(var(--fs,1)); transform-origin:0 0}
 
 /* ---------- droid ---------- */
 .droid svg{width:100%; height:auto; display:block; overflow:visible}
@@ -388,8 +475,9 @@ section{padding:84px 0}
 @media (max-width:860px){ #summon .sdroid{display:none} }
 .toast{position:fixed; left:50%; bottom:22px; transform:translate(-50%,140%); z-index:80; display:flex; align-items:center; gap:10px; padding:10px 12px 10px 16px; border-radius:14px; font-size:14px; transition:transform .5s cubic-bezier(.2,1.3,.4,1)}
 .toast.show{transform:translate(-50%,0)}
+@media (max-width:900px){ .toast, .fab{display:none!important} }
 .fab{display:none}
-@media (hover:none){ .fab{display:flex; position:fixed; right:16px; bottom:16px; z-index:85; width:58px; height:58px; border-radius:50%; align-items:center; justify-content:center; padding:6px} .toast{display:none} }
+@media (hover:none) and (min-width:901px){ .fab{display:flex; position:fixed; right:16px; bottom:16px; z-index:85; width:58px; height:58px; border-radius:50%; align-items:center; justify-content:center; padding:6px} .toast{display:none} }
 
 /* ---------- what it can do: a stack of photos you flip through by scrolling ---------- */
 #cases{padding:0}
@@ -410,6 +498,9 @@ section{padding:84px 0}
 .flat .stackouter{height:auto} .flat .pin{position:static; height:auto; padding-top:0}
 .flat .pstage{height:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:24px; margin-top:30px}
 .flat .pstage .pc{position:static; width:auto; transform:none} .flat .stackmeta{display:none}
+.phone #cases.flat{padding:64px 0}
+.phone .flat .pstage{grid-template-columns:1fr; max-width:340px; margin:26px auto 0; gap:30px}
+.phone .flat .pstage .pc:nth-child(odd){transform:rotate(-1.6deg)} .phone .flat .pstage .pc:nth-child(even){transform:rotate(1.6deg)}
 .pc figcaption{padding:14px 6px 16px}
 .pc figcaption b{display:block; font:700 21px/1.15 var(--display); letter-spacing:-.005em}
 .pc figcaption span{display:block; margin-top:4px; font-size:14px; color:var(--muted); line-height:1.4}
@@ -476,30 +567,19 @@ section{padding:84px 0}
 .plug b{font:600 19px/1.2 var(--display); display:block; margin:2px 0 4px}
 .plug p{margin:0; color:var(--ink-2); font-size:14.5px}
 .plug.add{border:1.5px dashed rgba(27,31,36,.2)}
-.sticker .ic.white{background:#fff; padding:4px; box-shadow:inset 0 0 0 1px rgba(27,31,36,.1)}
-.sticker .ic svg{width:100%; height:100%; display:block}
 @media (max-width:860px){ .plugs{grid-template-columns:1fr} }
 
-/* ---------- memory ---------- */
-.mem-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+/* ---------- panels ---------- */
 .panel{border-radius:20px; padding:22px}
 .panel h3{font:700 22px/1.15 var(--display); margin:0 0 6px; letter-spacing:-.01em}
 .panel > p{color:var(--ink-2); margin:0 0 16px; font-size:15px}
-.memlist{display:flex; flex-direction:column; gap:7px}
-.mem{display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.72); border:1px solid rgba(27,31,36,.07); font-size:14px; transition:opacity .3s, transform .3s}
-.mem .w{font:500 10.5px var(--mono); color:var(--muted); margin-left:auto; white-space:nowrap}
-.mem button{border:0; background:transparent; cursor:pointer; color:var(--muted); font:600 12px var(--sans); padding:4px 6px; border-radius:6px}
-.mem button:hover{background:rgba(217,72,59,.1); color:var(--red)}
-.mem.gone{opacity:0; transform:translateX(20px)}
 .filechip{display:inline-flex; gap:6px; align-items:center; margin-top:14px; font:500 12px var(--mono); color:var(--ink-2); padding:6px 9px; border-radius:8px; background:rgba(27,31,36,.06)}
-.compact-vis{display:flex; gap:4px; align-items:flex-end; height:120px; margin:8px 0 14px}
-.compact-vis i{flex:1; border-radius:4px 4px 2px 2px; background:var(--blue-soft); transition:height .5s cubic-bezier(.2,1,.3,1), background .3s}
-.compact-vis i.sum{background:var(--blue)}
-@media (max-width:860px){ .mem-grid{grid-template-columns:1fr} }
 
 /* ---------- private ---------- */
-.trio{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+.trio{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+@media (max-width:1100px){ .trio{grid-template-columns:1fr 1fr} }
 .trio .panel h3{font-size:20px}
+.trio .filechip{margin-top:0}
 .trio .ic{width:42px; height:42px; border-radius:12px; display:grid; place-items:center; margin-bottom:14px; background:var(--ink); color:#fff}
 .trio .ic svg{width:20px; height:20px}
 @media (max-width:860px){ .trio{grid-template-columns:1fr} }
@@ -524,36 +604,21 @@ section{padding:84px 0}
 .faq summary::after{content:"+"; font:400 22px/1 var(--mono); color:var(--muted); transition:transform .2s}
 .faq details[open] summary::after{transform:rotate(45deg)}
 .faq details p{margin:10px 0 0; color:var(--ink-2)}
-.closer{text-align:center; padding:90px 0 70px}
+.closer{text-align:center; padding:90px 24px 70px}
 .closer h2{font:700 clamp(36px,5vw,64px)/1 var(--display); letter-spacing:-.01em; margin:18px 0 22px}
 .closer .droid{width:120px; margin:0 auto}
 footer{border-top:1px solid var(--line); padding:26px 0 40px; font-size:13.5px; color:var(--muted)}
 footer .wrap{display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px}
 footer a{color:var(--ink-2)}
+@media (max-width:900px){ footer{padding:22px 0 calc(30px + env(safe-area-inset-bottom))} footer .wrap{flex-direction:column; align-items:center; text-align:center; gap:4px; padding:0 20px} footer .mono{display:none} }
 
 /* ---------- reveal ---------- */
 .rv{opacity:0; transform:translateY(18px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,1,.3,1)}
 .rv.in{opacity:1; transform:none}
-.hero .rv:nth-child(2){transition-delay:.08s} .hero .rv:nth-child(3){transition-delay:.16s} .hero .rv:nth-child(4){transition-delay:.24s}
+.htop .rv:nth-child(2){transition-delay:.08s} .htop .rv:nth-child(3){transition-delay:.16s}
 
-/* ---------- small screens: demo becomes a stack ---------- */
-@media (max-width:900px){
-  .hero{grid-template-columns:1fr; min-height:0; padding-top:28px}
-  .stage{height:420px}
-  .mac{height:auto; padding:44px 12px 16px; display:flex; flex-direction:column; gap:12px}
-  .win, .ddroid, .notch{position:relative; left:auto!important; right:auto!important; top:auto!important; bottom:auto!important}
-  .win{width:100%!important}
-  .win .tb{cursor:default}
-  .chat{height:500px; order:3}
-  .chat:not(.open){opacity:1; transform:none; pointer-events:auto}
-  .mailw{order:2} .calw{order:2} .agw{order:2}
-  .win.min{display:none}
-  .sess{grid-template-columns:24px minmax(0,1fr)} .sess .st{grid-column:2; justify-self:start}
-  .notch{transform:none; opacity:1; display:none; white-space:normal; order:1}
-  .notch.show{display:flex; transform:none}
-  .ddroid{width:76px; align-self:center; order:4}
-  .deskhint, .peek, .dock{display:none}
-}
+.phone .mfit{margin:0 -12px}
+.phone .mfit > .mac{width:1132px; height:660px}
 @media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important} }
 </style>
 </head>
@@ -573,10 +638,10 @@ footer a{color:var(--ink-2)}
 <!-- ============ HERO ============ -->
 <div class="wrap">
   <header class="hero">
-    <div>
-      <h1 class="rv">A little droid that <span class="bl">bleeps</span> at the right moment.</h1>
-      <p class="lede rv">bleep floats on your Mac. It watches your Claude Code and Codex sessions, your mail and your calendar. It handles the small asks, and it tells you what needs you.</p>
-      <div class="rv">
+    <div class="htop">
+      <h1 class="rv">Your agents, unblocked.<br><span>Your inbox, handled.</span></h1>
+      <p class="lede rv">bleep is a little droid that floats on your Mac. It watches Claude Code, Codex, your mail and your calendar. It handles the small asks and tells you what needs you.</p>
+      <div class="rv hjoin">
       <div class="joinwrap">
         <form class="join" data-join novalidate>
           <input type="email" name="email" placeholder="you@email.com" autocomplete="email" aria-label="Your email" required>
@@ -587,13 +652,51 @@ footer a{color:var(--ink-2)}
       </div>
       </div>
     </div>
-    <div class="stage rv">
-      <div class="ring"></div><div class="ring r2"></div>
-      <div class="hero-bubble" id="heroBubble">bleep bloop.</div>
-      <div class="sticker s1 glass"><span class="ic" data-icon="cc"></span><div><b>Tests passed. Approved.</b><span>Claude Code · 2 asks need you</span></div></div>
-      <div class="sticker s2 glass"><span class="ic white" data-icon="gm"></span><div><b>Bill due today</b><span>City Power · ₹2,340</span></div></div>
-      <div class="sticker s3 glass"><span class="ic" data-icon="me"></span><div><b>Remembered</b><span>you prep 1 hour before</span></div></div>
-      <div class="droid hero-droid" id="heroDroid" data-droid="full" title="Poke me"></div>
+    <div class="hfit" data-fit-all="1132">
+      <div class="hstage" id="hcanvas">
+        <div class="arcs" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="hc hcc" style="--r:-3deg">
+      <div class="tbar"><i></i><i></i><i></i><span>portfolio · claude</span></div>
+      <div class="term">
+        <p class="u">&gt; <b>run the tests, then fix the mobile nav</b></p>
+        <p class="tc"><span class="dt">⏺</span> <b>Bash</b>(npm test)</p>
+        <div class="perm">
+          <div class="pt">Bash command</div>
+          <div class="pc2">npm test<br><span>Run the test suite</span></div>
+          <div>Do you want to proceed?</div>
+          <div class="opt sel">❯ 1. Yes</div>
+          <div class="opt">&nbsp; 2. Yes, and don't ask again for npm test</div>
+          <div class="opt">&nbsp; 3. No, and tell Claude what to do differently</div>
+        </div>
+        <div class="out">⎿ <em>42 passed</em>, 0 failed (3.1s)</div>
+        <div class="by"><span data-droid="head"></span>Approved by bleep. Tests are safe.</div>
+        <p class="nx"><b>✻</b> Fixing the mobile nav… <i>(esc to interrupt)</i></p>
+      </div>
+      <div class="htile"><span data-icon="cx"></span><i class="bd">1</i></div>
+    </div>
+    <div class="hc hcal" style="--r:3deg">
+      <div class="htile"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="17" y="2" width="6" height="5" rx="1.5" fill="#3A424C"/><circle cx="20" cy="22" r="15" fill="#fff" stroke="#3A424C" stroke-width="3"/><path d="M20 12v10l6 4" fill="none" stroke="#D9483B" stroke-width="2.6" stroke-linecap="round"/><circle cx="20" cy="22" r="2" fill="#3A424C"/></svg></div>
+      <div class="hh"><span class="ic" data-icon="ca"></span><b>Today</b><small>Thu 13 Nov</small></div>
+      <div class="hev"><i style="background:var(--db-sky)"></i><div><b>Standup</b><span>10:00 AM · 15 min</span></div></div>
+      <div class="hev"><i style="background:var(--db-coral)"></i><div><b>Design review</b><span>3:00 PM · Priya, Arjun</span></div><em class="tchip">in 60 min</em></div>
+      <div class="hprep"><i></i>Prep ready: last 3 threads + deck</div>
+    </div>
+    <div class="hc hmail" style="--r:2.5deg">
+      <div class="hh"><span class="ic" data-icon="gm"></span><b>Inbox</b><small class="badge">3</small></div>
+      <div class="mr"><b>City Power</b><span>Your bill of ₹2,340 is due today</span><em class="mchip">remind 6 PM</em></div>
+      <div class="mr"><b>Arjun Rao</b><span>Does the API change ship this sprint?</span><em class="mchip blue">draft ready</em></div>
+      <div class="mr dim"><b>FoodNow</b><span>Weekend offers just for you</span><em class="mchip grey">muted</em></div>
+    </div>
+    <div class="hnote" style="--r:4deg">
+      <small>bleep remembers</small>
+      <p>You prep 1 hour before meetings.</p>
+      <p>You pay bills the evening they're due.</p>
+      <p class="nl">Arjun likes short replies.</p>
+      <em class="stamp">saved</em>
+    </div>
+        <div class="hpad" id="hpad"></div>
+    <div class="hfly" id="heroFly"><div class="droid" id="heroDroid" data-droid="full" title="Tap me"></div><div class="hero-bubble" id="heroBubble" aria-live="polite"></div></div>
+      </div>
     </div>
   </header>
 </div>
@@ -617,6 +720,7 @@ footer a{color:var(--ink-2)}
         </div>
         <button class="arr" id="nextScene" aria-label="Next scene">›</button>
       </div>
+      <div class="mfit" data-fit="1132">
       <div class="mac" id="mac">
         <div class="wall">
           <svg viewBox="0 0 1200 660" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -687,6 +791,7 @@ footer a{color:var(--ink-2)}
           <button class="app run" data-app="bleep"><span class="lbl">bleep</span><span class="ico bl" data-droid="head"></span></button>
           <button class="app" data-app="trash"><span class="lbl">Trash</span><span class="ico" style="background:rgba(255,255,255,.35);box-shadow:none"><svg viewBox="0 0 48 48"><path d="M15 15h18l-1.6 22a2.5 2.5 0 0 1-2.5 2.3H19.1a2.5 2.5 0 0 1-2.5-2.3z" fill="rgba(255,255,255,.75)" stroke="rgba(27,31,36,.45)" stroke-width="1.4"/><path d="M13 14.5h22" stroke="rgba(27,31,36,.5)" stroke-width="2" stroke-linecap="round"/><path d="M20.5 19v15M24 19v15M27.5 19v15" stroke="rgba(27,31,36,.25)" stroke-width="1.2"/></svg></span></button>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -770,41 +875,18 @@ footer a{color:var(--ink-2)}
   </div>
 </section>
 
-<!-- ============ MEMORY ============ -->
-<section id="memory">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <div><h2>It remembers. You can see what.</h2></div>
-      <p>Memory is plain files on your Mac. One chat holds everything. When it gets long, bleep compacts it into a summary and keeps going.</p>
-    </div>
-    <div class="mem-grid">
-      <div class="panel glass rv">
-        <h3>What bleep knows about you</h3>
-        <p>Learned from your days. Tap forget and it is gone.</p>
-        <div class="memlist" id="memlist"></div>
-        <span class="filechip">~/.bleep/memory/USER.md</span>
-      </div>
-      <div class="panel glass rv">
-        <h3>One chat, no threads</h3>
-        <p>You never pick a thread. At 250K tokens, older turns fold into a short summary. Facts go to memory first, so nothing is lost.</p>
-        <div class="compact-vis" id="cvis"></div>
-        <button class="btn ghost sm" id="compactBtn">Run a compaction</button>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- ============ PRIVATE ============ -->
 <section id="private">
   <div class="wrap">
     <div class="sec-head rv">
-      <div><h2>Lives on your Mac. Asks first.</h2></div>
-      <p>bleep is built to be trusted with your inbox. That means local by default and no surprises.</p>
+      <div><h2>Lives on your Mac. Asks first. Remembers you.</h2></div>
+      <p>bleep is built to be trusted with your inbox. That means local by default, no surprises, and memory you can read.</p>
     </div>
     <div class="trio">
       <div class="panel glass rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div><h3>Runs locally</h3><p>A small Rust core on your Mac. Light on memory and battery. Your data stays on disk.</p></div>
       <div class="panel glass rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.6 5.6L20 9.5l-4 4 1 5.8L12 16.6 7 19.3l1-5.8-4-4 5.4-.9z"/></svg></div><h3>Thinks with Claude</h3><p>It uses Claude through Claude Code on your Mac. No new API key. No extra bill.</p></div>
       <div class="panel glass rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Asks before it acts</h3><p>It never sends mail or changes your calendar without a tap. For coding agents, it approves only what your rules allow, and it logs each one.</p></div>
+      <div class="panel glass rv"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/></svg></div><h3>Remembers you</h3><p>It learns from your days, like when you pay bills and how early you prep. It keeps it all in a plain file. Read it, edit it, or tell it to forget.</p><span class="filechip">~/.bleep/memory/USER.md</span></div>
     </div>
   </div>
 </section>
@@ -910,7 +992,7 @@ document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = ICONS[el
 /* ================= helpers ================= */
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const isStack = () => matchMedia('(max-width:900px)').matches;
+const isStack = () => document.documentElement.classList.contains('phone');
 let chain = Promise.resolve();
 const enqueue = fn => (chain = chain.then(fn).catch(e => console.error(e)));
 
@@ -934,14 +1016,123 @@ function droidState(d, cls, ms) {
   if (ms) setTimeout(() => d.classList.remove(cls), ms);
 }
 
-/* hero droid pokes */
-const heroLines = ['bleep bloop.', 'Your tests passed. I approved it.', 'Codex wants to force push. Up to you.','Design review in 60 min.', 'Your power bill is due today.', 'I drafted your reply to Arjun.', 'Beep. All quiet. Nothing to report.', 'Double-tap ⌥ and I come running.'];
-let heroI = 0, heroT;
-$('#heroDroid').addEventListener('click', () => {
-  const b = $('#heroBubble'); b.textContent = heroLines[heroI++ % heroLines.length];
-  b.classList.add('show'); droidState($('#heroDroid'), 'happy', 700);
-  clearTimeout(heroT); heroT = setTimeout(() => b.classList.remove('show'), 2400);
-});
+/* ================= phones: laptop-shaped scenes keep their shape, scaled to fit ================= */
+(() => {
+  const boxes = [...document.querySelectorAll('[data-fit],[data-fit-all]')];
+  const fit = () => {
+    const on = innerWidth <= 900, was = document.documentElement.classList.contains('phone');
+    document.documentElement.classList.toggle('phone', on);
+    if (on !== was) dispatchEvent(new Event('phonechange'));
+    boxes.forEach(b => {
+      const all = b.hasAttribute('data-fit-all');
+      if (!on && !all) { b.style.height = ''; b.style.removeProperty('--fs'); return; }
+      const W = +(b.dataset.fit || b.dataset.fitAll), H = b.firstElementChild.offsetHeight;
+      let s = Math.min(1, b.clientWidth / W);
+      if (all && !on) s = Math.min(s, Math.max(.62, (innerHeight - (b.getBoundingClientRect().top + scrollY) - 8) / H));  // desktop: keep the whole stage in the first screen
+      b.firstElementChild.style.left = ((b.clientWidth - W * s) / 2) + 'px';
+      b.style.setProperty('--fs', s.toFixed(4)); b.style.height = (H * s) + 'px';
+    });
+  };
+  addEventListener('resize', fit); fit();
+  document.fonts && document.fonts.ready.then(fit);
+})();
+
+/* ================= hero intro: the droid visits each card, then says hi ================= */
+const heroIntro = (() => {
+  const cv = $('#hcanvas'), fly = $('#heroFly'), pad = $('#hpad'), bub = $('#heroBubble'), droid = $('#heroDroid');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const STOPS = [['.hcc', 'r', 1], ['.hcal', 'l', 0], ['.hmail', 'r', 0], ['.hnote', 'l', 0]];
+  let pos = { x: 0, y: 0, s: 1, r: 0 }, run = 0, busy = false, AC = null;
+
+  /* sound: a tiny synth, no files */
+  const ctx = () => { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); } catch { } return AC; };
+  const live = () => AC && AC.state === 'running';
+  function tone(t0, f0, f1, dur, type, vol) {
+    const o = AC.createOscillator(), g = AC.createGain(), lp = AC.createBiquadFilter();
+    o.type = type; lp.type = 'lowpass'; lp.frequency.value = 2600;
+    o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + .015); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+    o.connect(lp); lp.connect(g); g.connect(AC.destination); o.start(t0); o.stop(t0 + dur + .03);
+  }
+  const blip = () => { if (live()) tone(AC.currentTime, 1250, 1900, .08, 'triangle', .06); };
+  function bleepBloop() {
+    if (!live()) return false;
+    const t = AC.currentTime + .03;
+    tone(t, 880, 1480, .09, 'square', .045); tone(t + .1, 1480, 1320, .08, 'square', .04);   // bleep
+    tone(t + .26, 760, 240, .3, 'sine', .2); tone(t + .26, 1520, 480, .3, 'triangle', .04); // bloop
+    return true;
+  }
+  const unlock = () => { const a = ctx(); if (a && a.state !== 'running') a.resume().catch(() => { }); };
+  addEventListener('pointerdown', unlock, { passive: true }); addEventListener('keydown', unlock);
+
+  /* geometry, relative to the canvas */
+  const rel = el => { const a = el.getBoundingClientRect(), c = cv.getBoundingClientRect(), k = c.width / cv.offsetWidth || 1; return { x: (a.left - c.left) / k, y: (a.top - c.top) / k, w: a.width / k, h: a.height / k }; };
+  const place = p => { fly.style.transform = `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px) rotate(${p.r.toFixed(1)}deg) scale(${p.s.toFixed(3)})`; };
+  const home = () => { const p = rel(pad), w = fly.offsetWidth, h = fly.offsetHeight, s = p.w / w; return { x: p.x + p.w / 2 - w / 2, y: p.y + p.h / 2 - h / 2, s, r: 0 }; };
+  function spot(el, side) {
+    const r = rel(el), w = fly.offsetWidth, h = fly.offsetHeight, s = Math.min(.82, home().s * .8);
+    let x = side === 'r' ? r.x + r.w - w * .35 : r.x - w * .65, y = r.y + r.h * .42 - h / 2;
+    x = Math.max(4, Math.min(cv.clientWidth - w - 4, x)); y = Math.max(4, Math.min(cv.clientHeight - h - 4, y));
+    return { x, y, s, r: 0 };
+  }
+  const shown = el => el && el.getClientRects().length && getComputedStyle(el).display !== 'none';
+  const wait = (ms, me) => sleep(ms).then(() => me === run);
+
+  function flyTo(t, ms, me) {
+    return new Promise(res => {
+      const a = { ...pos }, t0 = performance.now(), lift = Math.min(110, Math.hypot(t.x - a.x, t.y - a.y) * .22);
+      let px = a.x;
+      const step = now => {
+        if (me !== run) return res(false);
+        const k = Math.min(1, (now - t0) / ms), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+        const x = a.x + (t.x - a.x) * e, y = a.y + (t.y - a.y) * e - Math.sin(Math.PI * e) * lift;
+        const tilt = Math.max(-18, Math.min(18, (x - px) * 1.3)); px = x;
+        pos = { x, y, s: a.s + (t.s - a.s) * e, r: k === 1 ? 0 : pos.r + (tilt - pos.r) * .35 };
+        place(pos);
+        k < 1 ? requestAnimationFrame(step) : res(true);
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  function reset() {
+    STOPS.forEach(([s]) => cv.querySelector(s).classList.remove('done', 'press'));
+    bub.classList.remove('show');
+  }
+  function sayHi(sound) {
+    droidState(droid, 'happy', 700);
+    const ok = sound && bleepBloop();
+    bub.innerHTML = 'bleep bloop! Hi, I\'m bleep.' + (ok || !sound ? '' : '<small>tap me for sound</small>');
+    bub.classList.add('show');
+  }
+
+  async function play() {
+    const me = ++run; busy = true;
+    reset(); pos = home(); place(pos);
+    if (!await wait(450, me)) return;
+    for (const [sel, side, isCC] of STOPS) {
+      const el = cv.querySelector(sel); if (!shown(el)) continue;
+      if (!await flyTo(spot(el, side), 430, me)) return;
+      droidState(droid, 'thinking');
+      if (!await wait(isCC ? 240 : 170, me)) return;
+      if (isCC) { el.classList.add('press'); if (!await wait(200, me)) return; }
+      el.classList.add('done'); droidState(droid, 'happy', 500); blip();
+      if (!await wait(isCC ? 380 : 300, me)) return;
+    }
+    if (!await flyTo(home(), 520, me)) return;
+    ctx(); if (AC && AC.state !== 'running') await Promise.race([AC.resume().catch(() => { }), sleep(80)]);
+    sayHi(true); busy = false;
+  }
+
+  function still() { run++; busy = false; STOPS.forEach(([s]) => cv.querySelector(s).classList.add('done')); pos = home(); place(pos); sayHi(false); }
+
+  droid.addEventListener('click', () => { unlock(); reduce ? sayHi(true) : play(); });
+  addEventListener('resize', () => { if (!busy) { pos = home(); place(pos); } });
+  pos = home(); place(pos);
+  const start = () => (reduce ? still() : play());
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => setTimeout(start, 250));
+  return { play };
+})();
 
 /* reveal on scroll */
 const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12 });
@@ -1322,7 +1513,12 @@ document.querySelectorAll('[data-scene]').forEach(b => b.addEventListener('click
 (() => {
   const sec = $('#cases'), outer = $('#stackOuter'), cards = [...document.querySelectorAll('#stage .pc')], N = cards.length;
   const dotsEl = $('#stackDots');
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { sec.classList.add('flat'); return; }
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const flat = () => {                          // reduced motion and phones get a plain list
+    const f = reduce || isStack();
+    if (f !== sec.classList.contains('flat')) { sec.classList.toggle('flat', f); if (f) cards.forEach(c => { c.style.transform = c.style.zIndex = c.style.opacity = ''; }); }
+    return f;
+  };
   const R = [-4, 3, -2.5, 4, -3];               // each photo's resting tilt
   const ease = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
   const LEAD = .25, FOLD = .9, TAIL = .3;      // hold before the first flip, then the fold into one stack, then a hold
@@ -1334,6 +1530,7 @@ document.querySelectorAll('[data-scene]').forEach(b => b.addEventListener('click
   let raf = 0;
   function frame() {
     raf = 0;
+    if (flat()) return;
     const t = Math.min(1, Math.max(0, -outer.getBoundingClientRect().top / total()));
     const raw = t * U - LEAD;
     const p = Math.min(N - 1, Math.max(0, raw));
@@ -1366,7 +1563,7 @@ document.querySelectorAll('[data-scene]').forEach(b => b.addEventListener('click
     $('#stackHint').style.opacity = p > .4 ? 0 : 1;
   }
   addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(frame); }, { passive: true });
-  addEventListener('resize', frame);
+  addEventListener('resize', frame); addEventListener('phonechange', frame);
   frame();
 })();
 
@@ -1471,29 +1668,6 @@ $('#peek').onclick = showDroid;
 $('#hideDroid').onclick = () => { hideDroid(); $('#chat').classList.remove('open'); };
 
 
-/* memory list */
-const MEM = [['You pay bills the evening they are due', 'seen 4 times'], ['You like prep 1 hour before meetings', 'you said so'], ['"Sync" means your 1:1 with Priya', 'from calendar'], ['No pings after 11 PM', 'rule'], ['Priya is your design lead', 'from mail']];
-$('#memlist').innerHTML = MEM.map(([a, b]) => `<div class="mem"><span>${a}</span><span class="w">${b}</span><button>forget</button></div>`).join('');
-$('#memlist').addEventListener('click', e => { if (e.target.tagName === 'BUTTON') { const r = e.target.closest('.mem'); r.classList.add('gone'); setTimeout(() => r.remove(), 300); } });
-
-/* compaction visual */
-const cvis = $('#cvis');
-const BARS = 26;
-function drawBars(compacted) {
-  cvis.innerHTML = '';
-  for (let i = 0; i < BARS; i++) {
-    const b = document.createElement('i');
-    if (compacted) { if (i === 0) { b.className = 'sum'; b.style.height = '34%'; } else if (i > BARS - 5) b.style.height = (30 + Math.random() * 40) + '%'; else b.style.height = '0%'; }
-    else b.style.height = (25 + Math.random() * 70) + '%';
-    cvis.appendChild(b);
-  }
-}
-drawBars(false);
-let compacted = false;
-$('#compactBtn').onclick = () => {
-  compacted = !compacted; drawBars(compacted);
-  $('#compactBtn').textContent = compacted ? 'Keep chatting' : 'Run a compaction';
-};
 
 /* ================= waitlist ================= */
 const REF = (() => {
@@ -1570,8 +1744,11 @@ document.querySelectorAll('#dock .app').forEach(a => a.addEventListener('click',
 
 /* tip toast */
 function hideToast() { $('#toast').classList.remove('show'); }
-setTimeout(() => $('#toast').classList.add('show'), 2500);
-setTimeout(hideToast, 11000);
+(() => {  // show the tip once you scroll past the hero, so it never covers the intro
+  let shown = false;
+  const onScroll = () => { if (shown || scrollY < innerHeight * .7) return; shown = true; $('#toast').classList.add('show'); setTimeout(hideToast, 8000); removeEventListener('scroll', onScroll); };
+  addEventListener('scroll', onScroll, { passive: true });
+})();
 $('#toastX').onclick = hideToast;
 </script>
 </body>
