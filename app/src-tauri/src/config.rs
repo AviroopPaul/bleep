@@ -77,6 +77,8 @@ pub struct Config {
     pub summon_fallback: String,
     pub autostart_set: bool,
     pub summon_note_shown: bool,
+    /// The first-run setup wizard was finished. Until then it opens at launch.
+    pub setup_done: bool,
     pub google: GoogleConfig,
     pub mail: MailConfig,
     pub checkin: CheckinConfig,
@@ -92,6 +94,7 @@ impl Default for Config {
             summon_fallback: "Alt+Space".into(),
             autostart_set: false,
             summon_note_shown: false,
+            setup_done: false,
             google: GoogleConfig::default(),
             mail: MailConfig::default(),
             checkin: CheckinConfig::default(),
@@ -147,6 +150,7 @@ mod tests {
         assert_eq!(c.summon_fallback, "Alt+Space");
         assert_eq!(c.droid_pos, None);
         assert!(!c.autostart_set);
+        assert!(!c.setup_done, "a fresh install starts with the setup wizard");
     }
 
     #[test]

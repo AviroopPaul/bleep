@@ -39,7 +39,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-export function AgentSettingsTab() {
+export function AgentSettingsTab({ onChange }: { onChange?: (s: AgentSettings) => void } = {}) {
   const [s, setS] = useState<AgentSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -48,7 +48,9 @@ export function AgentSettingsTab() {
   const run = async (f: () => Promise<AgentSettings>) => {
     setError(null);
     try {
-      setS(await f());
+      const n = await f();
+      setS(n);
+      onChange?.(n);
     } catch (e) {
       setError(String(e));
     }
