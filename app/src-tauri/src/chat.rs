@@ -167,11 +167,11 @@ impl ChatService {
                 return Err(ChatError::Other(msg));
             }
         };
-        let (store, emit) = (self.store.clone(), self.emit.clone());
+        let (store, emit, rid) = (self.store.clone(), self.emit.clone(), self.runtime.id());
         let task = tokio::spawn(async move {
             let _guard = guard;
             let _turn_end = turn_end;
-            run_turn(store, emit, session_id, aid, stream).await;
+            run_turn(store, emit, rid, session_id, aid, stream).await;
         });
         *self.turn.lock().await = Some(task);
         Ok(aid)
@@ -185,7 +185,8 @@ impl ChatService {
     }
 }
 
-async fn run_turn(store: Arc<Store>, emit: Emit, session_id: i64, aid: i64, mut stream: crate::runtime::EventStream) {
+async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i64, aid: i64, mut stream: crate::runtime::EventStream) {
+    let mut usage: Option<(i64, i64)> = None;
     let mut text = String::new();
     let mut steps: Vec<Value> = vec![];
     let mut tokens = None;
@@ -203,7 +204,10 @@ async fn run_turn(store: Arc<Store>, emit: Emit, session_id: i64, aid: i64, mut 
                     s["preview"] = json!(preview);
                 }
             }
-            AgentEvent::Usage { input, output } => tokens = Some((input + output) as i64),
+            AgentEvent::Usage { input, output } => {
+                tokens = Some((input + output) as i64);
+                usage = Some((input as i64, output as i64));
+            }
             AgentEvent::RateLimited { .. } => {}
             AgentEvent::Error { message, .. } => {
                 if !text.is_empty() {
@@ -221,6 +225,7 @@ async fn run_turn(store: Arc<Store>, emit: Emit, session_id: i64, aid: i64, mut 
             }
         }
     }
+    let _ = store.log_llm(runtime_id, "main", "chat", usage.map(|u| u.0), usage.map(|u| u.1), status == MsgStatus::Done);
     let _ = store.finish_message(aid, &text, &Value::Array(steps), tokens, status);
 }
 
@@ -385,6 +390,19 @@ mod tests {
         assert!(!SYSTEM_PROMPT.contains('\u{2014}'));
         assert!(SYSTEM_PROMPT.contains("calendar") && SYSTEM_PROMPT.contains("_untrusted"));
         assert!(SYSTEM_PROMPT.contains("gmail_draft") && SYSTEM_PROMPT.contains("gmail_send"));
+    }
+
+    #[tokio::test]
+    async fn chat_turn_logs_tokens() {
+        let r = rig(vec![vec![AgentEvent::TextDelta { text: "hi".into() }, AgentEvent::Usage { input: 100, output: 2 }, done("s1")]]);
+        let chat = service(&r);
+        chat.send("hello".into()).await.unwrap();
+        chat.wait_idle().await;
+        let items = r.store.activity(5).unwrap();
+        assert_eq!((items[0].kind.as_str(), items[0].name.as_str(), items[0].detail.as_deref(), items[0].ok), ("model", "chat", Some("main"), true));
+        let (tin, tout): (Option<i64>, Option<i64>) = r.store.llm_tokens_last().unwrap();
+        assert_eq!((tin, tout), (Some(100), Some(2)));
+        assert_eq!(r.store.llm_calls_since(chrono::DateTime::UNIX_EPOCH).unwrap(), 0, "chat turns do not count against the background cap");
     }
 
     #[tokio::test]

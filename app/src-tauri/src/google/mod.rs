@@ -81,6 +81,13 @@ struct Cached {
     until: Instant,
 }
 
+/// A failed Google API call. `status` is the HTTP status when Google answered.
+#[derive(Debug, PartialEq)]
+pub struct ApiError {
+    pub status: Option<u16>,
+    pub message: String,
+}
+
 pub struct GoogleAuth {
     /// The user's own client from settings; empty means "use bleep's".
     cfg: Mutex<GoogleConfig>,
@@ -239,6 +246,34 @@ impl GoogleAuth {
             }
             Err(e) => Err(AuthError::Other(format!("Could not reach Google: {}", describe(&e)))),
         }
+    }
+
+    /// The signed-in account, lowercased, when connected.
+    pub fn account(&self) -> Option<String> {
+        match self.status() {
+            ConnectorStatus::Connected { account } => Some(account.to_lowercase()),
+            _ => None,
+        }
+    }
+
+    /// Sends with a fresh access token; on 401 drops the token and tries once more.
+    pub async fn send_json(&self, build: impl Fn() -> reqwest::RequestBuilder) -> Result<serde_json::Value, ApiError> {
+        for attempt in 0..2 {
+            let token = self.access_token().await.map_err(|e| ApiError { status: None, message: e.to_string() })?;
+            let resp = build().bearer_auth(&token).send().await.map_err(|e| ApiError { status: None, message: format!("Could not reach Google: {e}") })?;
+            let status = resp.status();
+            if status == reqwest::StatusCode::UNAUTHORIZED && attempt == 0 {
+                self.invalidate().await;
+                continue;
+            }
+            let text = resp.text().await.unwrap_or_default();
+            if status.is_success() {
+                return if text.trim().is_empty() { Ok(serde_json::Value::Null) } else { serde_json::from_str(&text).map_err(|e| ApiError { status: Some(status.as_u16()), message: e.to_string() }) };
+            }
+            let message = serde_json::from_str::<serde_json::Value>(&text).ok().and_then(|v| v["error"]["message"].as_str().map(String::from)).unwrap_or(text);
+            return Err(ApiError { status: Some(status.as_u16()), message });
+        }
+        Err(ApiError { status: Some(401), message: "Google refused the sign-in twice.".into() })
     }
 
     /// Drops the cached access token (after the API answered 401).

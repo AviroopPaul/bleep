@@ -5,6 +5,7 @@ pub mod config;
 pub mod connectors;
 pub mod google;
 pub mod hotkey;
+pub mod mail;
 pub mod mcp;
 pub mod opener;
 pub mod paths;
@@ -40,6 +41,8 @@ struct Parts {
     state: AppState,
     google: Arc<google::GoogleAuth>,
     calendar: Arc<connectors::calendar::CalendarConnector>,
+    watcher: Arc<mail::watch::MailWatcher>,
+    triager: Arc<mail::triage::Triager>,
 }
 
 /// Approve or Decline on a card.
@@ -103,16 +106,19 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     google.set_builtin(google::builtin_client());
     let http = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()?;
     let calendar = connectors::calendar::CalendarConnector::new(google.clone(), http.clone(), google::GoogleEndpoints::google().api);
-    let gmail = connectors::gmail::GmailConnector::new(google.clone(), http, GMAIL_API.into(), store.clone());
+    let gmail = connectors::gmail::GmailConnector::new(google.clone(), http.clone(), GMAIL_API.into(), store.clone());
+    let watcher = mail::watch::MailWatcher::new(google.clone(), http, GMAIL_API.into(), store.clone());
     let h = handle.clone();
     let approvals = approvals::Approvals::new(store.clone(), Arc::new(move |a| {
         let _ = h.emit("approval://changed", a);
     }), approvals::WAIT);
     let turns = mcp::host::TurnTracker::default();
-    let tool_host = mcp::host::ToolHost::new(vec![Arc::new(connectors::bleep::BleepConnector), calendar.clone(), gmail], approvals.clone(), turns.clone());
+    let tool_host = mcp::host::ToolHost::new_logged(vec![Arc::new(connectors::bleep::BleepConnector), calendar.clone(), gmail], approvals.clone(), turns.clone(), store.clone());
     let mcp = tauri::async_runtime::block_on(mcp::McpServer::start(mcp::new_token(), tool_host))?;
     let bin = find_claude().unwrap_or_else(|| "claude".into());
     let runtime = Arc::new(ClaudeRuntime::new(paths.clone(), config.tiers.clone(), bin).with_hold(approvals.waiting()));
+    let h = handle.clone();
+    let triager = mail::triage::Triager::new(runtime.clone(), store.clone(), Arc::new(move || h.state::<AppState>().config.lock().unwrap().mail.clone()));
     let h = handle.clone();
     let emit: chat::Emit = Arc::new(move |m: ChatEmit| {
         let _ = h.emit("chat://event", m);
@@ -127,7 +133,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
         }
     });
     let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, _mcp: mcp };
-    Ok(Parts { state, google, calendar })
+    Ok(Parts { state, google, calendar, watcher, triager })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -139,7 +145,8 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            let Parts { state, google, calendar } = init(app)?;
+            let Parts { state, google, calendar, watcher, triager } = init(app)?;
+            let chat = state.chat.clone();
             let cfg = state.config.lock().unwrap().clone();
             let store = state.store.clone();
             app.manage(state);
@@ -148,16 +155,41 @@ pub fn run() {
             app.manage(ui);
             app.manage(google.clone());
             windows::create_windows(app.handle(), &cfg)?;
+            let bar_ui = bar::TauriBarUi::new(app.handle().clone());
             let sched = proactive::scheduler::Scheduler::new(proactive::scheduler::SchedulerDeps {
-                store,
+                store: store.clone(),
                 calendar,
                 auth: google,
-                paused,
-                ui: bar::TauriBarUi::new(app.handle().clone()),
+                paused: paused.clone(),
+                ui: bar_ui.clone(),
                 now: Arc::new(chrono::Utc::now),
             });
             app.manage(sched.clone());
             tauri::async_runtime::spawn(sched.run());
+            let h = app.handle().clone();
+            let mail_cfg: Arc<dyn Fn() -> config::MailConfig + Send + Sync> = Arc::new(move || h.state::<AppState>().config.lock().unwrap().mail.clone());
+            let notifier = proactive::notifier::Notifier::new(store.clone(), bar_ui, paused.clone(), mail_cfg, Arc::new(chrono::Utc::now));
+            app.manage(notifier.clone());
+            let pipeline = mail::pipeline::MailPipeline::new(watcher, triager, notifier, store.clone());
+            let h = app.handle().clone();
+            let checkins = proactive::checkins::CheckinRunner::new(
+                store,
+                chat,
+                Arc::new(move || h.state::<AppState>().config.lock().unwrap().checkin.clone()),
+                paused,
+                Arc::new(chrono::Utc::now),
+                Arc::new(|t: chrono::DateTime<chrono::Utc>| t.with_timezone(&chrono::Local).naive_local()),
+            );
+            // Mail every 2 minutes and check-ins, on one 30 s clock.
+            tauri::async_runtime::spawn(async move {
+                let mut every = tokio::time::interval(proactive::scheduler::TICK);
+                every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                loop {
+                    every.tick().await;
+                    pipeline.tick(chrono::Utc::now()).await;
+                    checkins.tick().await;
+                }
+            });
             windows::setup_tray(app.handle())?;
             if let Err(e) = hotkey::setup(app.handle()) {
                 eprintln!("bleep: summon shortcut not set: {e}");
@@ -190,6 +222,11 @@ pub fn run() {
             settings::google_disconnect,
             settings::open_link,
             settings::open_url,
+            settings::mail_settings,
+            settings::mail_set_lists,
+            settings::mail_resolve_suggestion,
+            settings::activity_list,
+            bar::bubble_not_useful,
             windows::chat_open,
             windows::chat_hide,
             windows::droid_toggle_tuck,

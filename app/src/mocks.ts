@@ -1,7 +1,7 @@
 // Fake backend for headless UI checks (Playwright). Loaded only with ?mock=1.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
-import type { Approval, BarCue, ChatEmit, GoogleState, Message } from "./ipc";
+import type { ActivityItem, Approval, BarCue, ChatEmit, GoogleState, MailConfig, Message } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
   id, role, kind: "chat", content, tool_steps: [], tokens: null, status: "done", session_id: 1, created_at: "",
@@ -38,8 +38,15 @@ export function installMocks(label: string) {
     builtin: gq !== "setup",
     using_own: own,
   };
+  let mail: MailConfig = { vips: [], muted: ["noisy@x.example"], suggested_mutes: ["bills@city.example"] };
+  const activity: ActivityItem[] = [
+    { kind: "model", name: "triage", detail: "small", ok: false, at: "2026-11-12T10:05:00.000Z" },
+    { kind: "approval", name: "calendar_create", detail: "declined", ok: true, at: "2026-11-12T10:04:00.000Z" },
+    { kind: "tool", name: "calendar_list", detail: "{}", ok: true, at: "2026-11-12T10:03:00.000Z" },
+  ];
   const bubble = q.get("bubble");
-  if (bubble) setTimeout(() => emit("bubble://text", { text: bubble }), 200);
+  const ping = q.get("ping");
+  if (bubble) setTimeout(() => emit("bubble://text", { text: bubble, ping_id: ping ? Number(ping) : null }), 200);
   const later = (ms: number, f: () => void) => setTimeout(f, ms);
   const chatEv = (id: number, event: ChatEmit["event"]) => emit("chat://event", { message_id: id, event });
   mockIPC(
@@ -107,6 +114,25 @@ export function installMocks(label: string) {
           return null;
         case "open_url":
           calls.push(`open_url:${a.url}`);
+          return null;
+        case "mail_settings":
+          return mail;
+        case "mail_set_lists": {
+          const clean = (l: unknown) => [...new Set((l as string[]).map((x) => x.trim().toLowerCase()))];
+          mail = { ...mail, vips: clean(a.vips), muted: clean(a.muted) };
+          calls.push(`mail_set_lists:${mail.vips.join(",")}|${mail.muted.join(",")}`);
+          return mail;
+        }
+        case "mail_resolve_suggestion": {
+          calls.push(`mail_resolve_suggestion:${a.addr}:${a.mute}`);
+          const addr = String(a.addr);
+          mail = { ...mail, suggested_mutes: mail.suggested_mutes.filter((x) => x !== addr), muted: a.mute ? [...mail.muted, addr] : mail.muted };
+          return mail;
+        }
+        case "activity_list":
+          return activity;
+        case "bubble_not_useful":
+          calls.push(`bubble_not_useful:${a.pingId}`);
           return null;
         case "bar_current":
           return cue;

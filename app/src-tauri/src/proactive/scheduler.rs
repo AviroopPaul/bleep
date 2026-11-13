@@ -17,6 +17,10 @@ pub trait BarUi: Send + Sync {
     fn show(&self, cue: &BarCue);
     fn hide(&self);
     fn bubble(&self, text: &str);
+    /// A mail ping: a bubble that can be marked "Not useful".
+    fn ping(&self, text: &str, _ping_id: i64) {
+        self.bubble(text);
+    }
 }
 
 pub type Clock = Arc<dyn Fn() -> DateTime<Utc> + Send + Sync>;

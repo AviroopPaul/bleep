@@ -28,6 +28,30 @@ impl std::fmt::Debug for GoogleConfig {
     }
 }
 
+/// Mail rules until Phase 5's RULES.md. Nothing is muted without the user's tap.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MailConfig {
+    pub vips: Vec<String>,
+    pub muted: Vec<String>,
+    /// Senders with three "Not useful" pings, waiting for the user to say Mute or Keep.
+    pub suggested_mutes: Vec<String>,
+}
+
+/// Local times, "HH:MM".
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CheckinConfig {
+    pub brief: String,
+    pub checkins: Vec<String>,
+}
+
+impl Default for CheckinConfig {
+    fn default() -> Self {
+        Self { brief: "09:00".into(), checkins: vec!["13:00".into(), "18:00".into()] }
+    }
+}
+
 /// `~/.bleep/config.toml`. Unknown keys are ignored so later phases can add fields.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -39,6 +63,8 @@ pub struct Config {
     pub autostart_set: bool,
     pub summon_note_shown: bool,
     pub google: GoogleConfig,
+    pub mail: MailConfig,
+    pub checkin: CheckinConfig,
 }
 
 impl Default for Config {
@@ -51,6 +77,8 @@ impl Default for Config {
             autostart_set: false,
             summon_note_shown: false,
             google: GoogleConfig::default(),
+            mail: MailConfig::default(),
+            checkin: CheckinConfig::default(),
         }
     }
 }
@@ -134,6 +162,21 @@ mod tests {
         assert_eq!(std::fs::metadata(&p).unwrap().permissions().mode() & 0o777, 0o600);
         assert_eq!(Config::load(&p).unwrap().google, c.google);
         assert!(!format!("{:?}", c).contains("shh"));
+    }
+
+    #[test]
+    fn config_reads_check_in_times_and_mail_lists() {
+        let c = Config::default();
+        assert_eq!(c.checkin.brief, "09:00");
+        assert_eq!(c.checkin.checkins, vec!["13:00".to_string(), "18:00".to_string()]);
+        assert!(c.mail.vips.is_empty() && c.mail.muted.is_empty() && c.mail.suggested_mutes.is_empty());
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("config.toml");
+        std::fs::write(&p, "[checkin]\nbrief = \"08:30\"\n[mail]\nvips = [\"priya@example.com\"]\n").unwrap();
+        let c = Config::load(&p).unwrap();
+        assert_eq!(c.checkin.brief, "08:30");
+        assert_eq!(c.checkin.checkins, vec!["13:00".to_string(), "18:00".to_string()], "unset keys keep defaults");
+        assert_eq!(c.mail.vips, vec!["priya@example.com".to_string()]);
     }
 
     #[test]

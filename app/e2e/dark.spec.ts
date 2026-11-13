@@ -60,3 +60,15 @@ test("dark mode: droid bubble is readable", async ({ page }) => {
   await expect(page.locator(".bubble")).toBeVisible();
   expect(await contrast(page, ".bubble")).toBeGreaterThanOrEqual(4.5);
 });
+
+test("dark mode: mail and activity tabs are readable", async ({ page }) => {
+  await page.goto("/?mock=1&g=builtin#settings");
+  await page.getByRole("tab", { name: "Mail" }).click();
+  for (const sel of [".tab[aria-selected=true]", ".tab[aria-selected=false]", ".chip", ".mail-h"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+  await page.getByRole("tab", { name: "Activity" }).click();
+  for (const sel of [".act-title", ".act-time", ".act-bad"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+});

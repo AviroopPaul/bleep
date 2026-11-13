@@ -73,11 +73,17 @@ pub struct ToolHost {
     connectors: Vec<Arc<dyn Connector>>,
     gate: Arc<dyn Gate>,
     turns: TurnTracker,
+    log: Option<Arc<crate::store::Store>>,
 }
 
 impl ToolHost {
     pub fn new(connectors: Vec<Arc<dyn Connector>>, gate: Arc<dyn Gate>, turns: TurnTracker) -> Arc<ToolHost> {
-        Arc::new(ToolHost { connectors, gate, turns })
+        Arc::new(ToolHost { connectors, gate, turns, log: None })
+    }
+
+    /// Like `new`, and writes every call to the Activity log.
+    pub fn new_logged(connectors: Vec<Arc<dyn Connector>>, gate: Arc<dyn Gate>, turns: TurnTracker, store: Arc<crate::store::Store>) -> Arc<ToolHost> {
+        Arc::new(ToolHost { connectors, gate, turns, log: Some(store) })
     }
 
     /// Every tool the model may see. `Never` tools are not listed.
@@ -90,6 +96,26 @@ impl ToolHost {
     }
 
     pub async fn call(&self, name: &str, args: Value) -> Result<Value, String> {
+        let started = std::time::Instant::now();
+        let risk = self.find(name).map(|(_, s)| s.risk);
+        let out = self.call_inner(name, args).await;
+        if let (Some(store), Some(risk)) = (&self.log, risk) {
+            let preview = match &out {
+                Ok(v) => crate::runtime::preview(&v.to_string(), 200),
+                Err(e) => crate::runtime::preview(e, 200),
+            };
+            let risk = match risk {
+                Risk::Read => "read",
+                Risk::Safe => "safe",
+                Risk::Write => "write",
+                Risk::Never => "never",
+            };
+            let _ = store.log_tool(name, risk, out.is_ok(), started.elapsed().as_millis() as i64, Some(&preview));
+        }
+        out
+    }
+
+    async fn call_inner(&self, name: &str, args: Value) -> Result<Value, String> {
         let Some((conn, spec)) = self.find(name) else { return Err(format!("Unknown tool: {name}")) };
         if spec.risk == Risk::Never {
             return Err(format!("Unknown tool: {name}"));
@@ -257,6 +283,22 @@ pub mod tests {
         let (h, _) = host(FakeConnector::new(), FakeGate::new(Decision::Approved));
         assert!(h.call("fake_forward", json!({})).await.is_err());
         assert!(h.call("nope", json!({})).await.unwrap_err().contains("Unknown tool"));
+    }
+
+    #[tokio::test]
+    async fn host_logs_each_call_with_outcome() {
+        let d = tempfile::tempdir().unwrap();
+        let store = Arc::new(crate::store::Store::open(&d.path().join("b.db")).unwrap());
+        let h = ToolHost::new_logged(vec![FakeConnector::new()], FakeGate::new(Decision::Declined), TurnTracker::default(), store.clone());
+        h.call("fake_read", json!({"q": 1})).await.unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        assert!(h.call("fake_write", json!({})).await.is_err());
+        let items = store.activity(10).unwrap();
+        let tools: Vec<_> = items.iter().filter(|i| i.kind == "tool").collect();
+        assert_eq!(tools.len(), 2);
+        assert_eq!((tools[0].name.as_str(), tools[0].ok, tools[0].detail.as_deref()), ("fake_write", false, Some(DECLINED)));
+        assert_eq!((tools[1].name.as_str(), tools[1].ok), ("fake_read", true));
+        assert!(tools[1].detail.as_deref().unwrap().contains("read"));
     }
 
     #[test]

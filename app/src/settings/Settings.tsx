@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MailSettings } from "./MailSettings";
+import { Activity } from "./Activity";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onGoogleStatus, type GoogleState, type LinkName } from "../ipc";
 
@@ -20,7 +22,7 @@ const STEPS: { text: string; links: [LinkName, string][] }[] = [
   { text: "Paste the client ID and secret below, save, then press Connect Google above.", links: [] },
 ];
 
-export function Settings() {
+export function GoogleSettings() {
   const [g, setG] = useState<GoogleState | null>(null);
   const [clientId, setClientId] = useState("");
   const [secret, setSecret] = useState("");
@@ -86,9 +88,7 @@ export function Settings() {
 
   const state = g?.status.state;
   return (
-    <main className="settings">
-      <h1>Settings</h1>
-      <section className="set-card" aria-labelledby="google-h">
+    <section className="set-card" aria-labelledby="google-h">
         <div className="set-head">
           <h2 id="google-h">Google</h2>
           <span className={`pill ${state ?? ""}`} role="status">{statusText(g)}</span>
@@ -141,6 +141,49 @@ export function Settings() {
           </details>
         )}
       </section>
+  );
+}
+
+const TABS = ["Google", "Mail", "Activity"] as const;
+type Tab = (typeof TABS)[number];
+
+export function Settings() {
+  const [tab, setTab] = useState<Tab>("Google");
+  const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+  const onKey = (e: React.KeyboardEvent, i: number) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = (i + step + TABS.length) % TABS.length;
+    setTab(TABS[next]);
+    tabs.current[next]?.focus();
+  };
+  return (
+    <main className="settings">
+      <h1>Settings</h1>
+      <div className="tabs" role="tablist" aria-label="Settings">
+        {TABS.map((t, i) => (
+          <button
+            key={t}
+            ref={(el) => { tabs.current[i] = el; }}
+            role="tab"
+            id={`tab-${t}`}
+            className="tab"
+            aria-selected={tab === t}
+            aria-controls={`panel-${t}`}
+            tabIndex={tab === t ? 0 : -1}
+            onClick={() => setTab(t)}
+            onKeyDown={(e) => onKey(e, i)}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-panel">
+        {tab === "Google" && <GoogleSettings />}
+        {tab === "Mail" && <MailSettings />}
+        {tab === "Activity" && <Activity />}
+      </div>
     </main>
   );
 }

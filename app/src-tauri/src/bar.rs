@@ -51,8 +51,18 @@ impl BarUi for TauriBarUi {
         let _ = self.app.emit("droid://mood", json!({"mood": "idle"}));
     }
 
-    /// Skipped when the droid is hidden or tucked: the bar is enough then.
     fn bubble(&self, text: &str) {
+        self.show_bubble(text, None);
+    }
+
+    fn ping(&self, text: &str, ping_id: i64) {
+        self.show_bubble(text, Some(ping_id));
+    }
+}
+
+impl TauriBarUi {
+    /// Skipped when the droid is hidden or tucked: the bar or the next check-in is enough then.
+    fn show_bubble(&self, text: &str, ping_id: Option<i64>) {
         let Some(d) = self.app.get_webview_window("droid") else { return };
         let tucked = self.app.state::<UiState>().tucked.lock().unwrap().is_some();
         if tucked || !d.is_visible().unwrap_or(false) {
@@ -61,7 +71,7 @@ impl BarUi for TauriBarUi {
         let (Some(r), Some(b)) = (rect_of(&d), self.app.get_webview_window("bubble")) else { return };
         let p = bubble_pos(r, screen_of(&self.app, r), BUBBLE);
         let _ = b.set_position(LogicalPosition::new(p.x, p.y));
-        let _ = self.app.emit("bubble://text", json!({"text": text}));
+        let _ = self.app.emit("bubble://text", json!({"text": text, "ping_id": ping_id}));
         let _ = b.show();
         let ticket = self.bubble_gen.fetch_add(1, Ordering::SeqCst) + 1;
         let (app, latest) = (self.app.clone(), self.bubble_gen.clone());
@@ -128,6 +138,18 @@ pub async fn bar_prep(app: AppHandle, sched: tauri::State<'_, Arc<Scheduler>>, s
             Err(e.to_string())
         }
     }
+}
+
+/// "Not useful" on a mail ping. The third for one sender adds a mute suggestion in settings.
+#[tauri::command]
+pub fn bubble_not_useful(app: AppHandle, state: tauri::State<'_, AppState>, notifier: tauri::State<'_, Arc<crate::proactive::notifier::Notifier>>, ping_id: i64) -> Result<(), String> {
+    hide_bubble(&app);
+    if let Some(sender) = notifier.not_useful(ping_id) {
+        let mut cfg = state.config.lock().unwrap();
+        cfg.mail.suggested_mutes.push(sender);
+        cfg.save(&state.paths.config_file).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]

@@ -179,6 +179,7 @@ pub trait AgentRuntime: Send + Sync {
 - **Keep it warm:** one child process stays alive for the main chat. Each new message is one JSON line on stdin. If the child dies, restart it with `--resume`.
 - **One-shots:** a separate `claude -p --output-format json --json-schema ... --model haiku --tools "" --no-session-persistence`. About 2.6 s per call (measured in the Valet doc).
 - **Tested on 12 Nov 2026:** `--strict-mcp-config` with `--setting-sources ""` runs fine headless and loads no other servers.
+- **Learned in Phase 3:** Gmail `history.list` answers 404 when the stored `historyId` is too old; bleep then reseeds from the last 2 days and those mails never ping. Rules sort most mail for free (categories, bill words plus an amount, VIPs, mailing lists); only unclear mail reaches the small model, 10 per call, at most 20 calls an hour.
 - **Learned in Phase 2:** Claude Code 2.1.319 aborts an MCP tool call that sends nothing for 300 s, and `MCP_TOOL_TIMEOUT` does not lift that. A per-server `"timeout": 660000` in the MCP config does: a live probe held a write call on an approval card for 371 s and the answer reached the model.
 - **Learned in Phase 1:** a stale `--resume` id fails within about 0.5 s with no input, so `start_session` waits up to 1.5 s when resuming. `ANTHROPIC_API_KEY` and the `CLAUDECODE` markers are removed from the child's env so it always uses the subscription. bleep's MCP server runs stateless with plain JSON replies, and Claude Code accepts that.
 
@@ -390,6 +391,7 @@ Done when: the bar shows up 1 hour before a real meeting on my calendar, "Prep m
 
 Deliverables:
 - Gmail connector: `gmail_search`, `gmail_read_thread` (read), `gmail_draft` (safe), `gmail_send` (write).
+  - **Rest of Phase 3 (13 Nov 2026):** Gmail watch every 2 minutes, rules-then-small-model sorting, bill amounts and due dates, waiting-on-me, calm pings with "Not useful" and mute suggestions, check-ins at 9:00, 13:00 and 18:00 (empty ones skipped, late ones run once within 2 hours), and the Activity tab. VIPs and muted senders live in `config.toml` until Phase 5.
   - **Built early (12 Nov 2026, with Phase 2):** all four tools. `gmail_send` shows a card with the exact email, warns about recipients I have never mailed, and stops after 10 sends a day. Replies keep the thread (`In-Reply-To`, `References`). The rest of Phase 3 (watcher, triage, check-ins) is still to do.
 - Gmail watcher (history polling) + rules triage in Rust + `small` one-shot for unclear mail.
 - Scheduled turns: morning brief 9:00, check-ins 13:00 and 18:00 (times in settings).

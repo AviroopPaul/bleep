@@ -1,0 +1,1 @@
+{"id": "m2", "threadId": "t2", "labelIds": ["INBOX", "CATEGORY_PROMOTIONS"], "snippet": "Big sale", "internalDate": "1794474000000", "payload": {"headers": [{"name": "From", "value": "Shop <deals@shop.example>"}, {"name": "To", "value": "me@example.com"}, {"name": "Subject", "value": "50% off today"}, {"name": "List-Unsubscribe", "value": "<mailto:u@shop.example>"}]}}

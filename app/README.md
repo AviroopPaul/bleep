@@ -53,6 +53,14 @@ Until Google verifies the app, users see an "unverified app" warning and Google 
 - **Drafts are free:** bleep saves a reply in your Gmail drafts without asking. Nothing is sent.
 - **Sending needs your tap:** a card shows the recipients, subject and full body. Someone you have never emailed gets a red warning. At most 10 sends a day.
 
+## Watching mail and check-ins
+
+- **Every 2 minutes** bleep checks Gmail for new mail. The first check only reads the last 2 days and never pings.
+- **Sorting:** rules first (promotions, social and forums are ignored; bill words plus an amount mean a bill; VIPs are important; mailing lists are worth knowing). Only unclear mail goes to the small model.
+- **Pings:** the droid's bubble says "Bill due today: City Power ₹2,340" or "Boss needs a reply". Never between 23:00 and 08:00, at most 4 an hour, once per thread every 6 hours. Pause in the menu stops them. Tap "Not useful" three times for one sender and Settings suggests muting them.
+- **Check-ins** at 9:00, 13:00 and 18:00 (times in `config.toml` under `[checkin]`): meetings, bills due within 3 days, and threads waiting over a day for your reply, with offers to add a reminder or draft a reply. Nothing to say means no check-in.
+- **Settings, Mail tab:** VIPs, muted senders, mute suggestions. **Activity tab:** every tool call, approval card and model call.
+
 ## Build
 
 ```bash
