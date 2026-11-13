@@ -52,3 +52,18 @@ test("bar fits 560 px with a 120 char title", async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(560);
   await expect(page.getByRole("button", { name: "Dismiss" })).toBeInViewport();
 });
+
+test("a mail ping offers Not useful and reports it", async ({ page }) => {
+  await page.setViewportSize({ width: 240, height: 72 });
+  await page.goto("/?mock=1&bubble=Bill%20due%20today%3A%20City%20Power&ping=7#bubble");
+  await expect(page.getByRole("button", { name: /Bill due today/ })).toBeVisible();
+  await page.getByRole("button", { name: "Not useful" }).click();
+  expect(await calls(page)).toEqual(["bubble_not_useful:7"]);
+});
+
+test("a meeting bubble has no Not useful", async ({ page }) => {
+  await page.setViewportSize({ width: 240, height: 72 });
+  await page.goto("/?mock=1&bubble=Design%20review%20in%201%20hour#bubble");
+  await expect(page.getByRole("button", { name: /Design review/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Not useful" })).toHaveCount(0);
+});

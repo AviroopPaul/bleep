@@ -23,6 +23,7 @@ macro_rules! str_enum {
 str_enum!(Role { User = "user", Assistant = "assistant", System = "system" });
 str_enum!(Kind { Chat = "chat", Scheduled = "scheduled", System = "system", Approval = "approval", Divider = "divider" });
 str_enum!(MsgStatus { Streaming = "streaming", Done = "done", Error = "error", Interrupted = "interrupted" });
+str_enum!(Label { Ignore = "ignore", Fyi = "fyi", Important = "important", NeedsReply = "needs_reply", Bill = "bill" });
 str_enum!(ApprovalStatus { Pending = "pending", Approved = "approved", Declined = "declined", Expired = "expired", Done = "done", Failed = "failed" });
 
 impl ApprovalStatus {
@@ -31,6 +32,40 @@ impl ApprovalStatus {
         use ApprovalStatus::*;
         matches!((self, to), (Pending, Approved | Declined | Expired) | (Approved, Done | Failed))
     }
+}
+
+/// One email bleep has seen. `subject` and `snippet` are other people's text.
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct MailRow {
+    pub message_id: String,
+    pub thread_id: String,
+    pub from_addr: String,
+    pub from_name: Option<String>,
+    pub to_me: bool,
+    pub from_me: bool,
+    pub subject: String,
+    pub snippet: String,
+    pub labels: Vec<String>,
+    pub received: DateTime<Utc>,
+    pub triage: Option<Label>,
+    pub amount: Option<String>,
+    pub due: Option<chrono::NaiveDate>,
+    pub reason: Option<String>,
+    pub seeded: bool,
+    pub paid: bool,
+}
+
+/// One line in the Activity tab.
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct ActivityItem {
+    /// "tool", "approval" or "model".
+    pub kind: String,
+    /// Tool name, or a model call's purpose.
+    pub name: String,
+    /// A tool result preview, an approval status, or a model tier.
+    pub detail: Option<String>,
+    pub ok: bool,
+    pub at: String,
 }
 
 /// One approval card: the exact payload that runs if the user approves.
@@ -133,6 +168,47 @@ CREATE TABLE pings (
   feedback TEXT
 );
 CREATE UNIQUE INDEX pings_kind_ref ON pings(kind, ref_id);
+"#, r#"
+CREATE TABLE mail_cache (
+  message_id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL,
+  from_addr TEXT NOT NULL,
+  from_name TEXT,
+  to_me INTEGER NOT NULL,
+  from_me INTEGER NOT NULL,
+  subject TEXT NOT NULL,
+  snippet TEXT NOT NULL,
+  labels TEXT NOT NULL DEFAULT '[]',
+  received TEXT NOT NULL,
+  triage TEXT,
+  amount TEXT,
+  due TEXT,
+  reason TEXT,
+  seeded INTEGER NOT NULL DEFAULT 0,
+  paid INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX mail_thread ON mail_cache(thread_id, received);
+CREATE TABLE cursors (connector TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE llm_calls (
+  id INTEGER PRIMARY KEY,
+  runtime TEXT NOT NULL,
+  tier TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  tokens_in INTEGER,
+  tokens_out INTEGER,
+  ok INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE tool_calls (
+  id INTEGER PRIMARY KEY,
+  tool TEXT NOT NULL,
+  risk TEXT NOT NULL,
+  ok INTEGER NOT NULL,
+  ms INTEGER NOT NULL,
+  preview TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+ALTER TABLE pings ADD COLUMN sender TEXT;
 "#];
 
 pub struct Store {
@@ -191,6 +267,32 @@ fn row_to_cal(r: &Row) -> rusqlite::Result<CalEvent> {
         my_response: r.get(7)?,
         html_link: r.get(8)?,
         description_untrusted: r.get(9)?,
+    })
+}
+
+const MAIL_COLS: &str = "message_id, thread_id, from_addr, from_name, to_me, from_me, subject, snippet, labels, received, triage, amount, due, reason, seeded, paid";
+
+fn row_to_mail(r: &Row) -> rusqlite::Result<MailRow> {
+    let labels: String = r.get(8)?;
+    let received: String = r.get(9)?;
+    let due: Option<String> = r.get(12)?;
+    Ok(MailRow {
+        message_id: r.get(0)?,
+        thread_id: r.get(1)?,
+        from_addr: r.get(2)?,
+        from_name: r.get(3)?,
+        to_me: r.get(4)?,
+        from_me: r.get(5)?,
+        subject: r.get(6)?,
+        snippet: r.get(7)?,
+        labels: serde_json::from_str(&labels).unwrap_or_default(),
+        received: DateTime::parse_from_rfc3339(&received).map(|d| d.with_timezone(&Utc)).map_err(|e| rusqlite::Error::FromSqlConversionFailure(9, rusqlite::types::Type::Text, Box::new(e)))?,
+        triage: r.get::<_, Option<String>>(10)?.map(|s| Label::parse(&s)),
+        amount: r.get(11)?,
+        due: due.and_then(|d| chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok()),
+        reason: r.get(13)?,
+        seeded: r.get(14)?,
+        paid: r.get(15)?,
     })
 }
 
@@ -348,6 +450,146 @@ impl Store {
         Ok(n as usize)
     }
 
+    /// Inserts a message, or refreshes its Gmail labels. Never touches bleep's own fields
+    /// (label, amount, due, paid, seeded) on a message it already has.
+    pub fn upsert_mail(&self, m: &MailRow) -> Result<()> {
+        self.db().execute(
+            "INSERT INTO mail_cache (message_id, thread_id, from_addr, from_name, to_me, from_me, subject, snippet, labels, received, triage, amount, due, reason, seeded, paid)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+             ON CONFLICT(message_id) DO UPDATE SET labels = excluded.labels",
+            params![
+                m.message_id, m.thread_id, m.from_addr, m.from_name, m.to_me, m.from_me, m.subject, m.snippet,
+                serde_json::to_string(&m.labels)?, ts(m.received), m.triage.map(|l| l.as_str()), m.amount,
+                m.due.map(|d| d.to_string()), m.reason, m.seeded, m.paid
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn mail_query(&self, filter: &str, p: &[&dyn rusqlite::ToSql]) -> Result<Vec<MailRow>> {
+        let sql = format!("SELECT {MAIL_COLS} FROM mail_cache {filter}");
+        Ok(self.db().prepare(&sql)?.query_map(p, row_to_mail)?.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Rows with no label yet, oldest first.
+    pub fn untriaged(&self, limit: usize) -> Result<Vec<MailRow>> {
+        self.mail_query("WHERE triage IS NULL ORDER BY received LIMIT ?1", &[&(limit as i64)])
+    }
+
+    pub fn set_triage(&self, message_id: &str, label: Label, amount: Option<&str>, due: Option<chrono::NaiveDate>, reason: &str) -> Result<()> {
+        self.db().execute(
+            "UPDATE mail_cache SET triage = ?2, amount = ?3, due = ?4, reason = ?5 WHERE message_id = ?1",
+            params![message_id, label.as_str(), amount, due.map(|d| d.to_string()), reason],
+        )?;
+        Ok(())
+    }
+
+    pub fn mail_since(&self, t: DateTime<Utc>) -> Result<Vec<MailRow>> {
+        self.mail_query("WHERE received >= ?1 ORDER BY received", &[&ts(t)])
+    }
+
+    pub fn mail_rows(&self, ids: &[String]) -> Result<Vec<MailRow>> {
+        let mut out = vec![];
+        for id in ids {
+            out.extend(self.mail_query("WHERE message_id = ?1", &[id])?);
+        }
+        Ok(out)
+    }
+
+    pub fn thread_rows(&self, thread_id: &str) -> Result<Vec<MailRow>> {
+        self.mail_query("WHERE thread_id = ?1 ORDER BY received", &[&thread_id])
+    }
+
+    /// Unpaid bills due on or before `until` (or with no due date), soonest first.
+    pub fn open_bills(&self, until: chrono::NaiveDate) -> Result<Vec<MailRow>> {
+        self.mail_query("WHERE triage = 'bill' AND paid = 0 AND (due IS NULL OR due <= ?1) ORDER BY due IS NULL, due, received", &[&until.to_string()])
+    }
+
+    pub fn get_cursor(&self, connector: &str) -> Result<Option<String>> {
+        Ok(self.db().query_row("SELECT value FROM cursors WHERE connector = ?1", params![connector], |r| r.get(0)).optional()?)
+    }
+
+    pub fn set_cursor(&self, connector: &str, value: Option<&str>) -> Result<()> {
+        match value {
+            Some(v) => self.db().execute("INSERT INTO cursors (connector, value) VALUES (?1, ?2) ON CONFLICT(connector) DO UPDATE SET value = excluded.value", params![connector, v])?,
+            None => self.db().execute("DELETE FROM cursors WHERE connector = ?1", params![connector])?,
+        };
+        Ok(())
+    }
+
+    pub fn log_llm(&self, runtime: &str, tier: &str, purpose: &str, tokens_in: Option<i64>, tokens_out: Option<i64>, ok: bool) -> Result<()> {
+        self.db().execute(
+            "INSERT INTO llm_calls (runtime, tier, purpose, tokens_in, tokens_out, ok) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![runtime, tier, purpose, tokens_in, tokens_out, ok],
+        )?;
+        Ok(())
+    }
+
+    /// Tokens of the newest model call (tests and the Activity tab).
+    pub fn llm_tokens_last(&self) -> Result<(Option<i64>, Option<i64>)> {
+        Ok(self.db().query_row("SELECT tokens_in, tokens_out FROM llm_calls ORDER BY id DESC LIMIT 1", [], |r| Ok((r.get(0)?, r.get(1)?)))?)
+    }
+
+    /// Background model calls since `t`. Chat turns (`purpose = "chat"`) do not count.
+    pub fn llm_calls_since(&self, t: DateTime<Utc>) -> Result<usize> {
+        let n: i64 = self.db().query_row("SELECT COUNT(*) FROM llm_calls WHERE purpose != 'chat' AND created_at >= ?1", params![ts(t)], |r| r.get(0))?;
+        Ok(n as usize)
+    }
+
+    pub fn log_tool(&self, tool: &str, risk: &str, ok: bool, ms: i64, preview: Option<&str>) -> Result<()> {
+        self.db().execute("INSERT INTO tool_calls (tool, risk, ok, ms, preview) VALUES (?1, ?2, ?3, ?4, ?5)", params![tool, risk, ok, ms, preview])?;
+        Ok(())
+    }
+
+    /// Tool calls, approvals and model calls, newest first. A declined card is not a failure.
+    pub fn activity(&self, limit: usize) -> Result<Vec<ActivityItem>> {
+        let sql = "SELECT 'tool', tool, preview, ok, created_at FROM tool_calls
+             UNION ALL SELECT 'approval', tool, status, status != 'failed', COALESCE(decided_at, created_at) FROM approvals
+             UNION ALL SELECT 'model', purpose, tier, ok, created_at FROM llm_calls
+             ORDER BY 5 DESC LIMIT ?1";
+        Ok(self
+            .db()
+            .prepare(sql)?
+            .query_map(params![limit as i64], |r| Ok(ActivityItem { kind: r.get(0)?, name: r.get(1)?, detail: r.get(2)?, ok: r.get(3)?, at: r.get(4)? }))?
+            .collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Records a ping and returns its id; `None` if this exact ping was already recorded.
+    pub fn record_ping_from(&self, kind: &str, ref_id: &str, sender: Option<&str>) -> Result<Option<i64>> {
+        let db = self.db();
+        let n = db.execute("INSERT OR IGNORE INTO pings (kind, ref_id, sender) VALUES (?1, ?2, ?3)", params![kind, ref_id, sender])?;
+        Ok((n == 1).then(|| db.last_insert_rowid()))
+    }
+
+    pub fn pings_since(&self, kind: &str, t: DateTime<Utc>) -> Result<usize> {
+        let n: i64 = self.db().query_row("SELECT COUNT(*) FROM pings WHERE kind = ?1 AND sent_at >= ?2", params![kind, ts(t)], |r| r.get(0))?;
+        Ok(n as usize)
+    }
+
+    /// When a ping whose ref starts with `ref_prefix` was last sent.
+    pub fn last_ping(&self, kind: &str, ref_prefix: &str) -> Result<Option<DateTime<Utc>>> {
+        let at: Option<String> = self.db().query_row(
+            "SELECT MAX(sent_at) FROM pings WHERE kind = ?1 AND substr(ref_id, 1, length(?2)) = ?2",
+            params![kind, ref_prefix],
+            |r| r.get(0),
+        )?;
+        Ok(at.and_then(|s| DateTime::parse_from_rfc3339(&s).ok()).map(|d| d.with_timezone(&Utc)))
+    }
+
+    /// Returns the ping's sender, or `None` if there is no such ping.
+    pub fn set_ping_feedback(&self, id: i64, feedback: &str) -> Result<Option<String>> {
+        let db = self.db();
+        if db.execute("UPDATE pings SET feedback = ?2 WHERE id = ?1", params![id, feedback])? == 0 {
+            return Ok(None);
+        }
+        Ok(db.query_row("SELECT sender FROM pings WHERE id = ?1", params![id], |r| r.get(0))?)
+    }
+
+    pub fn not_useful_count(&self, sender: &str) -> Result<usize> {
+        let n: i64 = self.db().query_row("SELECT COUNT(*) FROM pings WHERE sender = ?1 AND feedback = 'not_useful'", params![sender], |r| r.get(0))?;
+        Ok(n as usize)
+    }
+
     /// Cards still waiting when the app quit can never be answered: mark them expired.
     /// Approved cards that never finished may or may not have run: mark them failed with a
     /// note to check the calendar.
@@ -392,7 +634,7 @@ impl Store {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
     fn msg(content: &str, status: MsgStatus) -> NewMessage {
@@ -536,7 +778,7 @@ mod tests {
         }
     }
 
-    fn utc(s: &str) -> DateTime<Utc> {
+    pub fn utc(s: &str) -> DateTime<Utc> {
         DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc)
     }
 
@@ -566,6 +808,123 @@ mod tests {
         assert!(!s.record_ping("meeting_bar", "k").unwrap());
         assert!(s.has_ping("meeting_bar", "k").unwrap());
         assert!(!s.has_ping("other", "k").unwrap());
+    }
+
+    pub fn mail(id: &str, thread: &str, mins_ago: i64) -> MailRow {
+        MailRow {
+            message_id: id.into(),
+            thread_id: thread.into(),
+            from_addr: "priya@example.com".into(),
+            from_name: Some("Priya".into()),
+            to_me: true,
+            from_me: false,
+            subject: format!("Subject {id}"),
+            snippet: "snippet".into(),
+            labels: vec!["INBOX".into()],
+            received: utc("2026-11-12T12:00:00Z") - chrono::Duration::minutes(mins_ago),
+            triage: None,
+            amount: None,
+            due: None,
+            reason: None,
+            seeded: false,
+            paid: false,
+        }
+    }
+
+    pub fn day(s: &str) -> chrono::NaiveDate {
+        chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
+    }
+
+    #[test]
+    fn mail_round_trips_and_untriaged_are_oldest_first() {
+        let (_d, s) = store();
+        let a = mail("a", "t1", 10);
+        let b = mail("b", "t1", 30);
+        s.upsert_mail(&a).unwrap();
+        s.upsert_mail(&b).unwrap();
+        s.upsert_mail(&a).unwrap();
+        assert_eq!(s.untriaged(10).unwrap().iter().map(|m| m.message_id.as_str()).collect::<Vec<_>>(), vec!["b", "a"]);
+        s.set_triage("b", Label::Bill, Some("₹2,340"), Some(day("2026-11-13")), "bill words and amount").unwrap();
+        let rows = s.thread_rows("t1").unwrap();
+        let got = rows.iter().find(|m| m.message_id == "b").unwrap();
+        assert_eq!((got.triage, got.amount.as_deref(), got.due), (Some(Label::Bill), Some("₹2,340"), Some(day("2026-11-13"))));
+        assert_eq!(s.untriaged(10).unwrap().len(), 1);
+        assert_eq!(*rows.iter().find(|m| m.message_id == "a").unwrap(), a);
+        // An upsert of a known message keeps its label.
+        s.upsert_mail(&b).unwrap();
+        assert_eq!(s.thread_rows("t1").unwrap().iter().find(|m| m.message_id == "b").unwrap().triage, Some(Label::Bill));
+        assert_eq!(s.mail_since(utc("2026-11-12T11:45:00Z")).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn open_bills_skip_paid_and_far_due() {
+        let (_d, s) = store();
+        for (id, due) in [("soon", Some("2026-11-13")), ("far", Some("2026-11-30")), ("nodate", None), ("paid", Some("2026-11-12"))] {
+            s.upsert_mail(&mail(id, id, 5)).unwrap();
+            s.set_triage(id, Label::Bill, Some("$10"), due.map(day), "r").unwrap();
+        }
+        s.upsert_mail(&mail("fyi", "fyi", 5)).unwrap();
+        s.set_triage("fyi", Label::Fyi, None, None, "r").unwrap();
+        let mut p = mail("paid", "paid", 5);
+        p.paid = true;
+        s.upsert_mail(&p).unwrap();
+        s.db().execute("UPDATE mail_cache SET paid = 1 WHERE message_id = 'paid'", []).unwrap();
+        let ids: Vec<String> = s.open_bills(day("2026-11-15")).unwrap().into_iter().map(|m| m.message_id).collect();
+        assert_eq!(ids, vec!["soon".to_string(), "nodate".to_string()]);
+    }
+
+    #[test]
+    fn cursor_round_trips() {
+        let (_d, s) = store();
+        assert_eq!(s.get_cursor("gmail").unwrap(), None);
+        s.set_cursor("gmail", Some("100")).unwrap();
+        s.set_cursor("gmail", Some("105")).unwrap();
+        assert_eq!(s.get_cursor("gmail").unwrap().as_deref(), Some("105"));
+        s.set_cursor("gmail", None).unwrap();
+        assert_eq!(s.get_cursor("gmail").unwrap(), None);
+    }
+
+    #[test]
+    fn llm_calls_since_counts_one_shots_only() {
+        let (_d, s) = store();
+        s.log_llm("claude", "small", "triage", None, None, true).unwrap();
+        s.log_llm("claude", "small", "triage", None, None, false).unwrap();
+        s.log_llm("claude", "main", "chat", Some(1200), Some(40), true).unwrap();
+        assert_eq!(s.llm_calls_since(utc("2020-01-01T00:00:00Z")).unwrap(), 2);
+        assert_eq!(s.llm_calls_since(utc("2999-01-01T00:00:00Z")).unwrap(), 0);
+    }
+
+    #[test]
+    fn activity_merges_kinds_newest_first() {
+        let (_d, s) = store();
+        let tick = || std::thread::sleep(std::time::Duration::from_millis(5));
+        s.log_tool("calendar_list", "read", true, 120, Some("{}")).unwrap();
+        tick();
+        let a = s.insert_approval("calendar_create", &serde_json::json!({}), None).unwrap();
+        s.set_approval_status(a, ApprovalStatus::Declined, None).unwrap();
+        tick();
+        s.log_llm("claude", "small", "triage", None, None, false).unwrap();
+        let items = s.activity(10).unwrap();
+        assert_eq!(items.iter().map(|i| i.kind.as_str()).collect::<Vec<_>>(), vec!["model", "approval", "tool"]);
+        assert_eq!((items[0].name.as_str(), items[0].ok), ("triage", false));
+        assert_eq!((items[1].name.as_str(), items[1].detail.as_deref(), items[1].ok), ("calendar_create", Some("declined"), true));
+        assert_eq!((items[2].name.as_str(), items[2].ok), ("calendar_list", true));
+        assert_eq!(s.activity(1).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn pings_with_senders_and_feedback() {
+        let (_d, s) = store();
+        let id = s.record_ping_from("mail", "t1@1", Some("bills@city.example")).unwrap().unwrap();
+        assert_eq!(s.record_ping_from("mail", "t1@1", Some("bills@city.example")).unwrap(), None);
+        s.record_ping_from("mail", "t1@2", Some("bills@city.example")).unwrap();
+        assert_eq!(s.pings_since("mail", utc("2020-01-01T00:00:00Z")).unwrap(), 2);
+        assert_eq!(s.pings_since("meeting_bar", utc("2020-01-01T00:00:00Z")).unwrap(), 0);
+        assert!(s.last_ping("mail", "t1@").unwrap().is_some());
+        assert!(s.last_ping("mail", "t9@").unwrap().is_none());
+        assert_eq!(s.set_ping_feedback(id, "not_useful").unwrap().as_deref(), Some("bills@city.example"));
+        assert_eq!(s.not_useful_count("bills@city.example").unwrap(), 1);
+        assert_eq!(s.set_ping_feedback(999, "not_useful").unwrap(), None);
     }
 
     #[test]

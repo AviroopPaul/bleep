@@ -14,6 +14,10 @@ pub struct FakeRuntime {
     pub fail_send: AtomicBool,
     pub fail_start_with: Mutex<Option<String>>,
     pub health: Mutex<Option<RuntimeHealth>>,
+    /// Replies for `one_shot`, in order. Empty means `Value::Null`.
+    pub one_shot_replies: Mutex<VecDeque<std::result::Result<Value, String>>>,
+    /// Prompts `one_shot` received.
+    pub one_shots: Mutex<Vec<String>>,
 }
 
 impl FakeRuntime {
@@ -27,6 +31,8 @@ impl FakeRuntime {
             fail_send: AtomicBool::new(false),
             fail_start_with: Mutex::new(None),
             health: Mutex::new(None),
+            one_shot_replies: Mutex::new(VecDeque::new()),
+            one_shots: Mutex::new(vec![]),
         }
     }
 }
@@ -75,8 +81,13 @@ impl AgentRuntime for FakeRuntime {
         }
     }
 
-    async fn one_shot(&self, _req: OneShot) -> Result<Value> {
-        Ok(Value::Null)
+    async fn one_shot(&self, req: OneShot) -> Result<Value> {
+        self.one_shots.lock().unwrap().push(req.prompt);
+        match self.one_shot_replies.lock().unwrap().pop_front() {
+            Some(Ok(v)) => Ok(v),
+            Some(Err(e)) => anyhow::bail!(e),
+            None => Ok(Value::Null),
+        }
     }
 }
 

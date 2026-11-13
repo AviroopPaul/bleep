@@ -25,6 +25,7 @@ pub const LOST: &str = "bleep lost the connection to Claude Code. Send again to 
 /// How long a resumed child gets to report a bad session id before we call it healthy.
 const RESUME_CHECK: Duration = Duration::from_millis(1500);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+const ONE_SHOT_TIMEOUT: Duration = Duration::from_secs(90);
 const STALE_MARK: &str = "No conversation found";
 
 struct Warm {
@@ -45,6 +46,7 @@ pub struct ClaudeRuntime {
     idle: Duration,
     /// Above zero while an approval card waits on the user; the idle timer pauses.
     hold: Option<Arc<AtomicUsize>>,
+    one_shot_timeout: Duration,
 }
 
 /// Find `claude` the way a login shell does; a GUI app does not get the terminal PATH.
@@ -79,6 +81,13 @@ fn claude_fallbacks() -> Vec<PathBuf> {
 
 impl ClaudeRuntime {
     /// A turn with no output for this long is ended and the child replaced (default 120 s).
+    /// A one-shot that takes longer is killed (default 90 s), so a stuck CLI never blocks
+    /// mail sorting or check-ins.
+    pub fn with_one_shot_timeout(mut self, d: Duration) -> Self {
+        self.one_shot_timeout = d;
+        self
+    }
+
     pub fn with_idle_timeout(mut self, d: Duration) -> Self {
         self.idle = d;
         self
@@ -90,7 +99,7 @@ impl ClaudeRuntime {
     }
 
     pub fn new(paths: BleepPaths, tiers: Tiers, bin: PathBuf) -> Self {
-        Self { paths, tiers, bin, warm: Default::default(), cfg: Mutex::new(None), last_sid: Default::default(), idle: IDLE_TIMEOUT, hold: None }
+        Self { paths, tiers, bin, warm: Default::default(), cfg: Mutex::new(None), last_sid: Default::default(), idle: IDLE_TIMEOUT, hold: None, one_shot_timeout: ONE_SHOT_TIMEOUT }
     }
 
     fn spawn(&self, cfg: &SessionConfig) -> anyhow::Result<Warm> {
@@ -287,7 +296,11 @@ impl AgentRuntime for ClaudeRuntime {
             Tier::Main => &self.tiers.main,
             Tier::Small => &self.tiers.small,
         };
-        let out = base_command(&self.bin, &self.paths).args(one_shot_args(&req.prompt, &req.schema, model)).output().await?;
+        let mut cmd = base_command(&self.bin, &self.paths);
+        cmd.args(one_shot_args(&req.prompt, &req.schema, model)).kill_on_drop(true);
+        let out = tokio::time::timeout(self.one_shot_timeout, cmd.output())
+            .await
+            .map_err(|_| anyhow::anyhow!("one-shot took longer than {} s", self.one_shot_timeout.as_secs()))??;
         let v: serde_json::Value = serde_json::from_slice(&out.stdout)?;
         if v.get("is_error").and_then(|x| x.as_bool()).unwrap_or(true) {
             anyhow::bail!("one-shot failed: {}", v.pointer("/errors/0").or_else(|| v.get("result")).unwrap_or(&v));
@@ -416,6 +429,16 @@ mod tests {
         hold.store(0, Ordering::SeqCst);
         let rest = collect(s).await;
         assert!(rest.iter().any(|e| matches!(e, AgentEvent::Error { message, .. } if message.contains(STALLED))), "{rest:?}");
+    }
+
+    #[tokio::test]
+    async fn hung_one_shot_times_out() {
+        let (_d, rt) = rt(fixture_bin("hang_forever.sh"));
+        let rt = rt.with_one_shot_timeout(std::time::Duration::from_millis(300));
+        let started = std::time::Instant::now();
+        let r = rt.one_shot(OneShot { prompt: "p".into(), schema: serde_json::json!({}), tier: Tier::Small }).await;
+        assert!(r.is_err());
+        assert!(started.elapsed() < std::time::Duration::from_secs(5), "took {:?}", started.elapsed());
     }
 
     #[tokio::test]

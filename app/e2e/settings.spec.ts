@@ -75,3 +75,49 @@ test("no em dash on the page and no sideways scroll", async ({ page }) => {
   expect(await page.evaluate(() => document.body.innerText)).not.toMatch(/—/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(460);
 });
+
+test("tabs work with the keyboard", async ({ page }) => {
+  await page.goto("/?mock=1&g=builtin#settings");
+  const google = page.getByRole("tab", { name: "Google" });
+  await expect(google).toHaveAttribute("aria-selected", "true");
+  await google.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Mail" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel")).toContainText("VIPs");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(google).toHaveAttribute("aria-selected", "true");
+});
+
+test("mail tab adds a VIP and accepts a mute suggestion", async ({ page }) => {
+  await page.goto("/?mock=1&g=builtin#settings");
+  await page.getByRole("tab", { name: "Mail" }).click();
+  await page.getByLabel("Add a VIP").fill("Boss@Example.com");
+  await page.getByRole("button", { name: "Add VIP" }).click();
+  await expect(page.getByRole("list", { name: "VIPs" })).toContainText("boss@example.com");
+  await expect(page.getByRole("list", { name: "Muted senders" })).toContainText("noisy@x.example");
+  await page.getByRole("button", { name: "Remove noisy@x.example" }).click();
+  await expect(page.getByRole("list", { name: "Muted senders" })).not.toContainText("noisy@x.example");
+  await expect(page.getByText("bills@city.example")).toBeVisible();
+  await page.getByRole("button", { name: "Mute bills@city.example" }).click();
+  await expect(page.getByRole("list", { name: "Muted senders" })).toContainText("bills@city.example");
+  const c = await calls(page);
+  expect(c).toContain("mail_set_lists:boss@example.com|noisy@x.example");
+  expect(c).toContain("mail_set_lists:boss@example.com|");
+  expect(c).toContain("mail_resolve_suggestion:bills@city.example:true");
+  await page.screenshot({ path: test.info().outputPath("mail-tab.png") });
+});
+
+test("activity tab lists newest first and marks failures", async ({ page }) => {
+  await page.goto("/?mock=1&g=builtin#settings");
+  await page.getByRole("tab", { name: "Activity" }).click();
+  const rows = page.getByRole("list", { name: "Activity" }).getByRole("listitem");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText("Sorted mail (small model)");
+  await expect(rows.nth(0)).toContainText("failed");
+  await expect(rows.nth(1)).toContainText("Declined: add to your calendar");
+  await expect(rows.nth(2)).toContainText("Checked your calendar");
+  await expect(rows.nth(2)).not.toContainText("failed");
+  await page.screenshot({ path: test.info().outputPath("activity-tab.png") });
+});

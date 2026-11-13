@@ -41,6 +41,20 @@ export interface GoogleState {
 
 export type LinkName = "console" | "calendar_api" | "gmail_api" | "consent" | "credentials";
 
+export interface MailConfig {
+  vips: string[];
+  muted: string[];
+  suggested_mutes: string[];
+}
+
+export interface ActivityItem {
+  kind: "tool" | "approval" | "model" | string;
+  name: string;
+  detail: string | null;
+  ok: boolean;
+  at: string;
+}
+
 export interface BarCue {
   key: string;
   kind: "hour" | "ten_min";
@@ -107,6 +121,7 @@ export const api = {
   barJoin: () => invoke<void>("bar_join"),
   barDismiss: () => invoke<void>("bar_dismiss"),
   bubbleClick: () => invoke<void>("bubble_click"),
+  bubbleNotUseful: (pingId: number) => invoke<void>("bubble_not_useful", { pingId }),
   googleState: () => invoke<GoogleState>("google_state"),
   googleSaveClient: (clientId: string, clientSecret: string) => invoke<GoogleState>("google_save_client", { clientId, clientSecret }),
   googleConnect: () => invoke<string>("google_connect"),
@@ -115,6 +130,10 @@ export const api = {
   openLink: (which: LinkName) => invoke<void>("open_link", { which }),
   openSettings: () => invoke<void>("settings_open"),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
+  mailSettings: () => invoke<MailConfig>("mail_settings"),
+  mailSetLists: (vips: string[], muted: string[]) => invoke<MailConfig>("mail_set_lists", { vips, muted }),
+  mailResolveSuggestion: (addr: string, mute: boolean) => invoke<MailConfig>("mail_resolve_suggestion", { addr, mute }),
+  activityList: (limit: number) => invoke<ActivityItem[]>("activity_list", { limit }),
 };
 
 export const onGoogleStatus = (cb: (s: ConnectorStatus) => void): Promise<UnlistenFn> =>
@@ -122,8 +141,13 @@ export const onGoogleStatus = (cb: (s: ConnectorStatus) => void): Promise<Unlist
 
 export const onBarCue = (cb: (c: BarCue) => void): Promise<UnlistenFn> => listen<BarCue>("bar://cue", (e) => cb(e.payload));
 export const onBarHide = (cb: () => void): Promise<UnlistenFn> => listen("bar://hide", () => cb());
-export const onBubbleText = (cb: (text: string) => void): Promise<UnlistenFn> =>
-  listen<{ text: string }>("bubble://text", (e) => cb(e.payload.text));
+export interface BubbleText {
+  text: string;
+  /** Set for mail pings, which can be marked "Not useful". */
+  ping_id?: number | null;
+}
+export const onBubbleText = (cb: (b: BubbleText) => void): Promise<UnlistenFn> =>
+  listen<BubbleText>("bubble://text", (e) => cb(e.payload));
 export const onDroidMood = (cb: (mood: "alert" | "idle") => void): Promise<UnlistenFn> =>
   listen<{ mood: "alert" | "idle" }>("droid://mood", (e) => cb(e.payload.mood));
 export const onNotice = (cb: (text: string) => void): Promise<UnlistenFn> =>
