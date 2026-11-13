@@ -1,0 +1,16 @@
+{
+  "session_id": "60adba83-07cb-42b3-8c37-d834b9fbe879",
+  "transcript_path": "/Users/me/.claude/projects/-Users-me-code-shop/60adba83-07cb-42b3-8c37-d834b9fbe879.jsonl",
+  "cwd": "/Users/me/code/shop",
+  "prompt_id": "3033882a-6058-4682-aa09-fe62ef55e621",
+  "permission_mode": "default",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "npm test",
+    "description": "Run the tests"
+  }
+}

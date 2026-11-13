@@ -68,11 +68,20 @@ pub struct UserMessage {
     pub text: String,
 }
 
+/// An image for a one-shot, as base64 (a screenshot from an agent transcript).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImageIn {
+    pub media_type: String,
+    pub data_b64: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct OneShot {
     pub prompt: String,
     pub schema: Value,
     pub tier: Tier,
+    /// Sent with the prompt when not empty.
+    pub images: Vec<ImageIn>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]

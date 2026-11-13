@@ -1,0 +1,9 @@
+{
+  "id": 1,
+  "result": {
+    "userAgent": "bleep/0.167.0 (Mac OS 27.0.1; arm64) unknown (bleep; 0.1.0)",
+    "codexHome": "/Users/me/.codex",
+    "platformFamily": "unix",
+    "platformOs": "macos"
+  }
+}

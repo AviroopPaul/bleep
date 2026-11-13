@@ -1,0 +1,22 @@
+{
+  "id": 0,
+  "method": "item/commandExecution/requestApproval",
+  "params": {
+    "kind": "command",
+    "threadId": "thr_01a1",
+    "turnId": "turn_1",
+    "itemId": "exec-1",
+    "startedAtMs": 1794545135772,
+    "environmentId": "local",
+    "approvalId": null,
+    "command": "/bin/zsh -lc 'npm test'",
+    "cwd": "/Users/me/code/shop",
+    "commandActions": [
+      {
+        "type": "unknown",
+        "command": "npm test"
+      }
+    ],
+    "reason": null
+  }
+}

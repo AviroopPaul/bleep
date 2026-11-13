@@ -1,7 +1,7 @@
 // Fake backend for headless UI checks (Playwright). Loaded only with ?mock=1.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
-import type { ActivityItem, Approval, BarCue, ChatEmit, GoogleState, MailConfig, Message } from "./ipc";
+import type { ActivityItem, AgentAsk, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, GoogleState, MailConfig, Message } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
   id, role, kind: "chat", content, tool_steps: [], tokens: null, status: "done", session_id: 1, created_at: "",
@@ -44,6 +44,27 @@ export function installMocks(label: string) {
     { kind: "approval", name: "calendar_create", detail: "declined", ok: true, at: "2026-11-12T10:04:00.000Z" },
     { kind: "tool", name: "calendar_list", detail: "{}", ok: true, at: "2026-11-12T10:03:00.000Z" },
   ];
+  const minsAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+  const sess = (id: string, tool: AgentSession["tool"], project: string, state: AgentSession["state"], last_ask: string | null, m: number): AgentSession =>
+    ({ id, tool, project, title: null, transcript_path: null, state, last_ask, updated: minsAgo(m) });
+  const askRow = (id: number, session_id: string, summary: string, decision: AgentAsk["decision"], rule: string | null, rpc_id: string | null): AgentAsk =>
+    ({ id, session_id, kind: "permission", summary, payload: {}, checks: [], decision, rule, rpc_id, created_at: minsAgo(3), decided_at: decision === "queued" ? null : minsAgo(2) });
+  let sessions: AgentSession[] = q.has("agents")
+    ? [
+        sess("claude:a", "claude", "/Users/me/code/shop", "waiting", "wants to run git push --force", 4),
+        sess("codex:b", "codex", "/Users/me/code/api", "waiting", "wants to run rm -rf dist", 2),
+        sess("claude:c", "claude", "/Users/me/code/blog", "running", null, 1),
+        sess("codex:d", "codex", "/Users/me/code/cli", "done", null, 30),
+      ]
+    : [];
+  let asks: AgentAsk[] = q.has("agents")
+    ? [
+        askRow(21, "codex:b", "wants to run rm -rf dist", "queued", null, "1"),
+        askRow(20, "claude:a", "wants to run git push --force", "queued", null, null),
+        askRow(19, "claude:c", "wants to run npm test", "auto", "npm test", null),
+      ]
+    : [];
+  let agentSet: AgentSettings = { claude_hooks: false, codex_notify: false, codex_running: true, auto_approve: false, screenshot_check: true, codex_watch: false, rules_path: "/Users/me/.bleep/agent-rules.toml" };
   const bubble = q.get("bubble");
   const ping = q.get("ping");
   if (bubble) setTimeout(() => emit("bubble://text", { text: bubble, ping_id: ping ? Number(ping) : null }), 200);
@@ -131,6 +152,36 @@ export function installMocks(label: string) {
         }
         case "activity_list":
           return activity;
+        case "agents_list":
+          return { sessions, asks };
+        case "agents_decide": {
+          calls.push(`agents_decide:${a.askId}:${a.approve}`);
+          const ask = asks.find((x) => x.id === a.askId);
+          if (!ask || ask.decision !== "queued") throw "This ask is no longer waiting.";
+          if (!ask.rpc_id) throw "Answer this one in the terminal.";
+          asks = asks.map((x) => (x.id === ask.id ? { ...x, decision: a.approve ? "approved" : "denied", decided_at: new Date().toISOString() } : x));
+          sessions = sessions.map((x) => (x.id === ask.session_id ? { ...x, state: "running", last_ask: null } : x));
+          later(20, () => void emit("agents://changed", {}));
+          return null;
+        }
+        case "agents_settings":
+          return agentSet;
+        case "agents_install_claude":
+        case "agents_remove_claude":
+        case "agents_install_codex_notify":
+        case "agents_remove_codex_notify": {
+          calls.push(cmd);
+          const on = cmd.includes("install");
+          agentSet = cmd.includes("claude") ? { ...agentSet, claude_hooks: on } : { ...agentSet, codex_notify: on };
+          return agentSet;
+        }
+        case "agents_set":
+          calls.push(`agents_set:${a.autoApprove}:${a.screenshotCheck}:${a.codexWatch}`);
+          agentSet = { ...agentSet, auto_approve: !!a.autoApprove, screenshot_check: !!a.screenshotCheck, codex_watch: !!a.codexWatch };
+          return agentSet;
+        case "agents_reveal_rules":
+          calls.push(cmd);
+          return null;
         case "bubble_not_useful":
           calls.push(`bubble_not_useful:${a.pingId}`);
           return null;

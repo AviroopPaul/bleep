@@ -12,6 +12,10 @@ pub struct BleepPaths {
     pub run: PathBuf,
     pub logs: PathBuf,
     pub config_file: PathBuf,
+    pub bin: PathBuf,
+    pub hook_bin: PathBuf,
+    pub sock: PathBuf,
+    pub agent_rules: PathBuf,
 }
 
 pub fn resolve_root(bleep_home: Option<String>) -> PathBuf {
@@ -35,13 +39,17 @@ impl BleepPaths {
             run: root.join("run"),
             logs: root.join("logs"),
             config_file: root.join("config.toml"),
+            bin: root.join("bin"),
+            hook_bin: root.join("bin").join("bleep-hook"),
+            sock: root.join("run").join("bleep.sock"),
+            agent_rules: root.join("agent-rules.toml"),
             root,
         }
     }
 
     pub fn ensure(&self) -> io::Result<()> {
         use std::os::unix::fs::PermissionsExt;
-        for d in [&self.root, &self.memory, &self.claude_home, &self.claude_work, &self.run, &self.logs] {
+        for d in [&self.root, &self.memory, &self.claude_home, &self.claude_work, &self.run, &self.logs, &self.bin] {
             std::fs::create_dir_all(d)?;
         }
         std::fs::set_permissions(&self.run, std::fs::Permissions::from_mode(0o700))?;

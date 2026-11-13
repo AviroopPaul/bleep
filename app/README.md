@@ -61,6 +61,14 @@ Until Google verifies the app, users see an "unverified app" warning and Google 
 - **Check-ins** at 9:00, 13:00 and 18:00 (times in `config.toml` under `[checkin]`): meetings, bills due within 3 days, and threads waiting over a day for your reply, with offers to add a reminder or draft a reply. Nothing to say means no check-in.
 - **Settings, Mail tab:** VIPs, muted senders, mute suggestions. **Activity tab:** every tool call, approval card and model call.
 
+## Watching coding agents
+
+- **Turn it on:** Settings, Agents tab. "Install hooks" adds bleep's entries to `~/.claude/settings.json` after a second tap ("Yes, install"); a backup is saved next to it first, and "Remove hooks" takes only bleep's entries out. For Codex, "Install turn notices" puts `~/.bleep/bin/bleep-hook` in front of your `notify` program (which still runs first), and "Watch Codex sessions" connects to the Codex background service when it runs. bleep never starts that service.
+- **Watch only by default:** sessions that wait on you show in the chat panel's Agents view and in the droid's bubble ("shop: wants to run git push --force", or "2 agents need you"), and check-ins mention them.
+- **Approvals (off until you turn on "Approve safe asks by my rules"):** rules in `~/.bleep/agent-rules.toml` decide. Tests, lint, typecheck, `git status` and diff, and reads inside the repo are allowed; anything with `git push`, `rm`, `sudo`, `.env`, network installs, paths outside the repo, flags that run or write things (`--pre`, `-exec`, `--config`, `--output`, `--fix`), secret files, or shell tricks (`$(...)`, globs, redirects, `&`) asks you. The working folder must be a real repo folder, not `/` or your home folder. Anything bleep does not approve keeps its normal prompt in the terminal. Codex asks also get Approve and Deny buttons in bleep.
+- **Screenshots:** when a Claude Code session ends a turn with a screenshot and "Does this look right?", a small model compares it with your ask. Only a confident match says "go on", at most twice an hour per session.
+- **Fail closed:** if bleep is closed or takes over 20 seconds, the hook prints nothing and the agent shows its normal prompt.
+
 ## Build
 
 ```bash
@@ -77,10 +85,11 @@ Double tap Option anywhere. This needs System Settings, Privacy and Security, In
 
 ```bash
 cd src-tauri && cargo test     # Rust: store, runtime, parser, MCP, approvals, Google, calendar, scheduler, chat, windows, hotkey
-npm test                       # vitest: chat reducer, approval cards, bar text
+cd bleep-hook && cargo test    # the hook binary: never blocks an agent
+npm test                       # vitest: chat reducer, approval cards, bar text, agents text
 npm run e2e                    # Playwright, headless Chromium, mocked backend
 ```
 
 ## Data
 
-Everything lives in `~/.bleep/` (`BLEEP_HOME` overrides it): `bleep.db`, `config.toml`, `claude-home/`, `claude-work/`, `run/` (MCP config with a per-launch token, mode 700), `logs/`.
+Everything lives in `~/.bleep/` (`BLEEP_HOME` overrides it): `bleep.db`, `config.toml`, `claude-home/`, `claude-work/`, `run/` (MCP config with a per-launch token and `bleep.sock` for the hooks, mode 700), `bin/bleep-hook`, `agent-rules.toml`, `logs/`.

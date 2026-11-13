@@ -13,5 +13,7 @@ describe("activityTitle", () => {
     expect(activityTitle(item("model", "triage", "small"))).toBe("Sorted mail (small model)");
     expect(activityTitle(item("model", "chat", "main"))).toBe("Chat reply (main model)");
     expect(activityTitle(item("tool", "dayblocks_tasks"))).toBe("dayblocks_tasks");
+    expect(activityTitle({ ...item("agent", "auto", "wants to run npm test"), rule: "npm test" })).toBe('Approved by rule "npm test": wants to run npm test');
+    expect(activityTitle(item("agent", "queued", "wants to run git push --force"))).toBe("Sent to you: wants to run git push --force");
   });
 });

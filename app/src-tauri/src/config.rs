@@ -52,6 +52,21 @@ impl Default for CheckinConfig {
     }
 }
 
+/// Agent watch (Phase 4). Auto-approve stays off until the user turns it on.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AgentsConfig {
+    pub auto_approve: bool,
+    pub screenshot_check: bool,
+    pub codex_watch: bool,
+}
+
+impl Default for AgentsConfig {
+    fn default() -> Self {
+        Self { auto_approve: false, screenshot_check: true, codex_watch: false }
+    }
+}
+
 /// `~/.bleep/config.toml`. Unknown keys are ignored so later phases can add fields.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -65,6 +80,7 @@ pub struct Config {
     pub google: GoogleConfig,
     pub mail: MailConfig,
     pub checkin: CheckinConfig,
+    pub agents: AgentsConfig,
 }
 
 impl Default for Config {
@@ -79,6 +95,7 @@ impl Default for Config {
             google: GoogleConfig::default(),
             mail: MailConfig::default(),
             checkin: CheckinConfig::default(),
+            agents: AgentsConfig::default(),
         }
     }
 }
@@ -111,6 +128,14 @@ mod tests {
     use super::*;
     use crate::paths::{resolve_root, BleepPaths};
     use std::path::PathBuf;
+
+    #[test]
+    fn config_agents_defaults_off() {
+        let c: Config = toml::from_str("").unwrap();
+        assert_eq!(c.agents, AgentsConfig { auto_approve: false, screenshot_check: true, codex_watch: false });
+        let c: Config = toml::from_str("[agents]\nauto_approve = true").unwrap();
+        assert!(c.agents.auto_approve && c.agents.screenshot_check);
+    }
 
     #[test]
     fn load_missing_file_gives_defaults() {

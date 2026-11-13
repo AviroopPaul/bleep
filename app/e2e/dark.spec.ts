@@ -72,3 +72,16 @@ test("dark mode: mail and activity tabs are readable", async ({ page }) => {
     expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
   }
 });
+
+test("dark mode: agents view and agents tab are readable", async ({ page }) => {
+  await page.goto("/?mock=1&agents=1#chat");
+  await page.getByRole("tab", { name: /Agents/ }).click();
+  for (const sel of [".ag-h", ".ag-proj", ".ag-sum", ".ag-age", ".ag-note", ".view-tab[aria-selected=true]", ".view-tab[aria-selected=false]"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+  await page.goto("/?mock=1&g=builtin#settings");
+  await page.getByRole("tab", { name: "Agents" }).click();
+  for (const sel of [".mail-h", ".set-lead", ".toggle", ".pill"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+});

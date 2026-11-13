@@ -1,0 +1,14 @@
+{
+  "id": 1,
+  "method": "item/commandExecution/requestApproval",
+  "params": {
+    "kind": "command",
+    "threadId": "thr_01a1",
+    "turnId": "turn_1",
+    "itemId": "exec-2",
+    "approvalId": null,
+    "command": "/bin/zsh -lc 'git push --force origin main'",
+    "cwd": "/Users/me/code/shop",
+    "reason": null
+  }
+}

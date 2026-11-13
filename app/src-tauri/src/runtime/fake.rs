@@ -18,6 +18,8 @@ pub struct FakeRuntime {
     pub one_shot_replies: Mutex<VecDeque<std::result::Result<Value, String>>>,
     /// Prompts `one_shot` received.
     pub one_shots: Mutex<Vec<String>>,
+    /// How many images each `one_shot` carried.
+    pub one_shot_images: Mutex<Vec<usize>>,
 }
 
 impl FakeRuntime {
@@ -33,6 +35,7 @@ impl FakeRuntime {
             health: Mutex::new(None),
             one_shot_replies: Mutex::new(VecDeque::new()),
             one_shots: Mutex::new(vec![]),
+            one_shot_images: Mutex::new(vec![]),
         }
     }
 }
@@ -83,6 +86,7 @@ impl AgentRuntime for FakeRuntime {
 
     async fn one_shot(&self, req: OneShot) -> Result<Value> {
         self.one_shots.lock().unwrap().push(req.prompt);
+        self.one_shot_images.lock().unwrap().push(req.images.len());
         match self.one_shot_replies.lock().unwrap().pop_front() {
             Some(Ok(v)) => Ok(v),
             Some(Err(e)) => anyhow::bail!(e),

@@ -1,5 +1,6 @@
 import { stepLabel } from "../chat/chatReducer";
 import type { ActivityItem } from "../ipc";
+import { handledLine } from "../agents/agentsText";
 
 const WHAT: Record<string, string> = {
   calendar_create: "add to your calendar",
@@ -12,7 +13,8 @@ const STATUS: Record<string, string> = { pending: "Waiting", approved: "Approved
 const MODEL: Record<string, string> = { triage: "Sorted mail", chat: "Chat reply" };
 
 /** One Activity row in plain words. */
-export function activityTitle(a: Pick<ActivityItem, "kind" | "name" | "detail">): string {
+export function activityTitle(a: Pick<ActivityItem, "kind" | "name" | "detail" | "rule">): string {
+  if (a.kind === "agent") return `${handledLine({ decision: a.name as never, rule: a.rule ?? null })}: ${a.detail ?? ""}`;
   if (a.kind === "approval") return `${STATUS[a.detail ?? ""] ?? "Card"}: ${WHAT[a.name] ?? a.name}`;
   if (a.kind === "model") return `${MODEL[a.name] ?? a.name} (${a.detail ?? "model"} model)`;
   return stepLabel(a.name);
