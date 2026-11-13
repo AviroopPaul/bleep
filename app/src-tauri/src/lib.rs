@@ -1,3 +1,5 @@
+pub mod agents;
+pub mod agentwatch;
 pub mod approvals;
 pub mod bar;
 pub mod chat;
@@ -136,6 +138,41 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     Ok(Parts { state, google, calendar, watcher, triager })
 }
 
+/// Agent watch (Phase 4): the hook socket, the hub, and the Codex client.
+fn start_agent_watch(app: &tauri::App, store: Arc<Store>, runtime: Arc<dyn runtime::AgentRuntime>, notifier: Arc<proactive::notifier::Notifier>, paused: Arc<std::sync::atomic::AtomicBool>) {
+    let paths = app.state::<AppState>().paths.clone();
+    match agentwatch::install_hook_binary(&paths) {
+        Ok(true) => eprintln!("bleep: updated {}", paths.hook_bin.display()),
+        Ok(false) => {}
+        Err(e) => eprintln!("bleep: could not install bleep-hook: {e}"),
+    }
+    let rules_file = paths.agent_rules.clone();
+    let _ = agentwatch::rules::load_rules(&rules_file);
+    let (h1, h2) = (app.handle().clone(), app.handle().clone());
+    let watch = agentwatch::hub::AgentWatch::new(agentwatch::hub::WatchDeps {
+        store: store.clone(),
+        rules: Arc::new(move || agentwatch::rules::load_rules(&rules_file)),
+        cfg: Arc::new(move || h1.state::<AppState>().config.lock().unwrap().agents.clone()),
+        paused,
+        checker: agentwatch::screenshot::ModelChecker::new(runtime, store.clone()),
+        ping: notifier,
+        emit: Arc::new(move || {
+            let _ = h2.emit("agents://changed", ());
+        }),
+        now: Arc::new(chrono::Utc::now),
+    });
+    let codex = agentwatch::codex::CodexWatch::new(watch.clone(), store);
+    app.manage(codex.clone());
+    let sock = paths.sock.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = agentwatch::socket::serve(&sock, watch).await {
+            eprintln!("bleep: agent watch socket not started: {e}");
+        }
+    });
+    let h = app.handle().clone();
+    tauri::async_runtime::spawn(codex.run(agents::codex_home(), Arc::new(move || h.state::<AppState>().config.lock().unwrap().agents.codex_watch)));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -170,7 +207,8 @@ pub fn run() {
             let mail_cfg: Arc<dyn Fn() -> config::MailConfig + Send + Sync> = Arc::new(move || h.state::<AppState>().config.lock().unwrap().mail.clone());
             let notifier = proactive::notifier::Notifier::new(store.clone(), bar_ui, paused.clone(), mail_cfg, Arc::new(chrono::Utc::now));
             app.manage(notifier.clone());
-            let pipeline = mail::pipeline::MailPipeline::new(watcher, triager, notifier, store.clone());
+            let pipeline = mail::pipeline::MailPipeline::new(watcher, triager, notifier.clone(), store.clone());
+            start_agent_watch(app, store.clone(), chat.runtime().clone(), notifier, paused.clone());
             let h = app.handle().clone();
             let checkins = proactive::checkins::CheckinRunner::new(
                 store,
@@ -230,7 +268,16 @@ pub fn run() {
             windows::chat_open,
             windows::chat_hide,
             windows::droid_toggle_tuck,
-            windows::droid_set_visible
+            windows::droid_set_visible,
+            agents::agents_list,
+            agents::agents_decide,
+            agents::agents_settings,
+            agents::agents_install_claude,
+            agents::agents_remove_claude,
+            agents::agents_install_codex_notify,
+            agents::agents_remove_codex_notify,
+            agents::agents_set,
+            agents::agents_reveal_rules
         ])
         .run(tauri::generate_context!())
         .expect("error while running bleep");

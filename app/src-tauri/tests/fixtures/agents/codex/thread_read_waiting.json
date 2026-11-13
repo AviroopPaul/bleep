@@ -1,0 +1,15 @@
+{
+  "id": 3,
+  "result": {
+    "thread": {
+      "id": "thr_01a1",
+      "cwd": "/Users/me/code/shop",
+      "status": {
+        "type": "active",
+        "activeFlags": [
+          "waitingOnApproval"
+        ]
+      }
+    }
+  }
+}

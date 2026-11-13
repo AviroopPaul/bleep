@@ -9,3 +9,5 @@ app/src-tauri/target
 app/src-tauri/gen
 app/test-results
 app/playwright-report
+app/bleep-hook/target
+app/src-tauri/binaries

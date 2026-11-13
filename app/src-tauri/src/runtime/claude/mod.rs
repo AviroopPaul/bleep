@@ -297,11 +297,30 @@ impl AgentRuntime for ClaudeRuntime {
             Tier::Small => &self.tiers.small,
         };
         let mut cmd = base_command(&self.bin, &self.paths);
-        cmd.args(one_shot_args(&req.prompt, &req.schema, model)).kill_on_drop(true);
-        let out = tokio::time::timeout(self.one_shot_timeout, cmd.output())
+        cmd.kill_on_drop(true);
+        let run = async {
+            if req.images.is_empty() {
+                cmd.args(one_shot_args(&req.prompt, &req.schema, model));
+                return Ok::<_, anyhow::Error>(cmd.output().await?);
+            }
+            use tokio::io::AsyncWriteExt;
+            cmd.args(args::one_shot_image_args(&req.schema, model)).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null());
+            let mut child = cmd.spawn()?;
+            let mut stdin = child.stdin.take().ok_or_else(|| anyhow::anyhow!("no stdin"))?;
+            stdin.write_all(format!("{}\n", args::one_shot_image_input(&req.prompt, &req.images)).as_bytes()).await?;
+            drop(stdin);
+            Ok(child.wait_with_output().await?)
+        };
+        let out = tokio::time::timeout(self.one_shot_timeout, run)
             .await
             .map_err(|_| anyhow::anyhow!("one-shot took longer than {} s", self.one_shot_timeout.as_secs()))??;
-        let v: serde_json::Value = serde_json::from_slice(&out.stdout)?;
+        // Image one-shots stream events; the answer is the last "result" line.
+        let body = if req.images.is_empty() {
+            out.stdout
+        } else {
+            String::from_utf8_lossy(&out.stdout).lines().rev().find(|l| l.contains("\"type\":\"result\"")).unwrap_or("{}").as_bytes().to_vec()
+        };
+        let v: serde_json::Value = serde_json::from_slice(&body)?;
         if v.get("is_error").and_then(|x| x.as_bool()).unwrap_or(true) {
             anyhow::bail!("one-shot failed: {}", v.pointer("/errors/0").or_else(|| v.get("result")).unwrap_or(&v));
         }
@@ -436,9 +455,17 @@ mod tests {
         let (_d, rt) = rt(fixture_bin("hang_forever.sh"));
         let rt = rt.with_one_shot_timeout(std::time::Duration::from_millis(300));
         let started = std::time::Instant::now();
-        let r = rt.one_shot(OneShot { prompt: "p".into(), schema: serde_json::json!({}), tier: Tier::Small }).await;
+        let r = rt.one_shot(OneShot { prompt: "p".into(), schema: serde_json::json!({}), tier: Tier::Small, images: vec![] }).await;
         assert!(r.is_err());
         assert!(started.elapsed() < std::time::Duration::from_secs(5), "took {:?}", started.elapsed());
+    }
+
+    #[tokio::test]
+    async fn image_one_shot_reads_result_line() {
+        let (_d, rt) = rt(fixture_bin("one_shot_image.sh"));
+        let img = crate::runtime::ImageIn { media_type: "image/png".into(), data_b64: "AAAA".into() };
+        let r = rt.one_shot(OneShot { prompt: "Compare.".into(), schema: serde_json::json!({}), tier: Tier::Small, images: vec![img] }).await.unwrap();
+        assert_eq!(r, serde_json::json!({"matches": true, "confidence": "high", "reason": "ok"}));
     }
 
     #[tokio::test]

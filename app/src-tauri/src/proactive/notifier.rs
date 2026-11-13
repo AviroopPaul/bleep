@@ -8,6 +8,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub const KIND: &str = "mail";
+/// Agent pings share the hourly budget with mail pings.
+pub const AGENT_KIND: &str = "agent";
 /// "Not useful" taps on one sender before bleep suggests muting them.
 pub const MUTE_AFTER: usize = 3;
 
@@ -96,7 +98,7 @@ impl Notifier {
                 _ => text,
             };
             let last = self.store.last_ping(KIND, &format!("{}@", m.thread_id)).ok().flatten();
-            let in_hour = self.store.pings_since(KIND, now - Duration::hours(1)).unwrap_or(usize::MAX);
+            let in_hour = self.store.pings_since_kinds(&[KIND, AGENT_KIND], now - Duration::hours(1)).unwrap_or(usize::MAX);
             if may_ping(&self.calm, local.naive_local(), in_hour, last, now, self.paused.load(Ordering::SeqCst)) != Verdict::Send {
                 continue;
             }
@@ -114,6 +116,26 @@ impl Notifier {
         let cfg = (self.cfg)();
         let known = cfg.muted.iter().chain(&cfg.suggested_mutes).any(|m| m.eq_ignore_ascii_case(&sender));
         (self.store.not_useful_count(&sender).ok()? == MUTE_AFTER && !known).then_some(sender)
+    }
+}
+
+impl crate::agentwatch::hub::AgentPing for Notifier {
+    /// "shop: wants to run git push --force", or "2 agents need you". One ping per ask,
+    /// under the same calm rules as mail.
+    fn waiting(&self, project: &str, summary: &str, ask_id: i64, waiting_now: usize) {
+        let now = (self.now)();
+        let local = now.with_timezone(&chrono::Local);
+        let ref_id = format!("ask:{ask_id}");
+        let last = self.store.last_ping(AGENT_KIND, &ref_id).ok().flatten();
+        let in_hour = self.store.pings_since_kinds(&[KIND, AGENT_KIND], now - Duration::hours(1)).unwrap_or(usize::MAX);
+        if may_ping(&self.calm, local.naive_local(), in_hour, last, now, self.paused.load(Ordering::SeqCst)) != Verdict::Send {
+            return;
+        }
+        let folder = project.trim_end_matches('/').rsplit('/').next().unwrap_or(project);
+        let text = if waiting_now >= 2 { format!("{waiting_now} agents need you") } else { cut(&format!("{folder}: {summary}"), 80) };
+        if let Ok(Some(_)) = self.store.record_ping_from(AGENT_KIND, &ref_id, None) {
+            self.ui.bubble(&text);
+        }
     }
 }
 
@@ -253,4 +275,36 @@ mod tests {
         assert_eq!(r.n.not_useful(ids[2]).as_deref(), Some("bills@city.example"));
         assert_eq!(r.n.not_useful(999), None);
     }
+
+    #[test]
+    fn agent_ping_names_the_folder() {
+        let r = rig();
+        crate::agentwatch::hub::AgentPing::waiting(&*r.n, "/Users/me/code/shop", "wants to run git push --force", 7, 1);
+        assert_eq!(r.ui.0.lock().unwrap().as_slice(), ["shop: wants to run git push --force"]);
+        crate::agentwatch::hub::AgentPing::waiting(&*r.n, "/Users/me/code/shop", "wants to run git push --force", 7, 1);
+        assert_eq!(r.ui.0.lock().unwrap().len(), 1, "one ping per ask");
+    }
+
+    #[test]
+    fn two_waiting_say_n_agents() {
+        let r = rig();
+        crate::agentwatch::hub::AgentPing::waiting(&*r.n, "/Users/me/code/shop", "wants to run rm -rf dist", 8, 2);
+        assert_eq!(r.ui.0.lock().unwrap().as_slice(), ["2 agents need you"]);
+    }
+
+    #[test]
+    fn agent_pings_share_hourly_budget_with_mail() {
+        let r = rig();
+        for i in 0..4 {
+            r.store.record_ping(KIND, &format!("t{i}@1")).unwrap();
+        }
+        crate::agentwatch::hub::AgentPing::waiting(&*r.n, "/p/shop", "wants to run x", 9, 1);
+        assert!(r.ui.0.lock().unwrap().is_empty());
+        let r = rig();
+        for i in 0..4 {
+            r.store.record_ping(AGENT_KIND, &format!("ask:{i}")).unwrap();
+        }
+        assert!(r.n.after_triage(&[bill("b1", "2026-11-12")]).is_empty());
+    }
 }
+

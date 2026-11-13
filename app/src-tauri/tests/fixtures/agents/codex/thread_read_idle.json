@@ -1,0 +1,12 @@
+{
+  "id": 4,
+  "result": {
+    "thread": {
+      "id": "thr_idle",
+      "cwd": "/Users/me/code/shop",
+      "status": {
+        "type": "idle"
+      }
+    }
+  }
+}

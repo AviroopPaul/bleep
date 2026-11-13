@@ -1,0 +1,20 @@
+{
+  "session_id": "60adba83-07cb-42b3-8c37-d834b9fbe879",
+  "transcript_path": "/Users/me/.claude/projects/-Users-me-code-shop/60adba83-07cb-42b3-8c37-d834b9fbe879.jsonl",
+  "cwd": "/Users/me/code/shop",
+  "prompt_id": "3033882a-6058-4682-aa09-fe62ef55e621",
+  "permission_mode": "default",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Read",
+  "tool_input": {
+    "file_path": "/Users/me/code/shop/note.txt"
+  },
+  "tool_use_id": "toolu_014nme4bjp3fYvUCnqHoUpaT",
+  "duration_ms": 3,
+  "tool_response": {
+    "type": "text"
+  }
+}

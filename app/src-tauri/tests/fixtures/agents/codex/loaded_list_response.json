@@ -1,0 +1,10 @@
+{
+  "id": 2,
+  "result": {
+    "data": [
+      "thr_01a1",
+      "thr_idle"
+    ],
+    "nextCursor": null
+  }
+}

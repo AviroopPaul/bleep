@@ -1,0 +1,9 @@
+{
+  "session_id": "60adba83-07cb-42b3-8c37-d834b9fbe879",
+  "transcript_path": "/Users/me/.claude/projects/-Users-me-code-shop/60adba83-07cb-42b3-8c37-d834b9fbe879.jsonl",
+  "cwd": "/Users/me/code/shop",
+  "prompt_id": "3033882a-6058-4682-aa09-fe62ef55e621",
+  "permission_mode": "default",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "Run the shell command: echo hi > out.txt. Then read note.txt and tell me its content."
+}

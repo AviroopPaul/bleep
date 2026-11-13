@@ -48,11 +48,54 @@ export interface MailConfig {
 }
 
 export interface ActivityItem {
-  kind: "tool" | "approval" | "model" | string;
+  kind: "tool" | "approval" | "model" | "agent" | string;
   name: string;
   detail: string | null;
   ok: boolean;
   at: string;
+  /** The agent rule that approved an ask. */
+  rule?: string | null;
+}
+
+export interface AgentSession {
+  id: string;
+  tool: "claude" | "codex";
+  project: string;
+  title: string | null;
+  transcript_path: string | null;
+  state: "running" | "waiting" | "done";
+  /** Agent text: show as plain text only. */
+  last_ask: string | null;
+  updated: string;
+}
+
+export interface AgentAsk {
+  id: number;
+  session_id: string;
+  kind: "permission" | "question";
+  summary: string;
+  payload: Record<string, unknown>;
+  checks: string[];
+  decision: "auto" | "approved" | "denied" | "queued" | "expired";
+  rule: string | null;
+  rpc_id: string | null;
+  created_at: string;
+  decided_at: string | null;
+}
+
+export interface AgentsView {
+  sessions: AgentSession[];
+  asks: AgentAsk[];
+}
+
+export interface AgentSettings {
+  claude_hooks: boolean;
+  codex_notify: boolean;
+  codex_running: boolean;
+  auto_approve: boolean;
+  screenshot_check: boolean;
+  codex_watch: boolean;
+  rules_path: string;
 }
 
 export interface BarCue {
@@ -134,7 +177,19 @@ export const api = {
   mailSetLists: (vips: string[], muted: string[]) => invoke<MailConfig>("mail_set_lists", { vips, muted }),
   mailResolveSuggestion: (addr: string, mute: boolean) => invoke<MailConfig>("mail_resolve_suggestion", { addr, mute }),
   activityList: (limit: number) => invoke<ActivityItem[]>("activity_list", { limit }),
+  agentsList: () => invoke<AgentsView>("agents_list"),
+  agentsDecide: (askId: number, approve: boolean) => invoke<void>("agents_decide", { askId, approve }),
+  agentsSettings: () => invoke<AgentSettings>("agents_settings"),
+  agentsInstallClaude: () => invoke<AgentSettings>("agents_install_claude"),
+  agentsRemoveClaude: () => invoke<AgentSettings>("agents_remove_claude"),
+  agentsInstallCodexNotify: () => invoke<AgentSettings>("agents_install_codex_notify"),
+  agentsRemoveCodexNotify: () => invoke<AgentSettings>("agents_remove_codex_notify"),
+  agentsSet: (autoApprove: boolean, screenshotCheck: boolean, codexWatch: boolean) =>
+    invoke<AgentSettings>("agents_set", { autoApprove, screenshotCheck, codexWatch }),
+  agentsRevealRules: () => invoke<void>("agents_reveal_rules"),
 };
+
+export const onAgents = (cb: () => void): Promise<UnlistenFn> => listen("agents://changed", () => cb());
 
 export const onGoogleStatus = (cb: (s: ConnectorStatus) => void): Promise<UnlistenFn> =>
   listen<ConnectorStatus>("google://status", (e) => cb(e.payload));

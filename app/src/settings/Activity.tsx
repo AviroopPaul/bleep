@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type ActivityItem } from "../ipc";
 import { activityTime, activityTitle } from "./activityText";
 
-const ICON: Record<string, string> = { tool: "T", approval: "A", model: "M" };
+const ICON: Record<string, string> = { tool: "T", approval: "A", model: "M", agent: "C" };
 
 /** Every tool call, approval card and model call, newest first. */
 export function Activity() {

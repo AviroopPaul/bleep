@@ -51,6 +51,21 @@ pub fn one_shot_args(prompt: &str, schema: &serde_json::Value, model: &str) -> V
     a
 }
 
+/// A one-shot that carries images: the prompt and images go in one stream-json line on
+/// stdin (`--input-format stream-json` needs `--output-format stream-json`).
+pub fn one_shot_image_args(schema: &serde_json::Value, model: &str) -> Vec<String> {
+    let mut a = s(&["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--json-schema"]);
+    a.push(schema.to_string());
+    a.extend(s(&["--model", model, "--tools", "", "--setting-sources", "", "--strict-mcp-config", "--no-session-persistence"]));
+    a
+}
+
+pub fn one_shot_image_input(prompt: &str, images: &[crate::runtime::ImageIn]) -> String {
+    let mut content = vec![serde_json::json!({"type": "text", "text": prompt})];
+    content.extend(images.iter().map(|i| serde_json::json!({"type": "image", "source": {"type": "base64", "media_type": i.media_type, "data": i.data_b64}})));
+    serde_json::json!({"type": "user", "message": {"role": "user", "content": content}}).to_string()
+}
+
 /// The `--mcp-config` body for bleep's server.
 /// `timeout` lifts Claude Code's 300 s limit on a silent tool call for this server only:
 /// a write tool waits up to 10 minutes on an approval card.
@@ -163,6 +178,26 @@ mod tests {
         let mut c = cfg(None);
         c.tier = Tier::Small;
         assert_eq!(after(&chat_args(&c, &files(), &Tiers::default()), "--model"), "haiku");
+    }
+
+    #[test]
+    fn one_shot_with_image_builds_stream_json() {
+        let a = one_shot_image_args(&serde_json::json!({"type":"object"}), "haiku");
+        assert_eq!(a[0], "-p");
+        assert_eq!(after(&a, "--input-format"), "stream-json");
+        assert_eq!(after(&a, "--output-format"), "stream-json");
+        assert!(a.iter().any(|x| x == "--verbose"));
+        assert_eq!(after(&a, "--json-schema"), r#"{"type":"object"}"#);
+        assert_eq!(after(&a, "--model"), "haiku");
+        assert_eq!(after(&a, "--tools"), "");
+        assert!(a.iter().any(|x| x == "--no-session-persistence") && a.iter().any(|x| x == "--strict-mcp-config"));
+        let img = crate::runtime::ImageIn { media_type: "image/png".into(), data_b64: "AAAA".into() };
+        let line = one_shot_image_input("Compare.", &[img]);
+        assert!(!line.contains('\n'));
+        let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(v["type"], "user");
+        assert_eq!(v["message"]["content"][0], serde_json::json!({"type": "text", "text": "Compare."}));
+        assert_eq!(v["message"]["content"][1], serde_json::json!({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "AAAA"}}));
     }
 
     #[test]

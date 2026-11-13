@@ -1,0 +1,11 @@
+{"type": "user", "message": {"role": "user", "content": "old ask that is not the latest"}, "uuid": "u1"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "Old reply?"}]}}
+{"type": "user", "message": {"role": "user", "content": "Make the checkout button blue and full width, then show me a screenshot."}, "uuid": "u1"}
+{"type": "last-prompt", "lastPrompt": "x", "sessionId": "60adba83-07cb-42b3-8c37-d834b9fbe879"}
+{"type": "attachment", "attachment": {"type": "skill_listing"}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "t1", "name": "mcp__playwright__screenshot", "input": {}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": [{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}}]}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "thinking", "thinking": "hm"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "I made the button blue and full width. Does this look right?"}]}}
+{"type": "last-prompt", "lastPrompt": "x", "sessionId": "60adba83-07cb-42b3-8c37-d834b9fbe879"}
+{"type": "attachment", "attachment": {"type": "skill_listing"}}

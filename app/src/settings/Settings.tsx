@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MailSettings } from "./MailSettings";
 import { Activity } from "./Activity";
+import { AgentSettingsTab } from "./AgentSettings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onGoogleStatus, type GoogleState, type LinkName } from "../ipc";
 
@@ -144,7 +145,7 @@ export function GoogleSettings() {
   );
 }
 
-const TABS = ["Google", "Mail", "Activity"] as const;
+const TABS = ["Google", "Mail", "Agents", "Activity"] as const;
 type Tab = (typeof TABS)[number];
 
 export function Settings() {
@@ -182,6 +183,7 @@ export function Settings() {
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-panel">
         {tab === "Google" && <GoogleSettings />}
         {tab === "Mail" && <MailSettings />}
+        {tab === "Agents" && <AgentSettingsTab />}
         {tab === "Activity" && <Activity />}
       </div>
     </main>

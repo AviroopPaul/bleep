@@ -65,7 +65,7 @@ impl Triager {
             .map(|m| json!({"id": m.message_id, "from_untrusted": m.from_name.as_deref().unwrap_or(&m.from_addr), "subject_untrusted": m.subject, "snippet_untrusted": m.snippet}))
             .collect();
         let prompt = format!("{PROMPT}\n{}", Value::Array(list));
-        let reply = self.runtime.one_shot(OneShot { prompt, schema: schema(), tier: Tier::Small }).await;
+        let reply = self.runtime.one_shot(OneShot { prompt, schema: schema(), tier: Tier::Small, images: vec![] }).await;
         let _ = self.store.log_llm(self.runtime.id(), "small", "triage", None, None, reply.is_ok());
         let mut done = 0;
         let items = match reply {

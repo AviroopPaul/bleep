@@ -55,6 +55,54 @@ pub struct MailRow {
     pub paid: bool,
 }
 
+str_enum!(AgentTool { Claude = "claude", Codex = "codex" });
+str_enum!(AgentState { Running = "running", Waiting = "waiting", Done = "done" });
+str_enum!(AskKind { Permission = "permission", Question = "question" });
+str_enum!(AskDecision { Auto = "auto", Approved = "approved", Denied = "denied", Queued = "queued", Expired = "expired" });
+
+/// One of my coding sessions. `id` is "claude:<session id>" or "codex:<thread id>".
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct AgentSession {
+    pub id: String,
+    pub tool: AgentTool,
+    /// The session's working folder.
+    pub project: String,
+    pub title: Option<String>,
+    pub transcript_path: Option<String>,
+    pub state: AgentState,
+    /// One-line summary of what it waits for. Agent text: untrusted.
+    pub last_ask: Option<String>,
+    pub updated: DateTime<Utc>,
+}
+
+pub struct NewAsk {
+    pub session_id: String,
+    pub kind: AskKind,
+    pub summary: String,
+    pub payload: Value,
+    /// Why rules did not approve it, or what was checked.
+    pub checks: Vec<String>,
+    pub decision: AskDecision,
+    pub rule: Option<String>,
+    /// The Codex JSON-RPC request id, to answer later.
+    pub rpc_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct AgentAsk {
+    pub id: i64,
+    pub session_id: String,
+    pub kind: AskKind,
+    pub summary: String,
+    pub payload: Value,
+    pub checks: Vec<String>,
+    pub decision: AskDecision,
+    pub rule: Option<String>,
+    pub rpc_id: Option<String>,
+    pub created_at: String,
+    pub decided_at: Option<String>,
+}
+
 /// One line in the Activity tab.
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct ActivityItem {
@@ -66,6 +114,8 @@ pub struct ActivityItem {
     pub detail: Option<String>,
     pub ok: bool,
     pub at: String,
+    /// The agent rule that approved an ask.
+    pub rule: Option<String>,
 }
 
 /// One approval card: the exact payload that runs if the user approves.
@@ -209,6 +259,33 @@ CREATE TABLE tool_calls (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 ALTER TABLE pings ADD COLUMN sender TEXT;
+"#, r#"
+CREATE TABLE agent_sessions (
+  id TEXT PRIMARY KEY,
+  tool TEXT NOT NULL,
+  project TEXT NOT NULL,
+  title TEXT,
+  transcript_path TEXT,
+  state TEXT NOT NULL,
+  last_ask TEXT,
+  go_ons TEXT NOT NULL DEFAULT '[]',
+  ended INTEGER NOT NULL DEFAULT 0,
+  updated TEXT NOT NULL
+);
+CREATE TABLE agent_asks (
+  id INTEGER PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  checks TEXT NOT NULL DEFAULT '[]',
+  decision TEXT NOT NULL,
+  rule TEXT,
+  rpc_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  decided_at TEXT
+);
+CREATE INDEX agent_asks_session ON agent_asks(session_id, created_at);
 "#];
 
 pub struct Store {
@@ -305,6 +382,42 @@ const APPROVAL_COLS: &str = "id, tool, payload, status, turn_message_id, result,
 
 fn row_to_session(r: &Row) -> rusqlite::Result<Session> {
     Ok(Session { id: r.get(0)?, runtime: r.get(1)?, runtime_session_id: r.get(2)?, started_at: r.get(3)?, ended_at: r.get(4)? })
+}
+
+const AGENT_COLS: &str = "id, tool, project, title, transcript_path, state, last_ask, updated";
+const ASK_COLS: &str = "id, session_id, kind, summary, payload, checks, decision, rule, rpc_id, created_at, decided_at";
+
+fn parse_ts(s: &str) -> DateTime<Utc> {
+    DateTime::parse_from_rfc3339(s).map(|d| d.with_timezone(&Utc)).unwrap_or_default()
+}
+
+fn row_to_agent(r: &Row) -> rusqlite::Result<AgentSession> {
+    Ok(AgentSession {
+        id: r.get(0)?,
+        tool: AgentTool::parse(&r.get::<_, String>(1)?),
+        project: r.get(2)?,
+        title: r.get(3)?,
+        transcript_path: r.get(4)?,
+        state: AgentState::parse(&r.get::<_, String>(5)?),
+        last_ask: r.get(6)?,
+        updated: parse_ts(&r.get::<_, String>(7)?),
+    })
+}
+
+fn row_to_ask(r: &Row) -> rusqlite::Result<AgentAsk> {
+    Ok(AgentAsk {
+        id: r.get(0)?,
+        session_id: r.get(1)?,
+        kind: AskKind::parse(&r.get::<_, String>(2)?),
+        summary: r.get(3)?,
+        payload: serde_json::from_str(&r.get::<_, String>(4)?).unwrap_or(Value::Null),
+        checks: serde_json::from_str(&r.get::<_, String>(5)?).unwrap_or_default(),
+        decision: AskDecision::parse(&r.get::<_, String>(6)?),
+        rule: r.get(7)?,
+        rpc_id: r.get(8)?,
+        created_at: r.get(9)?,
+        decided_at: r.get(10)?,
+    })
 }
 
 const MSG_COLS: &str = "id, role, kind, content, tool_steps, tokens, status, session_id, created_at";
@@ -543,14 +656,15 @@ impl Store {
 
     /// Tool calls, approvals and model calls, newest first. A declined card is not a failure.
     pub fn activity(&self, limit: usize) -> Result<Vec<ActivityItem>> {
-        let sql = "SELECT 'tool', tool, preview, ok, created_at FROM tool_calls
-             UNION ALL SELECT 'approval', tool, status, status != 'failed', COALESCE(decided_at, created_at) FROM approvals
-             UNION ALL SELECT 'model', purpose, tier, ok, created_at FROM llm_calls
+        let sql = "SELECT 'tool', tool, preview, ok, created_at, NULL FROM tool_calls
+             UNION ALL SELECT 'approval', tool, status, status != 'failed', COALESCE(decided_at, created_at), NULL FROM approvals
+             UNION ALL SELECT 'model', purpose, tier, ok, created_at, NULL FROM llm_calls
+             UNION ALL SELECT 'agent', decision, summary, 1, COALESCE(decided_at, created_at), rule FROM agent_asks
              ORDER BY 5 DESC LIMIT ?1";
         Ok(self
             .db()
             .prepare(sql)?
-            .query_map(params![limit as i64], |r| Ok(ActivityItem { kind: r.get(0)?, name: r.get(1)?, detail: r.get(2)?, ok: r.get(3)?, at: r.get(4)? }))?
+            .query_map(params![limit as i64], |r| Ok(ActivityItem { kind: r.get(0)?, name: r.get(1)?, detail: r.get(2)?, ok: r.get(3)?, at: r.get(4)?, rule: r.get(5)? }))?
             .collect::<rusqlite::Result<_>>()?)
     }
 
@@ -564,6 +678,101 @@ impl Store {
     pub fn pings_since(&self, kind: &str, t: DateTime<Utc>) -> Result<usize> {
         let n: i64 = self.db().query_row("SELECT COUNT(*) FROM pings WHERE kind = ?1 AND sent_at >= ?2", params![kind, ts(t)], |r| r.get(0))?;
         Ok(n as usize)
+    }
+
+    pub fn pings_since_kinds(&self, kinds: &[&str], t: DateTime<Utc>) -> Result<usize> {
+        let mut n = 0;
+        for k in kinds {
+            n += self.pings_since(k, t)?;
+        }
+        Ok(n)
+    }
+
+    /// Saves what bleep knows about a session. A new event reopens an ended one; the
+    /// "go on" history stays.
+    pub fn upsert_agent_session(&self, a: &AgentSession) -> Result<()> {
+        self.db().execute(
+            "INSERT INTO agent_sessions (id, tool, project, title, transcript_path, state, last_ask, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT(id) DO UPDATE SET tool = ?2, project = ?3, title = ?4, transcript_path = ?5, state = ?6, last_ask = ?7, updated = ?8, ended = 0",
+            params![a.id, a.tool.as_str(), a.project, a.title, a.transcript_path, a.state.as_str(), a.last_ask, ts(a.updated)],
+        )?;
+        Ok(())
+    }
+
+    pub fn agent_session(&self, id: &str) -> Result<Option<AgentSession>> {
+        Ok(self.db().query_row(&format!("SELECT {AGENT_COLS} FROM agent_sessions WHERE id = ?1"), params![id], row_to_agent).optional()?)
+    }
+
+    /// Sessions with an event in the last 12 hours that have not ended: waiting first, then newest.
+    pub fn agent_sessions(&self, now: DateTime<Utc>) -> Result<Vec<AgentSession>> {
+        let sql = format!("SELECT {AGENT_COLS} FROM agent_sessions WHERE ended = 0 AND updated >= ?1 ORDER BY state = 'waiting' DESC, updated DESC");
+        Ok(self.db().prepare(&sql)?.query_map(params![ts(now - chrono::Duration::hours(12))], row_to_agent)?.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn end_agent_session(&self, id: &str) -> Result<()> {
+        self.db().execute("UPDATE agent_sessions SET ended = 1 WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn insert_agent_ask(&self, a: &NewAsk) -> Result<i64> {
+        let db = self.db();
+        let decided = (a.decision != AskDecision::Queued).then_some(());
+        db.execute(
+            "INSERT INTO agent_asks (session_id, kind, summary, payload, checks, decision, rule, rpc_id, decided_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, CASE WHEN ?9 THEN strftime('%Y-%m-%dT%H:%M:%fZ','now') END)",
+            params![a.session_id, a.kind.as_str(), a.summary, a.payload.to_string(), serde_json::to_string(&a.checks)?, a.decision.as_str(), a.rule, a.rpc_id, decided.is_some()],
+        )?;
+        Ok(db.last_insert_rowid())
+    }
+
+    /// Decides a queued ask. False when it was not queued (already decided or expired).
+    pub fn set_ask_decision(&self, id: i64, to: AskDecision, rule: Option<&str>) -> Result<bool> {
+        Ok(self.db().execute(
+            "UPDATE agent_asks SET decision = ?2, rule = COALESCE(?3, rule), decided_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?1 AND decision = 'queued'",
+            params![id, to.as_str(), rule],
+        )? == 1)
+    }
+
+    /// Expires every queued ask of sessions whose id starts with `prefix` ("codex:").
+    pub fn expire_queued_with_prefix(&self, prefix: &str) -> Result<usize> {
+        Ok(self.db().execute(
+            "UPDATE agent_asks SET decision = 'expired', decided_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE decision = 'queued' AND substr(session_id, 1, length(?1)) = ?1",
+            params![prefix],
+        )?)
+    }
+
+    pub fn queued_asks(&self, session_id: &str) -> Result<Vec<AgentAsk>> {
+        let sql = format!("SELECT {ASK_COLS} FROM agent_asks WHERE session_id = ?1 AND decision = 'queued' ORDER BY id");
+        Ok(self.db().prepare(&sql)?.query_map(params![session_id], row_to_ask)?.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn agent_ask(&self, id: i64) -> Result<Option<AgentAsk>> {
+        Ok(self.db().query_row(&format!("SELECT {ASK_COLS} FROM agent_asks WHERE id = ?1"), params![id], row_to_ask).optional()?)
+    }
+
+    pub fn agent_asks_recent(&self, limit: usize) -> Result<Vec<AgentAsk>> {
+        let sql = format!("SELECT {ASK_COLS} FROM agent_asks ORDER BY id DESC LIMIT ?1");
+        Ok(self.db().prepare(&sql)?.query_map(params![limit as i64], row_to_ask)?.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Notes one screenshot "go on" for a session.
+    pub fn push_go_on(&self, session_id: &str, t: DateTime<Utc>) -> Result<()> {
+        let db = self.db();
+        let cur: Option<String> = db.query_row("SELECT go_ons FROM agent_sessions WHERE id = ?1", params![session_id], |r| r.get(0)).optional()?;
+        let mut list: Vec<String> = cur.and_then(|c| serde_json::from_str(&c).ok()).unwrap_or_default();
+        list.push(ts(t));
+        // Only the last hour matters; keep the list short.
+        if list.len() > 20 {
+            list.drain(..list.len() - 20);
+        }
+        db.execute("UPDATE agent_sessions SET go_ons = ?2 WHERE id = ?1", params![session_id, serde_json::to_string(&list)?])?;
+        Ok(())
+    }
+
+    pub fn go_ons_since(&self, session_id: &str, t: DateTime<Utc>) -> Result<usize> {
+        let cur: Option<String> = self.db().query_row("SELECT go_ons FROM agent_sessions WHERE id = ?1", params![session_id], |r| r.get(0)).optional()?;
+        let list: Vec<String> = cur.and_then(|c| serde_json::from_str(&c).ok()).unwrap_or_default();
+        Ok(list.iter().filter(|x| parse_ts(x) >= t).count())
     }
 
     /// When a ping whose ref starts with `ref_prefix` was last sent.
@@ -938,5 +1147,121 @@ pub mod tests {
         s.end_session(a.id).unwrap();
         assert!(s.current_session("claude").unwrap().is_none());
         assert!(s.current_session("codex").unwrap().is_none());
+    }
+
+    pub fn agent(id: &str, state: AgentState, mins_ago: i64) -> AgentSession {
+        AgentSession {
+            id: id.into(),
+            tool: AgentTool::Claude,
+            project: "/Users/me/code/shop".into(),
+            title: None,
+            transcript_path: None,
+            state,
+            last_ask: None,
+            updated: utc("2026-11-13T10:00:00Z") - chrono::Duration::minutes(mins_ago),
+        }
+    }
+
+    fn ask(session: &str, decision: AskDecision) -> NewAsk {
+        NewAsk { session_id: session.into(), kind: AskKind::Permission, summary: "wants to run npm test".into(), payload: serde_json::json!({"command":"npm test"}), checks: vec![], decision, rule: None, rpc_id: None }
+    }
+
+    #[test]
+    fn agent_session_round_trips_and_stale_ones_hide() {
+        let (_d, s) = store();
+        let now = utc("2026-11-13T10:00:00Z");
+        let mut a = agent("claude:s1", AgentState::Running, 5);
+        a.title = Some("Fix cart".into());
+        a.last_ask = Some("wants to run npm test".into());
+        s.upsert_agent_session(&a).unwrap();
+        assert_eq!(s.agent_session("claude:s1").unwrap().unwrap(), a);
+        s.upsert_agent_session(&agent("claude:old", AgentState::Waiting, 13 * 60)).unwrap();
+        let ids: Vec<_> = s.agent_sessions(now).unwrap().into_iter().map(|x| x.id).collect();
+        assert_eq!(ids, vec!["claude:s1"]);
+        s.end_agent_session("claude:s1").unwrap();
+        assert!(s.agent_sessions(now).unwrap().is_empty());
+        assert!(s.agent_session("claude:s1").unwrap().is_some());
+    }
+
+    #[test]
+    fn a_new_event_reopens_an_ended_session() {
+        let (_d, s) = store();
+        s.upsert_agent_session(&agent("claude:s1", AgentState::Done, 5)).unwrap();
+        s.end_agent_session("claude:s1").unwrap();
+        s.upsert_agent_session(&agent("claude:s1", AgentState::Running, 1)).unwrap();
+        assert_eq!(s.agent_sessions(utc("2026-11-13T10:00:00Z")).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn waiting_sessions_sort_first() {
+        let (_d, s) = store();
+        s.upsert_agent_session(&agent("a", AgentState::Running, 1)).unwrap();
+        s.upsert_agent_session(&agent("b", AgentState::Waiting, 30)).unwrap();
+        s.upsert_agent_session(&agent("c", AgentState::Done, 2)).unwrap();
+        let ids: Vec<_> = s.agent_sessions(utc("2026-11-13T10:00:00Z")).unwrap().into_iter().map(|x| x.id).collect();
+        assert_eq!(ids, vec!["b", "a", "c"]);
+    }
+
+    #[test]
+    fn ask_decision_moves_only_from_queued() {
+        let (_d, s) = store();
+        let q = s.insert_agent_ask(&ask("a", AskDecision::Queued)).unwrap();
+        let auto = s.insert_agent_ask(&NewAsk { rule: Some("npm test".into()), ..ask("a", AskDecision::Auto) }).unwrap();
+        assert_eq!(s.queued_asks("a").unwrap().iter().map(|x| x.id).collect::<Vec<_>>(), vec![q]);
+        assert!(s.set_ask_decision(q, AskDecision::Approved, None).unwrap());
+        assert!(!s.set_ask_decision(q, AskDecision::Denied, None).unwrap());
+        assert!(!s.set_ask_decision(auto, AskDecision::Expired, None).unwrap());
+        let got = s.agent_ask(q).unwrap().unwrap();
+        assert_eq!(got.decision, AskDecision::Approved);
+        assert!(got.decided_at.is_some());
+        assert_eq!(got.payload["command"], "npm test");
+        assert_eq!(s.agent_ask(auto).unwrap().unwrap().rule.as_deref(), Some("npm test"));
+        assert_eq!(s.agent_asks_recent(10).unwrap().first().map(|x| x.id), Some(auto));
+        assert!(s.queued_asks("a").unwrap().is_empty());
+    }
+
+    #[test]
+    fn expire_queued_with_prefix_touches_only_those_sessions() {
+        let (_d, s) = store();
+        let codex = s.insert_agent_ask(&ask("codex:t1", AskDecision::Queued)).unwrap();
+        let claude = s.insert_agent_ask(&ask("claude:a", AskDecision::Queued)).unwrap();
+        assert_eq!(s.expire_queued_with_prefix("codex:").unwrap(), 1);
+        assert_eq!(s.agent_ask(codex).unwrap().unwrap().decision, AskDecision::Expired);
+        assert_eq!(s.agent_ask(claude).unwrap().unwrap().decision, AskDecision::Queued);
+    }
+
+    #[test]
+    fn go_ons_count_in_window() {
+        let (_d, s) = store();
+        s.upsert_agent_session(&agent("a", AgentState::Done, 1)).unwrap();
+        let t = utc("2026-11-13T10:00:00Z");
+        s.push_go_on("a", t - chrono::Duration::minutes(90)).unwrap();
+        s.push_go_on("a", t - chrono::Duration::minutes(20)).unwrap();
+        s.push_go_on("a", t - chrono::Duration::minutes(5)).unwrap();
+        assert_eq!(s.go_ons_since("a", t - chrono::Duration::hours(1)).unwrap(), 2);
+        assert_eq!(s.go_ons_since("nobody", t).unwrap(), 0);
+        // Upserting the session keeps its go-ons.
+        s.upsert_agent_session(&agent("a", AgentState::Running, 0)).unwrap();
+        assert_eq!(s.go_ons_since("a", t - chrono::Duration::hours(1)).unwrap(), 2);
+    }
+
+    #[test]
+    fn pings_since_kinds_counts_mail_and_agent() {
+        let (_d, s) = store();
+        s.record_ping("mail", "t1@1").unwrap();
+        s.record_ping("agent", "ask:1").unwrap();
+        s.record_ping("checkin", "2026-11-13@13:00").unwrap();
+        let t = Utc::now() - chrono::Duration::minutes(1);
+        assert_eq!(s.pings_since_kinds(&["mail", "agent"], t).unwrap(), 2);
+    }
+
+    #[test]
+    fn activity_lists_agent_asks() {
+        let (_d, s) = store();
+        let id = s.insert_agent_ask(&NewAsk { rule: Some("npm test".into()), ..ask("a", AskDecision::Auto) }).unwrap();
+        let a = s.activity(10).unwrap();
+        assert_eq!(a.len(), 1);
+        assert_eq!((a[0].kind.as_str(), a[0].name.as_str(), a[0].detail.as_deref(), a[0].rule.as_deref(), a[0].ok), ("agent", "auto", Some("wants to run npm test"), Some("npm test"), true));
+        let _ = id;
     }
 }

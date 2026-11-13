@@ -6,6 +6,7 @@ import { ToolSteps } from "./ToolSteps";
 import { ApprovalCard } from "./ApprovalCard";
 import { Markdown } from "./Markdown";
 import { DROID_HEAD } from "../droid/droidSvg";
+import { AgentsView, useAgents } from "../agents/AgentsView";
 
 const PAGE = 50;
 const SUGGESTIONS = ["What time is it in Tokyo?", "What day is it today?"];
@@ -41,6 +42,9 @@ export function ChatPanel() {
   const input = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
   const keepFrom = useRef<number | null>(null);
+  const [view, setView] = useState<"chat" | "agents">("chat");
+  const agents = useAgents();
+  const waiting = agents.view.sessions.filter((x) => x.state === "waiting").length;
 
   const checkHealth = useCallback(() => api.health().then(setHealth).catch(() => setHealth(null)), []);
 
@@ -139,14 +143,22 @@ export function ChatPanel() {
       <header className="panel-head" data-tauri-drag-region>
         <span className="head-droid" dangerouslySetInnerHTML={{ __html: DROID_HEAD }} />
         <h1>bleep</h1>
-        <span className="badge">Claude Code</span>
+        <div className="views" role="tablist" aria-label="View">
+          <button role="tab" className="view-tab" aria-selected={view === "chat"} onClick={() => setView("chat")}>Chat</button>
+          <button role="tab" className="view-tab" aria-selected={view === "agents"} aria-label={waiting ? `Agents, ${waiting} need you` : "Agents"} onClick={() => setView("agents")}>
+            Agents{waiting > 0 && <span className="view-count" aria-hidden="true">{waiting}</span>}
+          </button>
+        </div>
         <span className="spacer" data-tauri-drag-region />
+        <span className="badge">Claude Code</span>
         <button className="iconbtn" aria-label="Close chat" title="Close (Esc)" onClick={() => void api.hideChat()}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
         </button>
       </header>
 
-      {health && !ok && (
+      {view === "agents" && <AgentsView view={agents.view} refresh={() => void agents.refresh()} />}
+
+      {view === "chat" && health && !ok && (
         <div className="banner" role="status">
           <p>{health.hint}</p>
           <div className="acts">
@@ -158,7 +170,7 @@ export function ChatPanel() {
         </div>
       )}
 
-      <div className="log" ref={log} onScroll={onScroll} aria-live="polite">
+      <div className="log" ref={log} onScroll={onScroll} aria-live="polite" hidden={view !== "chat"}>
         {state.messages.map((m) => <Bubble key={m.id} m={m} />)}
         {state.loose.map((a) => <ApprovalCard key={a.id} a={a} />)}
         {limited && <div className="msg sys">{formatBackAt(state.rateLimitedUntil!)}</div>}
@@ -166,13 +178,13 @@ export function ChatPanel() {
         {notice && <div className="msg sys" role="status">{notice}</div>}
       </div>
 
-      {ok && state.messages.length === 0 && (
+      {view === "chat" && ok && state.messages.length === 0 && (
         <div className="sugs">
           {SUGGESTIONS.map((s) => <button key={s} onClick={() => void send(s)} disabled={busy}>{s}</button>)}
         </div>
       )}
 
-      <form className="composer" onSubmit={(e) => { e.preventDefault(); void send(draft); }}>
+      <form className="composer" hidden={view !== "chat"} onSubmit={(e) => { e.preventDefault(); void send(draft); }}>
         <label htmlFor="msg" className="sr-only">Message bleep</label>
         <textarea
           id="msg"

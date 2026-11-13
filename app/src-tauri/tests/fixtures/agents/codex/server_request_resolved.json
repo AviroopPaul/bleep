@@ -1,0 +1,7 @@
+{
+  "method": "serverRequest/resolved",
+  "params": {
+    "threadId": "thr_01a1",
+    "requestId": 1
+  }
+}

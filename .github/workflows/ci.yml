@@ -59,7 +59,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app/src-tauri
+          workspaces: |
+            app/src-tauri
+            app/bleep-hook
+      - name: bleep-hook tests
+        working-directory: app/bleep-hook
+        run: cargo test
+      - name: Build the bleep-hook sidecar (Tauri checks it at compile time)
+        working-directory: app
+        run: npm run build:hook
       - name: cargo test
         working-directory: app/src-tauri
         run: cargo test

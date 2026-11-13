@@ -85,6 +85,8 @@ test("tabs work with the keyboard", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Mail" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tabpanel")).toContainText("VIPs");
   await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Agents" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowRight");
   await expect(google).toHaveAttribute("aria-selected", "true");
@@ -120,4 +122,33 @@ test("activity tab lists newest first and marks failures", async ({ page }) => {
   await expect(rows.nth(2)).toContainText("Checked your calendar");
   await expect(rows.nth(2)).not.toContainText("failed");
   await page.screenshot({ path: test.info().outputPath("activity-tab.png") });
+});
+
+test("agents tab installs Claude Code hooks only after consent", async ({ page }) => {
+  await page.goto("/?mock=1&g=builtin#settings");
+  await page.getByRole("tab", { name: "Agents" }).click();
+  const claude = page.getByRole("region", { name: "Claude Code" });
+  await expect(claude.getByRole("status")).toHaveText("Not installed");
+  await claude.getByRole("button", { name: "Install hooks" }).click();
+  await expect(claude).toContainText("A backup is saved first.");
+  expect(await calls(page)).not.toContain("agents_install_claude");
+  await claude.getByRole("button", { name: "Yes, install" }).click();
+  await expect(claude.getByRole("status")).toHaveText("Installed");
+  expect(await calls(page)).toContain("agents_install_claude");
+  await claude.getByRole("button", { name: "Remove hooks" }).click();
+  await expect(claude.getByRole("status")).toHaveText("Not installed");
+  expect(await calls(page)).toContain("agents_remove_claude");
+});
+
+test("agents tab toggles call agents_set", async ({ page }) => {
+  await page.goto("/?mock=1&g=builtin#settings");
+  await page.getByRole("tab", { name: "Agents" }).click();
+  const auto = page.getByRole("switch", { name: "Approve safe asks by my rules" });
+  await expect(auto).not.toBeChecked();
+  await expect(page.getByRole("switch", { name: "Check screenshots with a small model" })).toBeChecked();
+  await auto.click();
+  await expect(auto).toBeChecked();
+  expect(await calls(page)).toContain("agents_set:true:true:false");
+  await page.getByRole("button", { name: "Show rules file" }).click();
+  expect(await calls(page)).toContain("agents_reveal_rules");
 });

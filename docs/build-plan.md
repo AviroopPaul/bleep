@@ -179,6 +179,7 @@ pub trait AgentRuntime: Send + Sync {
 - **Keep it warm:** one child process stays alive for the main chat. Each new message is one JSON line on stdin. If the child dies, restart it with `--resume`.
 - **One-shots:** a separate `claude -p --output-format json --json-schema ... --model haiku --tools "" --no-session-persistence`. About 2.6 s per call (measured in the Valet doc).
 - **Tested on 12 Nov 2026:** `--strict-mcp-config` with `--setting-sources ""` runs fine headless and loads no other servers.
+- **Learned in Phase 4:** Claude Code 2.1.319 sends `PermissionRequest` only when it would prompt me, also in headless runs; `{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}` skips the prompt and no output leaves it. `Stop` input carries `last_assistant_message`. The Codex daemon's control socket (`~/.codex/app-server-control/app-server-control.sock`) speaks JSON-RPC inside WebSocket frames, not newline JSON, and `codex app-server proxy` does not start the daemon. A client that subscribes (`thread/resume`) after an approval request gets it replayed, the first answer wins, the other client gets `serverRequest/resolved`, and `thread/unsubscribe` does not unload a thread another client holds. Codex wraps commands as `/bin/zsh -lc '<cmd>'`. An image one-shot needs `--input-format stream-json --output-format stream-json --verbose`.
 - **Learned in Phase 3:** Gmail `history.list` answers 404 when the stored `historyId` is too old; bleep then reseeds from the last 2 days and those mails never ping. Rules sort most mail for free (categories, bill words plus an amount, VIPs, mailing lists); only unclear mail reaches the small model, 10 per call, at most 20 calls an hour.
 - **Learned in Phase 2:** Claude Code 2.1.319 aborts an MCP tool call that sends nothing for 300 s, and `MCP_TOOL_TIMEOUT` does not lift that. A per-server `"timeout": 660000` in the MCP config does: a live probe held a write call on an approval card for 371 s and the answer reached the model.
 - **Learned in Phase 1:** a stale `--resume` id fails within about 0.5 s with no input, so `start_session` waits up to 1.5 s when resuming. `ANTHROPIC_API_KEY` and the `CLAUDECODE` markers are removed from the child's env so it always uses the subscription. bleep's MCP server runs stateless with plain JSON replies, and Claude Code accepts that.
@@ -403,6 +404,8 @@ Deliverables:
 Done when: a real bill mail leads to a reminder offer at the next check-in, a draft reply lands in Gmail drafts, the send happens only after I approve the card, and a promo mail never pings me.
 
 ### Phase 4. Agent watch: Claude Code and Codex
+
+Status (13 Nov 2026): built on branch `phase-4-agent-watch` (plan: `docs/superpowers/plans/2026-11-13-phase-4-agent-watch.md`). Auto-approve and the Codex watch are off until turned on in Settings. Screenshot "go on" is Claude Code only for now.
 
 Deliverables:
 - `bleep-hook` binary and the local socket. Install and remove the Claude Code hooks from settings, with a clear consent screen.
