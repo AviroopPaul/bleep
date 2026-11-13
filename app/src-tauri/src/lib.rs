@@ -14,6 +14,7 @@ pub mod paths;
 pub mod proactive;
 pub mod runtime;
 pub mod settings;
+pub mod setup;
 pub mod startup;
 pub mod store;
 pub mod windows;
@@ -253,6 +254,8 @@ pub fn run() {
             bar::bar_dismiss,
             bar::bubble_click,
             settings::settings_open,
+            setup::setup_open,
+            setup::setup_finish,
             settings::google_state,
             settings::google_save_client,
             settings::google_use_builtin,

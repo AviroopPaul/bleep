@@ -91,7 +91,13 @@ nav.top .links a.btn.primary:hover{background:#000}
 .btn.sm{padding:9px 13px; font-size:13.5px; border-radius:10px}
 nav.top .btn{margin-left:6px}
 
-/* ---------- waitlist ---------- */
+/* ---------- download ---------- */
+.dlwrap{display:flex; flex-direction:column; align-items:center; gap:10px}
+.btn.dl{gap:10px; padding:15px 24px; font-size:16.5px; border-radius:14px}
+.btn.dl .apl{width:19px; height:19px; margin-top:-3px; flex:none}
+nav.top .btn.dl{padding:9px 14px; font-size:13.5px; gap:7px} nav.top .btn.dl .apl{width:14px; height:14px; margin-top:-2px}
+.dlnote{margin:0; font-size:13.5px; color:var(--muted)} .dlnote a{color:var(--blue)}
+/* ---------- waitlist (unused since v0.0.1) ---------- */
 .joinwrap{max-width:480px; width:100%}
 .join{position:relative; display:flex; gap:6px; padding:6px; border-radius:16px; background:rgba(255,255,255,.65); border:1px solid var(--glass-line); box-shadow:var(--shadow); transition:box-shadow .2s}
 .join:focus-within{box-shadow:0 0 0 3px rgba(47,92,147,.2), var(--shadow)}
@@ -629,7 +635,7 @@ footer a{color:var(--ink-2)}
   <div class="bar glass">
     <a class="brand" href="#top" aria-label="bleep, back to top"><span data-droid="head"></span><em class="wm">bleep</em></a>
     <div class="links">
-      <a class="btn sm primary" href="#join">Get early access</a>
+      <a class="btn sm primary dl" href="https://github.com/AviroopPaul/bleep-releases/releases/latest/download/bleep-mac.dmg" data-dl><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download</a>
     </div>
   </div>
 </nav>
@@ -642,13 +648,9 @@ footer a{color:var(--ink-2)}
       <h1 class="rv">Your agents, unblocked.<br><span>Your inbox, handled.</span></h1>
       <p class="lede rv">bleep is a little droid that floats on your Mac. It watches Claude Code, Codex, your mail and your calendar. It handles the small asks and tells you what needs you.</p>
       <div class="rv hjoin">
-      <div class="joinwrap">
-        <form class="join" data-join novalidate>
-          <input type="email" name="email" placeholder="you@email.com" autocomplete="email" aria-label="Your email" required>
-          <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-          <button class="btn primary" type="submit">Get early access</button>
-        </form>
-        <p class="joinnote" role="status">Not out yet. One email when it ships. <a href="#demo">Or try the demo</a></p>
+      <div class="dlwrap">
+        <a class="btn primary dl" href="https://github.com/AviroopPaul/bleep-releases/releases/latest/download/bleep-mac.dmg" data-dl><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for Mac</a>
+        <p class="dlnote">v0.0.1 · Free · macOS 15 or later on Apple silicon. <a href="#first-open">First time opening it?</a></p>
       </div>
       </div>
     </div>
@@ -896,7 +898,8 @@ footer a{color:var(--ink-2)}
   <div class="wrap">
     <div class="sec-head rv"><div><h2>Questions.</h2></div></div>
     <div class="faq rv">
-      <details open><summary>Can I download it?</summary><p>Not yet. bleep is still being built. Join the waitlist and you get one email when it ships. Until then, the demo on this page shows how it will work.</p></details>
+      <details open id="first-open"><summary>How do I install it?</summary><p>Download the file, open it, and drag bleep into Applications. This first version is not notarized by Apple yet, so macOS blocks the first launch. Open bleep once, then go to System Settings, Privacy &amp; Security, and click Open Anyway. After that it opens like any app, and a short setup connects Claude Code, Google and your agents.</p></details>
+      <details><summary>What do I need?</summary><p>A Mac with Apple silicon on macOS 15 or later, and Claude Code installed. bleep signs in to Claude once during setup.</p></details>
       <details><summary>Can it approve things in Claude Code or Codex for me?</summary><p>Only what your rules allow. Out of the box that is tests, lint, file reads, and screenshots it can check against the ask. Push, deploy, delete, secrets and money always wait for you. Every approval goes in a log you can read.</p></details>
       <details><summary>Which AI does it use?</summary><p>Claude. bleep talks to Claude through Claude Code on your Mac, so it needs no new API key.</p></details>
       <details><summary>Will it ping me all day?</summary><p>No. Rules filter the noise first. It has quiet hours and a limit on pings per hour. Most checks end with it saying nothing.</p></details>
@@ -909,15 +912,9 @@ footer a{color:var(--ink-2)}
 <div class="wrap closer rv">
   <div class="droid" data-droid="full"></div>
   <h2>An AI buddy for your MacBook.</h2>
-  <div id="join" style="display:flex;justify-content:center">
-    <div class="joinwrap">
-        <form class="join" data-join novalidate>
-          <input type="email" name="email" placeholder="you@email.com" autocomplete="email" aria-label="Your email" required>
-          <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-          <button class="btn primary" type="submit">Get early access</button>
-        </form>
-        <p class="joinnote" role="status">Be first to get it. No spam, one email when it ships.</p>
-      </div>
+  <div id="download" class="dlwrap">
+    <a class="btn primary dl" href="https://github.com/AviroopPaul/bleep-releases/releases/latest/download/bleep-mac.dmg" data-dl><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for Mac</a>
+    <p class="dlnote">v0.0.1 · Free · macOS 15 or later on Apple silicon. <a href="#first-open">First time opening it?</a></p>
   </div>
 </div>
 </main>
@@ -1669,34 +1666,10 @@ $('#hideDroid').onclick = () => { hideDroid(); $('#chat').classList.remove('open
 
 
 
-/* ================= waitlist ================= */
-const REF = (() => {
-  try {
-    const q = new URLSearchParams(location.search).get('ref'); if (q) return q;
-    const r = document.referrer ? new URL(document.referrer).hostname : '';
-    return r && r !== location.hostname ? r : null;
-  } catch { return null; }
-})();
-document.querySelectorAll('[data-join]').forEach(form => form.addEventListener('submit', async e => {
-  e.preventDefault();
-  const note = form.parentNode.querySelector('.joinnote'), btn = form.querySelector('button');
-  const email = form.email.value.trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { note.textContent = 'Please enter a valid email.'; note.classList.add('err'); form.email.focus(); return; }
-  btn.disabled = true; btn.textContent = 'Adding…'; note.classList.remove('err');
-  try {
-    const r = await fetch('/api/waitlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, ref: REF, website: form.website.value }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || 'Something went wrong. Please try again.');
-    document.querySelectorAll('[data-join]').forEach(f => {
-      f.classList.add('done'); f.innerHTML = `<span>${DROID_HEAD}</span>You're on the list. bleep will bleep when it ships.`;
-      f.parentNode.querySelector('.joinnote').textContent = '';
-    });
-    droidState($('#heroDroid'), 'happy', 700);
-    try { window.va && va('event', { name: 'waitlist_join', ref: REF || 'direct' }); } catch {}
-  } catch (err) {
-    note.textContent = err.message; note.classList.add('err');
-    btn.disabled = false; btn.textContent = 'Get early access';
-  }
+/* ================= download ================= */
+document.querySelectorAll('[data-dl]').forEach(a => a.addEventListener('click', () => {
+  try { window.va && va('event', { name: 'download_mac' }); } catch {}
+  const d = $('#heroDroid'); if (d) droidState(d, 'happy', 700);
 }));
 
 /* ================= ⌥⌥ summon ================= */

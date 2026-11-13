@@ -28,6 +28,10 @@ pub fn first_run(app: &AppHandle) {
             }
         }
     }
+    if crate::setup::should_open(&state.config.lock().unwrap()) {
+        crate::setup::open_setup(app);
+        return;
+    }
     let chat = state.chat.clone();
     let app = app.clone();
     tauri::async_runtime::spawn(async move {

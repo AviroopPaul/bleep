@@ -300,8 +300,9 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     // A dev build must never register itself at login, so the item is greyed out there.
     let login = CheckMenuItem::with_id(app, "login", "Launch at login", crate::startup::IS_RELEASE, login_on, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
+    let setup = MenuItem::with_id(app, "setup", "Set up bleep…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit bleep", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&toggle, &open, &pause, &login, &settings, &PredefinedMenuItem::separator(app)?, &quit])?;
+    let menu = Menu::with_items(app, &[&toggle, &open, &pause, &login, &settings, &setup, &PredefinedMenuItem::separator(app)?, &quit])?;
     let mut tray = TrayIconBuilder::with_id("bleep").tooltip("bleep").menu(&menu).show_menu_on_left_click(true);
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
@@ -332,6 +333,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             let _ = login.set_checked(al.is_enabled().unwrap_or(false));
         }
         "settings" => crate::settings::open_settings(app),
+        "setup" => crate::setup::open_setup(app),
         "quit" => app.exit(0),
         _ => {}
     })

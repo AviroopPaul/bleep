@@ -252,3 +252,27 @@ button { font: inherit; color: inherit; }
 .toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
 .toggle input:checked { background: var(--blue); }
 .toggle input:checked::after { transform: translateX(14px); }
+
+/* ---------- setup wizard ---------- */
+.setup { height: 100%; display: flex; flex-direction: column; background: var(--surface); user-select: text; -webkit-user-select: text; }
+.su-steps { display: flex; gap: 6px; list-style: none; margin: 0; padding: 16px 20px 0; }
+.su-steps li { flex: 1; font: 700 11px/1 var(--sans); color: var(--muted); padding-top: 8px; border-top: 3px solid var(--line); }
+.su-steps li.past { color: var(--ink-2); border-top-color: var(--blue-2); }
+.su-steps li.on { color: var(--ink); border-top-color: var(--blue); }
+.su-body { flex: 1; overflow-y: auto; padding: 18px 20px 12px; }
+.su-body h1 { margin: 6px 0 4px; font: 600 28px/1.1 var(--display); }
+.su-body h2 { margin: 0 0 2px; font: 600 21px/1.15 var(--display); }
+.su-center { text-align: center; }
+.su-small { font-size: 12.5px; color: var(--muted); }
+.su-droid { width: 104px; margin: 10px auto 4px; }
+.su-droid svg { width: 100%; height: auto; display: block; overflow: visible; }
+.su-checks { list-style: none; margin: 4px 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.su-check { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 11px; background: var(--raised); border: 1px solid var(--line); font: 600 13.5px var(--sans); color: var(--ink-2); }
+.su-check > span[aria-hidden] { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 800 11px/1 var(--sans); background: rgba(127, 127, 127, 0.18); color: var(--muted); flex: none; }
+.su-check.ok { color: var(--ink); }
+.su-check.ok > span[aria-hidden] { background: var(--sage); color: #fff; }
+.su-note { padding: 11px 12px; border-radius: 12px; background: rgba(76, 125, 184, 0.1); border: 1px solid rgba(76, 125, 184, 0.3); font-size: 13.5px; margin: 0 0 12px; }
+.su-note p { margin: 0 0 9px; }
+.su-body .set-card { margin-top: 4px; }
+.su-body kbd { font: 600 12px var(--mono); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--raised); }
+.su-foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px 16px; border-top: 1px solid var(--line); background: var(--surface); }

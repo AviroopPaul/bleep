@@ -76,8 +76,15 @@ export function installMocks(label: string) {
       switch (cmd) {
         case "chat_history":
           return a.beforeId ? [] : history;
-        case "runtime_health":
-          return { runtime: "claude", installed: true, version: "2.1.319", version_ok: true, signed_in: true, plan: "pro", hint: null };
+        case "runtime_health": {
+          // ?health=none: Claude Code missing. ?health=signin: installed, not signed in for bleep.
+          const hq = q.get("health");
+          return { runtime: "claude", installed: hq !== "none", version: hq === "none" ? null : "2.1.319", version_ok: hq !== "none", signed_in: !hq, plan: hq ? null : "pro", hint: null };
+        }
+        case "open_claude_login":
+        case "setup_finish":
+          calls.push(cmd);
+          return null;
         case "chat_send": {
           if (a.text === "fail please") throw "bleep could not reach Claude Code: spawn failed";
           next += 2;
