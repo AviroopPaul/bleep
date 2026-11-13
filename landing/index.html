@@ -92,8 +92,21 @@ nav.top .links a.btn.primary:hover{background:#000}
 nav.top .btn{margin-left:6px}
 
 /* ---------- download ---------- */
-.dlwrap{display:flex; flex-direction:column; align-items:center; gap:10px}
-.btn.dl{gap:10px; padding:15px 24px; font-size:16.5px; border-radius:14px}
+.dlwrap{display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; max-width:700px; margin:0 auto}
+.hjoin{width:100%}
+.inst{width:100%; min-width:0; background:var(--ink); color:#fff; border-radius:16px; padding:6px; box-shadow:0 16px 36px -18px rgba(27,31,36,.75); text-align:left}
+.itabs{display:flex; gap:4px}
+.itabs button{border:0; cursor:pointer; font:700 13px/1 var(--sans); color:rgba(255,255,255,.55); background:transparent; padding:8px 12px; border-radius:10px}
+.itabs button:hover{color:#fff}
+.itabs button[aria-selected="true"]{color:#fff; background:rgba(255,255,255,.12)}
+.icmd{display:flex; align-items:center; gap:10px; padding:10px 4px 4px 12px}
+.iprompt{flex:none; font:500 14px var(--mono); color:rgba(255,255,255,.4)}
+.icmd code{flex:1; min-width:0; font:500 14px/1.4 var(--mono); white-space:nowrap; overflow-x:auto; scrollbar-width:none; user-select:all; -webkit-user-select:all}
+.icmd code::-webkit-scrollbar{display:none}
+.icopy{flex:none; border:0; cursor:pointer; font:700 12.5px/1 var(--sans); padding:9px 12px; border-radius:9px; background:rgba(255,255,255,.12); color:#fff}
+.icopy:hover{background:rgba(255,255,255,.22)} .icopy.ok{background:var(--sage)}
+@media (max-width:560px){ .icmd code{font-size:12.5px} }
+.faq code{font:500 .9em var(--mono); background:rgba(27,31,36,.06); padding:1px 5px; border-radius:5px}
 .btn.dl .apl{width:19px; height:19px; margin-top:-3px; flex:none}
 nav.top .btn.dl{padding:9px 14px; font-size:13.5px; gap:7px} nav.top .btn.dl .apl{width:14px; height:14px; margin-top:-2px}
 .dlnote{margin:0; font-size:13.5px; color:var(--muted)} .dlnote a{color:var(--blue)}
@@ -635,7 +648,7 @@ footer a{color:var(--ink-2)}
   <div class="bar glass">
     <a class="brand" href="#top" aria-label="bleep, back to top"><span data-droid="head"></span><em class="wm">bleep</em></a>
     <div class="links">
-      <a class="btn sm primary dl" href="https://github.com/AviroopPaul/bleep-releases/releases/latest/download/bleep-mac.dmg" data-dl><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download</a>
+      <a class="btn sm primary" href="#install">Install</a>
     </div>
   </div>
 </nav>
@@ -648,9 +661,17 @@ footer a{color:var(--ink-2)}
       <h1 class="rv">Your agents, unblocked.<br><span>Your inbox, handled.</span></h1>
       <p class="lede rv">bleep is a little droid that floats on your Mac. It watches Claude Code, Codex, your mail and your calendar. It handles the small asks and tells you what needs you.</p>
       <div class="rv hjoin">
-      <div class="dlwrap">
-        <a class="btn primary dl" href="https://github.com/AviroopPaul/bleep-releases/releases/latest/download/bleep-mac.dmg" data-dl><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for Mac</a>
-        <p class="dlnote">v0.0.1 · Free · macOS 15 or later on Apple silicon. <a href="#first-open">First time opening it?</a></p>
+      <div class="dlwrap" id="install">
+        <div class="inst" data-inst>
+          <div class="itabs" role="tablist" aria-label="How to install bleep">
+            <button type="button" role="tab" id="tab-brew-1" aria-controls="pane-1" aria-selected="true" data-tab="brew">Homebrew</button>
+            <button type="button" role="tab" id="tab-curl-1" aria-controls="pane-1" aria-selected="false" tabindex="-1" data-tab="curl">curl</button>
+          </div>
+          <div class="icmd" role="tabpanel" id="pane-1" aria-labelledby="tab-brew-1">
+            <span class="iprompt" aria-hidden="true">$</span><code data-cmd="brew">brew install --cask AviroopPaul/tap/bleep</code><code data-cmd="curl" hidden>curl -fsSL https://bleep-omega.vercel.app/install.sh | sh</code>
+            <button class="icopy" type="button">Copy</button>
+          </div>
+        </div>
       </div>
       </div>
     </div>
@@ -898,7 +919,7 @@ footer a{color:var(--ink-2)}
   <div class="wrap">
     <div class="sec-head rv"><div><h2>Questions.</h2></div></div>
     <div class="faq rv">
-      <details open id="first-open"><summary>How do I install it?</summary><p>Download the file, open it, and drag bleep into Applications. This first version is not notarized by Apple yet, so macOS blocks the first launch. Open bleep once, then go to System Settings, Privacy &amp; Security, and click Open Anyway. After that it opens like any app, and a short setup connects Claude Code, Google and your agents.</p></details>
+      <details open id="first-open"><summary>How do I install it?</summary><p>Run one of the two commands above in Terminal. Homebrew users: <code>brew install --cask AviroopPaul/tap/bleep</code>. Everyone else: <code>curl -fsSL https://bleep-omega.vercel.app/install.sh | sh</code>. Both check the download, put bleep in Applications, and let macOS open it. After that, press ⌘ Space, type bleep, and a short setup connects Claude Code, Google and your agents.</p></details>
       <details><summary>What do I need?</summary><p>A Mac with Apple silicon on macOS 15 or later, and Claude Code installed. bleep signs in to Claude once during setup.</p></details>
       <details><summary>Can it approve things in Claude Code or Codex for me?</summary><p>Only what your rules allow. Out of the box that is tests, lint, file reads, and screenshots it can check against the ask. Push, deploy, delete, secrets and money always wait for you. Every approval goes in a log you can read.</p></details>
       <details><summary>Which AI does it use?</summary><p>Claude. bleep talks to Claude through Claude Code on your Mac, so it needs no new API key.</p></details>
@@ -913,8 +934,16 @@ footer a{color:var(--ink-2)}
   <div class="droid" data-droid="full"></div>
   <h2>An AI buddy for your MacBook.</h2>
   <div id="download" class="dlwrap">
-    <a class="btn primary dl" href="https://github.com/AviroopPaul/bleep-releases/releases/latest/download/bleep-mac.dmg" data-dl><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for Mac</a>
-    <p class="dlnote">v0.0.1 · Free · macOS 15 or later on Apple silicon. <a href="#first-open">First time opening it?</a></p>
+    <div class="inst" data-inst>
+          <div class="itabs" role="tablist" aria-label="How to install bleep">
+            <button type="button" role="tab" id="tab-brew-2" aria-controls="pane-2" aria-selected="true" data-tab="brew">Homebrew</button>
+            <button type="button" role="tab" id="tab-curl-2" aria-controls="pane-2" aria-selected="false" tabindex="-1" data-tab="curl">curl</button>
+          </div>
+          <div class="icmd" role="tabpanel" id="pane-2" aria-labelledby="tab-brew-2">
+            <span class="iprompt" aria-hidden="true">$</span><code data-cmd="brew">brew install --cask AviroopPaul/tap/bleep</code><code data-cmd="curl" hidden>curl -fsSL https://bleep-omega.vercel.app/install.sh | sh</code>
+            <button class="icopy" type="button">Copy</button>
+          </div>
+        </div>
   </div>
 </div>
 </main>
@@ -1666,11 +1695,38 @@ $('#hideDroid').onclick = () => { hideDroid(); $('#chat').classList.remove('open
 
 
 
-/* ================= download ================= */
-document.querySelectorAll('[data-dl]').forEach(a => a.addEventListener('click', () => {
-  try { window.va && va('event', { name: 'download_mac' }); } catch {}
-  const d = $('#heroDroid'); if (d) droidState(d, 'happy', 700);
-}));
+/* ================= install commands: Homebrew / curl tabs, kept in sync across the page ================= */
+const insts = [...document.querySelectorAll('[data-inst]')];
+function pickInstall(which) {
+  insts.forEach(box => {
+    box.querySelectorAll('[role="tab"]').forEach(t => {
+      const on = t.dataset.tab === which;
+      t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1;
+      if (on) box.querySelector('[role="tabpanel"]').setAttribute('aria-labelledby', t.id);
+    });
+    box.querySelectorAll('[data-cmd]').forEach(c => { c.hidden = c.dataset.cmd !== which; });
+  });
+}
+insts.forEach(box => {
+  const tabs = [...box.querySelectorAll('[role="tab"]')];
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => pickInstall(t.dataset.tab));
+    t.addEventListener('keydown', e => {
+      const k = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!k) return;
+      e.preventDefault(); const n = tabs[(i + k + tabs.length) % tabs.length]; pickInstall(n.dataset.tab); n.focus();
+    });
+  });
+  const btn = box.querySelector('.icopy');
+  btn.addEventListener('click', async () => {
+    const code = box.querySelector('[data-cmd]:not([hidden])'), text = code.textContent;
+    try { await navigator.clipboard.writeText(text); }
+    catch { const r = document.createRange(); r.selectNodeContents(code); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); document.execCommand('copy'); }
+    btn.textContent = 'Copied'; btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1600);
+    try { window.va && va('event', { name: 'copy_install', how: code.dataset.cmd }); } catch {}
+    const d = $('#heroDroid'); if (d) droidState(d, 'happy', 700);
+  });
+});
 
 /* ================= ⌥⌥ summon ================= */
 const chatEl = $('#chat'), chatHome = { parent: chatEl.parentNode, next: chatEl.nextSibling };

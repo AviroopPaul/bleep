@@ -11,3 +11,6 @@ app/test-results
 app/playwright-report
 app/bleep-hook/target
 app/src-tauri/binaries
+
+# release builds (scripts/build-release.sh)
+app/release/
