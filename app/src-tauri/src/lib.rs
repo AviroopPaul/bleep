@@ -9,6 +9,7 @@ pub mod google;
 pub mod hotkey;
 pub mod mail;
 pub mod mcp;
+pub mod memory;
 pub mod opener;
 pub mod paths;
 pub mod proactive;
