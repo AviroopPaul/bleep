@@ -149,46 +149,63 @@ export function GoogleSettings() {
 
 const TABS = ["Google", "Mail", "Memory", "Connectors", "Agents", "Activity"] as const;
 type Tab = (typeof TABS)[number];
+const BLURB: Record<Tab, string> = {
+  Google: "Account and calendar",
+  Mail: "VIPs, mutes and lists",
+  Memory: "Facts and compaction",
+  Connectors: "MCP servers you add",
+  Agents: "Coding sessions",
+  Activity: "What bleep did",
+};
 
 export function Settings() {
   const [tab, setTab] = useState<Tab>("Google");
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
-  const onKey = (e: React.KeyboardEvent, i: number) => {
-    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-    if (!step) return;
-    e.preventDefault();
-    const next = (i + step + TABS.length) % TABS.length;
+  const go = (i: number) => {
+    const next = (i + TABS.length) % TABS.length;
     setTab(TABS[next]);
     tabs.current[next]?.focus();
   };
+  const onKey = (e: React.KeyboardEvent, i: number) => {
+    const to: Record<string, number> = { ArrowDown: i + 1, ArrowRight: i + 1, ArrowUp: i - 1, ArrowLeft: i - 1, Home: 0, End: TABS.length - 1 };
+    if (!(e.key in to)) return;
+    e.preventDefault();
+    go(to[e.key]);
+  };
   return (
     <main className="settings">
-      <h1>Settings</h1>
-      <div className="tabs" role="tablist" aria-label="Settings">
-        {TABS.map((t, i) => (
-          <button
-            key={t}
-            ref={(el) => { tabs.current[i] = el; }}
-            role="tab"
-            id={`tab-${t}`}
-            className="tab"
-            aria-selected={tab === t}
-            aria-controls={`panel-${t}`}
-            tabIndex={tab === t ? 0 : -1}
-            onClick={() => setTab(t)}
-            onKeyDown={(e) => onKey(e, i)}
-          >
-            {t}
-          </button>
-        ))}
+      <div className="set-side">
+        <h1>Settings</h1>
+        <div className="tabs" role="tablist" aria-label="Settings" aria-orientation="vertical">
+          {TABS.map((t, i) => (
+            <button
+              key={t}
+              ref={(el) => { tabs.current[i] = el; }}
+              role="tab"
+              id={`tab-${t}`}
+              className="tab"
+              aria-label={t}
+              aria-selected={tab === t}
+              aria-controls={`panel-${t}`}
+              tabIndex={tab === t ? 0 : -1}
+              onClick={() => setTab(t)}
+              onKeyDown={(e) => onKey(e, i)}
+            >
+              <span>{t}</span>
+              <small aria-hidden="true">{BLURB[t]}</small>
+            </button>
+          ))}
+        </div>
       </div>
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-panel">
-        {tab === "Google" && <GoogleSettings />}
-        {tab === "Mail" && <MailSettings />}
-        {tab === "Memory" && <MemorySettingsTab />}
-        {tab === "Connectors" && <ConnectorsSettingsTab />}
-        {tab === "Agents" && <AgentSettingsTab />}
-        {tab === "Activity" && <Activity />}
+        <div className="set-page">
+          {tab === "Google" && <GoogleSettings />}
+          {tab === "Mail" && <MailSettings />}
+          {tab === "Memory" && <MemorySettingsTab />}
+          {tab === "Connectors" && <ConnectorsSettingsTab />}
+          {tab === "Agents" && <AgentSettingsTab />}
+          {tab === "Activity" && <Activity />}
+        </div>
       </div>
     </main>
   );

@@ -51,15 +51,19 @@ pub fn settings_open(app: AppHandle) {
 
 pub fn open_settings(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("settings") {
+        crate::windows::bring_to_droid_screen(app, &w);
         let _ = w.show();
         let _ = w.set_focus();
         return;
     }
+    // On the screen where the droid is, not always the main one.
+    let (at, size) = crate::windows::panel_on_droid_screen(app, crate::windows::Size { w: 860.0, h: 620.0 });
     let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html#settings".into()))
         .title("bleep settings")
-        .inner_size(460.0, 520.0)
-        .resizable(false)
-        .center()
+        .inner_size(size.w, size.h)
+        .min_inner_size(440.0, 460.0)
+        .resizable(true)
+        .position(at.x, at.y)
         .build();
     match built {
         Ok(w) => {

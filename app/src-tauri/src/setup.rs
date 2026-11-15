@@ -11,15 +11,17 @@ pub fn should_open(cfg: &Config) -> bool {
 
 pub fn open_setup(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("setup") {
+        crate::windows::bring_to_droid_screen(app, &w);
         let _ = w.show();
         let _ = w.set_focus();
         return;
     }
+    let (at, size) = crate::windows::panel_on_droid_screen(app, crate::windows::Size { w: 520.0, h: 640.0 });
     let built = WebviewWindowBuilder::new(app, "setup", WebviewUrl::App("index.html#setup".into()))
         .title("Set up bleep")
-        .inner_size(520.0, 640.0)
+        .inner_size(size.w, size.h)
         .resizable(false)
-        .center()
+        .position(at.x, at.y)
         .build();
     match built {
         Ok(w) => {
