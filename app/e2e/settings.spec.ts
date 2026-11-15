@@ -76,24 +76,27 @@ test("no em dash on the page and no sideways scroll", async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(460);
 });
 
-test("tabs work with the keyboard", async ({ page }) => {
+test("the setting list works with the keyboard", async ({ page }) => {
   await page.goto("/?mock=1&g=builtin#settings");
+  await expect(page.getByRole("tablist")).toHaveAttribute("aria-orientation", "vertical");
   const google = page.getByRole("tab", { name: "Google" });
   await expect(google).toHaveAttribute("aria-selected", "true");
   await google.focus();
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("tab", { name: "Mail" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tabpanel")).toContainText("VIPs");
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Memory" })).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Connectors" })).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Agents" })).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("ArrowRight");
+  for (const name of ["Memory", "Connectors", "Agents", "Activity"]) {
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
+  }
+  await page.keyboard.press("ArrowDown");
   await expect(google).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Home");
+  await expect(google).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("End");
+  await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("mail tab adds a VIP and accepts a mute suggestion", async ({ page }) => {
@@ -155,4 +158,38 @@ test("agents tab toggles call agents_set", async ({ page }) => {
   expect(await calls(page)).toContain("agents_set:true:true:false");
   await page.getByRole("button", { name: "Show rules file" }).click();
   expect(await calls(page)).toContain("agents_reveal_rules");
+});
+
+test.describe("window sizes", () => {
+  test("narrow: all six tabs fit and nothing scrolls sideways", async ({ page }) => {
+    await page.setViewportSize({ width: 380, height: 600 });
+    await page.goto("/?mock=1&g=builtin#settings");
+    const tabs = page.locator(".tabs");
+    expect(await tabs.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    const box = await tabs.boundingBox();
+    for (const t of await page.getByRole("tab").all()) {
+      const b = (await t.boundingBox())!;
+      expect(b.x + b.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(380);
+    await expect(page.getByRole("tab", { name: "Activity" })).toBeInViewport();
+  });
+
+  test("wide: the list is on the left and the page on the right", async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await page.goto("/?mock=1&g=builtin#settings");
+    const list = (await page.getByRole("tablist").boundingBox())!;
+    const panel = (await page.getByRole("tabpanel").boundingBox())!;
+    expect(list.x).toBeLessThan(40);
+    expect(list.x + list.width).toBeLessThanOrEqual(panel.x);
+    expect(list.height).toBeGreaterThan(list.width);
+    const tabs = await page.getByRole("tab").all();
+    const first = (await tabs[0].boundingBox())!;
+    const last = (await tabs[tabs.length - 1].boundingBox())!;
+    expect(last.y).toBeGreaterThan(first.y + 100);
+    expect(Math.abs(last.x - first.x)).toBeLessThan(2);
+    const card = (await page.locator(".set-card").first().boundingBox())!;
+    expect(card.width).toBeLessThanOrEqual(760);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1200);
+  });
 });

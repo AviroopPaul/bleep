@@ -82,6 +82,30 @@ pub fn center_pos(screen: Rect, chat: Size) -> Point {
     Point { x: screen.x + (screen.w - chat.w) / 2.0, y: screen.y + (screen.h - chat.h) / 2.0 }
 }
 
+/// Where a panel window (Settings, Setup) opens: centered on the screen that holds the
+/// droid, or the main screen when there is no droid on any screen. Shrunk to fit.
+pub fn panel_place(droid: Option<Rect>, screens: &[Rect], want: Size) -> (Point, Size) {
+    let on = droid.and_then(|d| screens.iter().copied().find(|s| s.contains(d.x + d.w / 2.0, d.y + d.h / 2.0)));
+    let screen = on.or_else(|| screens.first().copied()).unwrap_or(Rect { x: 0.0, y: 25.0, w: 1440.0, h: 875.0 });
+    let size = Size { w: want.w.min(screen.w - 2.0 * MARGIN), h: want.h.min(screen.h - 2.0 * MARGIN) };
+    (center_pos(screen, size), size)
+}
+
+/// `panel_place` for the running app.
+pub(crate) fn panel_on_droid_screen(app: &AppHandle, want: Size) -> (Point, Size) {
+    let droid = app.get_webview_window("droid").and_then(|w| rect_of(&w));
+    panel_place(droid, &screens(app), want)
+}
+
+/// Moves an open panel to the droid's screen when it sits on another one.
+pub(crate) fn bring_to_droid_screen(app: &AppHandle, w: &WebviewWindow) {
+    let (Some(droid), Some(r)) = (app.get_webview_window("droid").and_then(|d| rect_of(&d)), rect_of(w)) else { return };
+    if screen_of(app, droid) != screen_of(app, r) {
+        let (p, _) = panel_place(Some(droid), &screens(app), Size { w: r.w, h: r.h });
+        let _ = w.set_position(tauri::LogicalPosition::new(p.x, p.y));
+    }
+}
+
 pub fn default_droid_pos(screen: Rect, droid: Size) -> Point {
     Point { x: screen.x + screen.w - droid.w - 24.0, y: screen.y + screen.h - droid.h - 24.0 }
 }
@@ -399,6 +423,30 @@ mod tests {
         assert_eq!((left.x, left.y), (SCREEN.x - 132.0 + PEEK, 400.0));
         let right = tuck_pos(droid(1100.0, 400.0), SCREEN);
         assert_eq!(right.x, SCREEN.x + SCREEN.w - PEEK);
+    }
+
+    #[test]
+    fn panels_open_on_the_droids_screen() {
+        let laptop = Rect { x: 0.0, y: 25.0, w: 1440.0, h: 875.0 };
+        let monitor = Rect { x: 1440.0, y: 0.0, w: 2560.0, h: 1415.0 };
+        let want = Size { w: 860.0, h: 620.0 };
+        let droid = Rect { x: 3500.0, y: 1200.0, w: 132.0, h: 132.0 };
+        let (p, s) = panel_place(Some(droid), &[laptop, monitor], want);
+        assert_eq!((s.w, s.h), (860.0, 620.0));
+        assert_eq!((p.x, p.y), (1440.0 + (2560.0 - 860.0) / 2.0, (1415.0 - 620.0) / 2.0), "centered on the monitor");
+        let (p, _) = panel_place(None, &[laptop, monitor], want);
+        assert!(laptop.contains(p.x + 430.0, p.y + 310.0), "no droid: the main screen");
+        let off = Rect { x: 9000.0, y: 9000.0, w: 132.0, h: 132.0 };
+        let (p, _) = panel_place(Some(off), &[laptop, monitor], want);
+        assert!(laptop.contains(p.x + 430.0, p.y + 310.0), "droid off every screen: the main screen");
+    }
+
+    #[test]
+    fn panels_shrink_to_fit_a_small_screen() {
+        let small = Rect { x: 0.0, y: 25.0, w: 800.0, h: 560.0 };
+        let (p, s) = panel_place(None, &[small], Size { w: 860.0, h: 620.0 });
+        assert_eq!((s.w, s.h), (800.0 - 2.0 * MARGIN, 560.0 - 2.0 * MARGIN));
+        assert_eq!((p.x, p.y), (MARGIN, 25.0 + MARGIN));
     }
 
     #[test]
