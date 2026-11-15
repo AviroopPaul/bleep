@@ -194,8 +194,9 @@ button { font: inherit; color: inherit; }
 .linkbtn:hover { background: rgba(47, 92, 147, 0.08); }
 .fields { display: grid; gap: 6px; }
 .fields label { font: 700 12.5px var(--sans); color: var(--ink-2); margin-top: 4px; }
-.fields input { font: 14px var(--sans); padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--input); color: var(--ink); min-height: 40px; }
-.fields input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47, 92, 147, 0.18); }
+.fields input, .fields select { font: 14px var(--sans); padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--input); color: var(--ink); min-height: 40px; }
+.fields select { appearance: none; padding-right: 32px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: right 16px center, right 11px center; background-size: 5px 5px; background-repeat: no-repeat; cursor: pointer; }
+.fields input:focus, .fields select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47, 92, 147, 0.18); }
 .fields .acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .main-acts { display: flex; gap: 8px; margin: 0 0 4px; }
 .own { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
@@ -229,9 +230,10 @@ button { font: inherit; color: inherit; }
   .tab { min-height: 32px; padding: 0 12px; justify-content: center; }
   .tab small { display: none; }
   .tab-panel { padding: 14px 16px 24px; }
+  .mail-set section { padding: 14px 14px 16px; }
 }
-.mail-set section { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
-.mail-h { margin: 0; font: 600 15px/1.2 var(--display); color: var(--ink); }
+.mail-set section { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px 20px; margin-bottom: 14px; }
+.mail-h { margin: 0 0 12px; font: 600 15px/1.2 var(--display); color: var(--ink); }
 .chips { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; font: 600 12.5px var(--sans); color: var(--ink); background: var(--input); border: 1px solid var(--line); border-radius: 99px; padding: 2px 4px 2px 10px; }
 .chip-x { border: 0; background: transparent; color: var(--ink-2); font-size: 15px; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; }
