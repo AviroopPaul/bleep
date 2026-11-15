@@ -77,6 +77,14 @@ Until Google verifies the app, users see an "unverified app" warning and Google 
 - **Forget:** Settings, Memory tab, lists every fact with Forget.
 - **Compaction:** when the chat passes the limit (250K tokens by default, or 80% of the model's window if that is lower), bleep saves facts, writes a summary, and goes on in a fresh session that holds the summary, the approval cards still waiting and the last 10 turns. A divider shows in the chat; nothing leaves view. Claude Code's own auto-compact is off for bleep's chat. The thin line under the chat header shows how full it is. For testing, `[memory] compact_at = 20000` in `config.toml` compacts early; "Compact now" in the Memory tab does it at once.
 
+## Connectors
+
+- **Add any MCP server:** Settings, Connectors tab. Paste its URL (for example `https://dayblocks.vercel.app/api/mcp`) and press Add. Only `https://` works, and plain `http://` only for servers on this Mac.
+- **Sign-in is found for you:** bleep sends one `initialize`. An open server is added at once. A `401` starts OAuth the way Claude Code does it: the server's resource metadata, then its authorization server's metadata, then bleep registers itself as a client and opens the sign-in page in your browser (PKCE, reply on a local port). A server with no dynamic registration asks for a client ID; one with no OAuth at all asks for a token. Tokens live in the Keychain, never in `config.toml`.
+- **Tools and cards:** a server's tools show up as `<name>_<tool>` from your next message (bleep starts a fresh session with the chat carried over, because Claude Code reads tools only at the start). A tool runs at once only if the server marks it read-only, or you set it to "Run at once". Every other tool shows a card with the exact arguments first. You can also turn a tool Off.
+- **Untrusted by default:** a server's tool descriptions and results reach the model marked as data, never as instructions.
+- **Remove:** revokes the tokens where the server allows it and deletes the server's secrets and cached tools.
+
 ## Build
 
 ```bash

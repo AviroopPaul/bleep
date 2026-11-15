@@ -13,6 +13,21 @@ const create = (extra: Record<string, unknown> = {}) =>
   });
 
 describe("approvalView", () => {
+  it("remote tool card names the tool and server and shows every argument", () => {
+    const payload = { server: "dayblocks", tool: "move_task", arguments: { id: "t1", day: "2026-11-16", tags: ["home"] } };
+    const v = approvalView(card("dayblocks_move_task", payload));
+    expect(v.heading).toBe("Run move_task on dayblocks?");
+    expect(v.rows).toEqual([["id", "t1"], ["day", "2026-11-16"], ["tags", '["home"]']]);
+    expect(v.details).toBe(JSON.stringify(payload.arguments, null, 2));
+    expect(v.warn).toBe("A server you added asks to run this. bleep cannot check what it does.");
+    expect(approvalView(card("dayblocks_move_task", payload, "done")).doneText).toBe("Done");
+  });
+
+  it("remote tool card with no arguments says so", () => {
+    const v = approvalView(card("wiki_ask", { server: "wiki", tool: "ask", arguments: {} }));
+    expect(v.rows).toEqual([["Arguments", "None"]]);
+  });
+
   it("memory card shows the exact fact and where it goes", () => {
     const v = approvalView(card("memory_promote", { fact: "Sync means my 1:1 with Priya", file: "MEMORY.md" }));
     expect(v.heading).toBe("Remember this?");

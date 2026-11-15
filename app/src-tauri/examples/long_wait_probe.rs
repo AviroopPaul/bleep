@@ -17,7 +17,7 @@ impl Connector for Probe {
         "probe"
     }
     fn tools(&self) -> Vec<ToolSpec> {
-        vec![ToolSpec { name: "probe_change", description: "Makes a test change. Needs the user's approval.", schema: json!({"type": "object", "properties": {"note": {"type": "string"}}}), risk: Risk::Write }]
+        vec![ToolSpec { name: "probe_change".into(), description: "Makes a test change. Needs the user's approval.".into(), schema: json!({"type": "object", "properties": {"note": {"type": "string"}}}), risk: Risk::Write }]
     }
     fn status(&self) -> ConnectorStatus {
         ConnectorStatus::Connected { account: "probe".into() }

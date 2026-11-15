@@ -104,6 +104,55 @@ impl MemoryConfig {
     }
 }
 
+/// How a remote MCP tool runs: ask with a card, run at once, or hidden.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ToolMode {
+    Ask,
+    Auto,
+    Off,
+}
+
+/// How a remote MCP server signs in. Secrets are in the Keychain, never here.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum McpAuth {
+    #[default]
+    None,
+    Oauth,
+    Token,
+}
+
+fn yes() -> bool {
+    true
+}
+
+/// One remote MCP server I added (Phase 7).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct McpServer {
+    pub name: String,
+    pub url: String,
+    #[serde(default = "yes")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub auth: McpAuth,
+    /// Per-tool mode by the server's own tool name. A missing tool uses its default.
+    #[serde(default)]
+    pub tools: std::collections::BTreeMap<String, ToolMode>,
+}
+
+impl McpServer {
+    pub fn mode(&self, tool: &str) -> Option<ToolMode> {
+        self.tools.get(tool).copied()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct McpConfig {
+    pub servers: Vec<McpServer>,
+}
+
 /// `~/.bleep/config.toml`. Unknown keys are ignored so later phases can add fields.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -121,6 +170,7 @@ pub struct Config {
     pub checkin: CheckinConfig,
     pub agents: AgentsConfig,
     pub memory: MemoryConfig,
+    pub mcp: McpConfig,
 }
 
 impl Default for Config {
@@ -138,6 +188,7 @@ impl Default for Config {
             checkin: CheckinConfig::default(),
             agents: AgentsConfig::default(),
             memory: MemoryConfig::default(),
+            mcp: McpConfig::default(),
         }
     }
 }
@@ -183,6 +234,24 @@ mod tests {
         assert_eq!(m(250_000, Some(1_000_000)).hard_stop(), 950_000);
         let c: Config = toml::from_str("[memory]\ncompact_at = 20000").unwrap();
         assert_eq!((c.memory.compact_at, c.memory.nightly.as_str()), (20_000, "22:00"));
+    }
+
+    #[test]
+    fn mcp_servers_round_trip_with_defaults() {
+        let c: Config = toml::from_str("").unwrap();
+        assert!(c.mcp.servers.is_empty());
+        let c: Config = toml::from_str("[[mcp.servers]]\nname = \"dayblocks\"\nurl = \"https://dayblocks.vercel.app/api/mcp\"\n").unwrap();
+        let s = &c.mcp.servers[0];
+        assert_eq!((s.name.as_str(), s.enabled, s.auth), ("dayblocks", true, McpAuth::None));
+        assert!(s.tools.is_empty(), "no tools map is fine");
+        let mut c = c.clone();
+        c.mcp.servers[0].auth = McpAuth::Oauth;
+        c.mcp.servers[0].tools.insert("move_task".into(), ToolMode::Auto);
+        c.mcp.servers[0].tools.insert("delete_task".into(), ToolMode::Off);
+        let back: Config = toml::from_str(&toml::to_string_pretty(&c).unwrap()).unwrap();
+        assert_eq!(back.mcp, c.mcp);
+        assert_eq!(back.mcp.servers[0].mode("move_task"), Some(ToolMode::Auto));
+        assert_eq!(back.mcp.servers[0].mode("list_tasks"), None);
     }
 
     #[test]

@@ -32,8 +32,8 @@ pub enum Risk {
 
 #[derive(Clone, Debug)]
 pub struct ToolSpec {
-    pub name: &'static str,
-    pub description: &'static str,
+    pub name: std::borrow::Cow<'static, str>,
+    pub description: std::borrow::Cow<'static, str>,
     pub schema: Value,
     pub risk: Risk,
 }
@@ -42,7 +42,7 @@ pub struct ToolSpec {
 /// `prepare` (the exact payload the card shows) and, after approval, `execute` with that payload.
 #[async_trait]
 pub trait Connector: Send + Sync {
-    fn id(&self) -> &'static str;
+    fn id(&self) -> &str;
     fn tools(&self) -> Vec<ToolSpec>;
     fn status(&self) -> ConnectorStatus;
     async fn call(&self, tool: &str, args: Value) -> Result<Value, String>;

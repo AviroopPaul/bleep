@@ -432,13 +432,13 @@ impl Connector for CalendarConnector {
         let when = json!({"type": "string", "description": "Date and time, like 2026-11-12T18:00 (this Mac's time zone) or with an offset."});
         let id = json!({"type": "string", "description": "event_id from calendar_list or calendar_next."});
         vec![
-            ToolSpec { name: "calendar_list", description: "List events on the user's calendar between two times. Defaults to today.", schema: json!({"type": "object", "properties": {"start": when, "end": when}}), risk: Risk::Read },
-            ToolSpec { name: "calendar_next", description: "The next events on the user's calendar.", schema: json!({"type": "object", "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 10}}}), risk: Risk::Read },
-            ToolSpec { name: "calendar_free", description: "Free time on the user's calendar between two times (at most 14 days apart).", schema: json!({"type": "object", "properties": {"start": when, "end": when, "min_minutes": {"type": "integer", "minimum": 5}}, "required": ["start", "end"]}), risk: Risk::Read },
-            ToolSpec { name: "calendar_create", description: "Add an event or reminder to the user's calendar. The user sees a card and must approve. End defaults to 30 minutes after start. For all-day events set all_day and give dates.", schema: json!({"type": "object", "properties": {"title": {"type": "string"}, "start": when, "end": when, "all_day": {"type": "boolean"}, "location": {"type": "string"}, "description": {"type": "string"}, "attendees": {"type": "array", "items": {"type": "string"}, "description": "Email addresses. They get an invite."}, "reminder_minutes": {"type": "integer", "minimum": 0}}, "required": ["title", "start"]}), risk: Risk::Write },
-            ToolSpec { name: "calendar_update", description: "Change an event's title, time, place or notes. The user approves a card first. A new start without an end keeps the length.", schema: json!({"type": "object", "properties": {"event_id": id, "title": {"type": "string"}, "start": when, "end": when, "location": {"type": "string"}, "description": {"type": "string"}}, "required": ["event_id"]}), risk: Risk::Write },
-            ToolSpec { name: "calendar_delete", description: "Delete an event. The user approves a card first.", schema: json!({"type": "object", "properties": {"event_id": id}, "required": ["event_id"]}), risk: Risk::Write },
-            ToolSpec { name: "calendar_respond", description: "Accept, decline or say maybe to an invite. The user approves a card first.", schema: json!({"type": "object", "properties": {"event_id": id, "response": {"type": "string", "enum": ["accepted", "declined", "tentative"]}}, "required": ["event_id", "response"]}), risk: Risk::Write },
+            ToolSpec { name: "calendar_list".into(), description: "List events on the user's calendar between two times. Defaults to today.".into(), schema: json!({"type": "object", "properties": {"start": when, "end": when}}), risk: Risk::Read },
+            ToolSpec { name: "calendar_next".into(), description: "The next events on the user's calendar.".into(), schema: json!({"type": "object", "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 10}}}), risk: Risk::Read },
+            ToolSpec { name: "calendar_free".into(), description: "Free time on the user's calendar between two times (at most 14 days apart).".into(), schema: json!({"type": "object", "properties": {"start": when, "end": when, "min_minutes": {"type": "integer", "minimum": 5}}, "required": ["start", "end"]}), risk: Risk::Read },
+            ToolSpec { name: "calendar_create".into(), description: "Add an event or reminder to the user's calendar. The user sees a card and must approve. End defaults to 30 minutes after start. For all-day events set all_day and give dates.".into(), schema: json!({"type": "object", "properties": {"title": {"type": "string"}, "start": when, "end": when, "all_day": {"type": "boolean"}, "location": {"type": "string"}, "description": {"type": "string"}, "attendees": {"type": "array", "items": {"type": "string"}, "description": "Email addresses. They get an invite."}, "reminder_minutes": {"type": "integer", "minimum": 0}}, "required": ["title", "start"]}), risk: Risk::Write },
+            ToolSpec { name: "calendar_update".into(), description: "Change an event's title, time, place or notes. The user approves a card first. A new start without an end keeps the length.".into(), schema: json!({"type": "object", "properties": {"event_id": id, "title": {"type": "string"}, "start": when, "end": when, "location": {"type": "string"}, "description": {"type": "string"}}, "required": ["event_id"]}), risk: Risk::Write },
+            ToolSpec { name: "calendar_delete".into(), description: "Delete an event. The user approves a card first.".into(), schema: json!({"type": "object", "properties": {"event_id": id}, "required": ["event_id"]}), risk: Risk::Write },
+            ToolSpec { name: "calendar_respond".into(), description: "Accept, decline or say maybe to an invite. The user approves a card first.".into(), schema: json!({"type": "object", "properties": {"event_id": id, "response": {"type": "string", "enum": ["accepted", "declined", "tentative"]}}, "required": ["event_id", "response"]}), risk: Risk::Write },
         ]
     }
 
@@ -739,7 +739,8 @@ mod tests {
     fn tools_have_the_planned_names_and_risks() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let r = rt.block_on(rig(false));
-        let got: Vec<(&str, Risk)> = r.cal.tools().iter().map(|t| (t.name, t.risk)).collect();
+        let tools = r.cal.tools();
+        let got: Vec<(&str, Risk)> = tools.iter().map(|t| (t.name.as_ref(), t.risk)).collect();
         assert_eq!(
             got,
             vec![

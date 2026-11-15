@@ -3,6 +3,7 @@ import { MailSettings } from "./MailSettings";
 import { Activity } from "./Activity";
 import { AgentSettingsTab } from "./AgentSettings";
 import { MemorySettingsTab } from "./MemorySettings";
+import { ConnectorsSettingsTab } from "./ConnectorsSettings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onGoogleStatus, type GoogleState, type LinkName } from "../ipc";
 
@@ -146,7 +147,7 @@ export function GoogleSettings() {
   );
 }
 
-const TABS = ["Google", "Mail", "Memory", "Agents", "Activity"] as const;
+const TABS = ["Google", "Mail", "Memory", "Connectors", "Agents", "Activity"] as const;
 type Tab = (typeof TABS)[number];
 
 export function Settings() {
@@ -185,6 +186,7 @@ export function Settings() {
         {tab === "Google" && <GoogleSettings />}
         {tab === "Mail" && <MailSettings />}
         {tab === "Memory" && <MemorySettingsTab />}
+        {tab === "Connectors" && <ConnectorsSettingsTab />}
         {tab === "Agents" && <AgentSettingsTab />}
         {tab === "Activity" && <Activity />}
       </div>

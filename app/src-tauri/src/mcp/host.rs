@@ -70,7 +70,8 @@ impl TurnTracker {
 }
 
 pub struct ToolHost {
-    connectors: Vec<Arc<dyn Connector>>,
+    /// Built-in connectors and remote servers. Remote ones come and go at run time.
+    connectors: std::sync::RwLock<Vec<Arc<dyn Connector>>>,
     gate: Arc<dyn Gate>,
     turns: TurnTracker,
     log: Option<Arc<crate::store::Store>>,
@@ -78,21 +79,64 @@ pub struct ToolHost {
 
 impl ToolHost {
     pub fn new(connectors: Vec<Arc<dyn Connector>>, gate: Arc<dyn Gate>, turns: TurnTracker) -> Arc<ToolHost> {
-        Arc::new(ToolHost { connectors, gate, turns, log: None })
+        Arc::new(ToolHost { connectors: connectors.into(), gate, turns, log: None })
     }
 
     /// Like `new`, and writes every call to the Activity log.
     pub fn new_logged(connectors: Vec<Arc<dyn Connector>>, gate: Arc<dyn Gate>, turns: TurnTracker, store: Arc<crate::store::Store>) -> Arc<ToolHost> {
-        Arc::new(ToolHost { connectors, gate, turns, log: Some(store) })
+        Arc::new(ToolHost { connectors: connectors.into(), gate, turns, log: Some(store) })
+    }
+
+    fn snapshot(&self) -> Vec<Arc<dyn Connector>> {
+        self.connectors.read().unwrap().clone()
     }
 
     /// Every tool the model may see. `Never` tools are not listed.
     pub fn specs(&self) -> Vec<ToolSpec> {
-        self.connectors.iter().flat_map(|c| c.tools()).filter(|t| t.risk != Risk::Never).collect()
+        self.snapshot().iter().flat_map(|c| c.tools()).filter(|t| t.risk != Risk::Never).collect()
     }
 
     fn find(&self, name: &str) -> Option<(Arc<dyn Connector>, ToolSpec)> {
-        self.connectors.iter().find_map(|c| c.tools().into_iter().find(|t| t.name == name).map(|t| (c.clone(), t)))
+        self.snapshot().into_iter().find_map(|c| c.tools().into_iter().find(|t| t.name == name).map(|t| (c.clone(), t)))
+    }
+
+    /// Adds a connector at the end, after the built-in ones.
+    pub fn add(&self, c: Arc<dyn Connector>) {
+        self.connectors.write().unwrap().push(c);
+    }
+
+    /// Swaps the connector with the same id, or adds it.
+    pub fn replace(&self, c: Arc<dyn Connector>) {
+        let mut list = self.connectors.write().unwrap();
+        match list.iter().position(|x| x.id() == c.id()) {
+            Some(i) => list[i] = c,
+            None => list.push(c),
+        }
+    }
+
+    /// Removes a connector by id. A call already running keeps its own handle and ends.
+    pub fn remove(&self, id: &str) -> bool {
+        let mut list = self.connectors.write().unwrap();
+        let n = list.len();
+        list.retain(|c| c.id() != id);
+        list.len() != n
+    }
+
+    /// Changes when a tool the model sees is added, removed, renamed, or gets a new
+    /// description or schema. Not when only its risk changes: the model does not see that.
+    pub fn tools_hash(&self) -> String {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        for t in self.specs() {
+            t.name.hash(&mut h);
+            t.description.hash(&mut h);
+            t.schema.to_string().hash(&mut h);
+        }
+        format!("{:016x}", h.finish())
+    }
+
+    pub fn connector(&self, id: &str) -> Option<Arc<dyn Connector>> {
+        self.snapshot().into_iter().find(|c| c.id() == id)
     }
 
     pub async fn call(&self, name: &str, args: Value) -> Result<Value, String> {
@@ -168,9 +212,9 @@ pub mod tests {
         fn tools(&self) -> Vec<ToolSpec> {
             let s = json!({"type": "object"});
             vec![
-                ToolSpec { name: "fake_read", description: "r", schema: s.clone(), risk: Risk::Read },
-                ToolSpec { name: "fake_write", description: "w", schema: s.clone(), risk: Risk::Write },
-                ToolSpec { name: "fake_forward", description: "n", schema: s, risk: Risk::Never },
+                ToolSpec { name: "fake_read".into(), description: "r".into(), schema: s.clone(), risk: Risk::Read },
+                ToolSpec { name: "fake_write".into(), description: "w".into(), schema: s.clone(), risk: Risk::Write },
+                ToolSpec { name: "fake_forward".into(), description: "n".into(), schema: s, risk: Risk::Never },
             ]
         }
         fn status(&self) -> ConnectorStatus {
@@ -301,11 +345,82 @@ pub mod tests {
         assert!(tools[1].detail.as_deref().unwrap().contains("read"));
     }
 
+    /// A connector with a name chosen at run time, like a remote server.
+    struct Named {
+        id: String,
+        tools: Vec<String>,
+        delay_ms: u64,
+    }
+
+    #[async_trait]
+    impl Connector for Named {
+        fn id(&self) -> &str {
+            &self.id
+        }
+        fn tools(&self) -> Vec<ToolSpec> {
+            self.tools.iter().map(|t| ToolSpec { name: t.clone().into(), description: format!("[{}] tool", self.id).into(), schema: json!({"type": "object"}), risk: Risk::Read }).collect()
+        }
+        fn status(&self) -> ConnectorStatus {
+            ConnectorStatus::NeedsSetup
+        }
+        async fn call(&self, tool: &str, _args: Value) -> Result<Value, String> {
+            tokio::time::sleep(std::time::Duration::from_millis(self.delay_ms)).await;
+            Ok(json!({"tool": tool}))
+        }
+    }
+
+    fn named(id: &str, tools: &[&str], delay_ms: u64) -> Arc<Named> {
+        Arc::new(Named { id: id.into(), tools: tools.iter().map(|t| t.to_string()).collect(), delay_ms })
+    }
+
+    fn names(h: &ToolHost) -> Vec<String> {
+        h.specs().iter().map(|t| t.name.to_string()).collect()
+    }
+
+    #[tokio::test]
+    async fn add_remove_replace_change_the_tool_set() {
+        let (h, _) = host(FakeConnector::new(), FakeGate::new(Decision::Approved));
+        let before = names(&h);
+        h.add(named("wiki", &["wiki_ask"], 0));
+        assert_eq!(names(&h).last().map(String::as_str), Some("wiki_ask"));
+        assert_eq!(h.call("wiki_ask", json!({})).await.unwrap(), json!({"tool": "wiki_ask"}));
+        h.replace(named("wiki", &["wiki_read", "wiki_search"], 0));
+        assert!(!names(&h).contains(&"wiki_ask".to_string()));
+        assert!(names(&h).ends_with(&["wiki_read".to_string(), "wiki_search".to_string()]));
+        assert!(h.remove("wiki"));
+        assert_eq!(names(&h), before, "built-in tools are unchanged");
+        assert_eq!(h.call("wiki_read", json!({})).await.unwrap_err(), "Unknown tool: wiki_read");
+        assert!(!h.remove("wiki"), "already gone");
+        assert!(h.connector("fake").is_some() && h.connector("wiki").is_none());
+    }
+
+    #[tokio::test]
+    async fn tools_hash_follows_what_the_model_sees() {
+        let (h, _) = host(FakeConnector::new(), FakeGate::new(Decision::Approved));
+        let a = h.tools_hash();
+        assert_eq!(a, h.tools_hash(), "stable");
+        h.add(named("wiki", &["wiki_ask"], 0));
+        let b = h.tools_hash();
+        assert_ne!(a, b);
+        h.remove("wiki");
+        assert_eq!(h.tools_hash(), a);
+    }
+
+    #[tokio::test]
+    async fn a_call_started_before_remove_still_ends() {
+        let (h, _) = host(FakeConnector::new(), FakeGate::new(Decision::Approved));
+        h.add(named("wiki", &["wiki_ask"], 80));
+        let h2 = h.clone();
+        let call = tokio::spawn(async move { h2.call("wiki_ask", json!({})).await });
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        h.remove("wiki");
+        assert_eq!(call.await.unwrap().unwrap(), json!({"tool": "wiki_ask"}));
+    }
+
     #[test]
     fn never_tools_are_not_listed() {
         let (h, _) = host(FakeConnector::new(), FakeGate::new(Decision::Approved));
-        let names: Vec<&str> = h.specs().iter().map(|t| t.name).collect();
-        assert_eq!(names, vec!["fake_read", "fake_write", "bleep_now"]);
+        assert_eq!(names(&h), vec!["fake_read", "fake_write", "bleep_now"]);
     }
 
     #[test]

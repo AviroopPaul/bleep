@@ -179,6 +179,7 @@ pub trait AgentRuntime: Send + Sync {
 - **Keep it warm:** one child process stays alive for the main chat. Each new message is one JSON line on stdin. If the child dies, restart it with `--resume`.
 - **One-shots:** a separate `claude -p --output-format json --json-schema ... --model haiku --tools "" --no-session-persistence`. About 2.6 s per call (measured in the Valet doc).
 - **Tested on 12 Nov 2026:** `--strict-mcp-config` with `--setting-sources ""` runs fine headless and loads no other servers.
+- **Learned in Phase 7:** rmcp 3.9 has the whole MCP client OAuth flow (`AuthorizationManager`, `AuthorizationSession`, `AuthClient`), on reqwest 0.13, so bleep carries reqwest 0.12 and 0.13 side by side. rmcp refreshes a token 30 s before it expires, and it erases error types on the way out, so "auth required" is known by its text. It has no token revocation; bleep calls the `revocation_endpoint` itself. Real servers vary: Linear answers `401` with `resource_metadata` and offers registration, S256 and revocation; DeepWiki needs no auth, answers as SSE, keeps no session, and sends no tool annotations, so every DeepWiki tool asks first until I set it to run at once.
 - **Learned in Phase 5:** Claude Code 2.1.325 fixes the system prompt when a session is created: `--resume` keeps the first `--append-system-prompt-file` and ignores a new one. The `result` line's `usage` adds up every model call in a turn, so the context size is the last `assistant` message's usage; `result.modelUsage.<model>.contextWindow` gives the window (1M for Sonnet on my plan, so the 250K default holds). `DISABLE_AUTO_COMPACT=1` turns off both auto-compact and idle compaction. One-shot prompts travel as a command-line argument, so the compaction transcript is capped at 150 KB.
 - **Learned in Phase 4:** Claude Code 2.1.319 sends `PermissionRequest` only when it would prompt me, also in headless runs; `{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}` skips the prompt and no output leaves it. `Stop` input carries `last_assistant_message`. The Codex daemon's control socket (`~/.codex/app-server-control/app-server-control.sock`) speaks JSON-RPC inside WebSocket frames, not newline JSON, and `codex app-server proxy` does not start the daemon. A client that subscribes (`thread/resume`) after an approval request gets it replayed, the first answer wins, the other client gets `serverRequest/resolved`, and `thread/unsubscribe` does not unload a thread another client holds. Codex wraps commands as `/bin/zsh -lc '<cmd>'`. An image one-shot needs `--input-format stream-json --output-format stream-json --verbose`.
 - **Learned in Phase 3:** Gmail `history.list` answers 404 when the stored `historyId` is too old; bleep then reseeds from the last 2 days and those mails never ping. Rules sort most mail for free (categories, bill words plus an amount, VIPs, mailing lists); only unclear mail reaches the small model, 10 per call, at most 20 calls an hour.
@@ -421,7 +422,7 @@ Done when: I leave four sessions running and walk away. When I come back, `npm t
 
 ### Phase 5. Memory and compaction
 
-Status (15 Nov 2026): built on branch `phase-5-memory-and-compaction` (plan: `docs/superpowers/plans/2026-11-15-phase-5-memory-and-compaction.md`). The carry-over after compaction goes in the new session's system prompt, not a first message. Memory changes reach a running session as a `[memory changed]` block on the next message.
+Status (15 Nov 2026): merged (#15). Built on branch `phase-5-memory-and-compaction` (plan: `docs/superpowers/plans/2026-11-15-phase-5-memory-and-compaction.md`). The carry-over after compaction goes in the new session's system prompt, not a first message. Memory changes reach a running session as a `[memory changed]` block on the next message.
 
 Deliverables:
 - `~/.bleep/memory/` files, loaded into the system prompt.
@@ -434,6 +435,8 @@ Done when: I can tell it "Sync means my 1:1 with Priya" and it uses that a week 
 
 ### Phase 6. Codex runtime
 
+Status (15 Nov 2026): skipped for now. Phase 7 came first.
+
 Deliverables:
 - Codex backend for `AgentRuntime` (section 8.1): app-server for chat, `codex exec --json` for one-shots, bleep's MCP server passed in by config override.
 - Built-in Codex tools off or locked down.
@@ -442,15 +445,17 @@ Deliverables:
 
 Done when: I switch to Codex in settings, the chat carries on with context, the 13:00 check-in runs on Codex, and an email send still shows the same approval card.
 
-### Phase 7. More connectors
+### Phase 7. Remote MCP servers
+
+Status (15 Nov 2026): built on branch `phase-7-remote-mcp` (plan: `docs/superpowers/plans/2026-11-15-phase-7-remote-mcp.md`). Changed on 15 Nov 2026: instead of a Dayblocks connector inside bleep, bleep can add any MCP server by URL. The Dayblocks MCP server (with its own auth) is built in the Dayblocks repo, and bleep reaches it through this feature.
 
 Deliverables:
-- Dayblocks connector: `dayblocks_tasks` (read), `dayblocks_add`, `dayblocks_update`, `dayblocks_move` (write). Uses the REST API at `dayblocks.vercel.app`.
-- Before connecting: add a token check to the Dayblocks API. Today it has no auth, so anyone with the URL can read and edit my tasks. This change is in the Dayblocks repo.
-- To-do check-ins: the 13:00 and 18:00 check-ins include open tasks and offer to move them to tomorrow.
-- Connector settings page that lists every connector with its status.
+- Settings, Connectors tab: add a server by URL, see every connector's status, sign in again, refresh tools, set each tool to Ask first, Run at once or Off, remove.
+- Auth discovery like Claude Code: no auth, a pasted token, or OAuth (RFC 9728 resource metadata, RFC 8414 server metadata, RFC 7591 registration or a typed client ID, PKCE in the browser, refresh, revoke on remove). Secrets in the Keychain.
+- Remote tools go through bleep's own MCP server and the approval gate. Only `readOnlyHint` tools (or ones I set) run without a card. Descriptions and results are marked untrusted.
+- A changed tool set starts a fresh session with the chat carried over in code.
 
-Done when: the 18:00 check-in lists my open Dayblocks tasks and moves them to tomorrow after I approve.
+Done when: I add the Dayblocks MCP URL in Settings, sign in through whatever auth it offers, and the chat reads my tasks and moves one after I approve the card. The to-do check-ins (13:00 and 18:00 with open tasks) wait for a later phase.
 
 ### Phase 8. 3D droid
 

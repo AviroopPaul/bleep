@@ -15,6 +15,8 @@ pub mod memory_cmds;
 pub mod opener;
 pub mod paths;
 pub mod proactive;
+pub mod remote;
+pub mod remote_cmds;
 pub mod runtime;
 pub mod settings;
 pub mod setup;
@@ -38,6 +40,7 @@ pub struct AppState {
     pub chat: Arc<ChatService>,
     pub approvals: Arc<approvals::Approvals>,
     pub memory: Arc<memory::Memory>,
+    pub remotes: Arc<remote::manager::Remotes>,
     pub _mcp: mcp::McpServer,
 }
 
@@ -130,7 +133,11 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let memory_tools = Arc::new(connectors::memory::MemoryConnector::new(memory.clone(), Arc::new(chrono::Local::now)));
     let turns = mcp::host::TurnTracker::default();
     let tool_host = mcp::host::ToolHost::new_logged(vec![Arc::new(connectors::bleep::BleepConnector), calendar.clone(), gmail, memory_tools], approvals.clone(), turns.clone(), store.clone());
-    let mcp = tauri::async_runtime::block_on(mcp::McpServer::start(mcp::new_token(), tool_host))?;
+    let mcp = tauri::async_runtime::block_on(mcp::McpServer::start(mcp::new_token(), tool_host.clone()))?;
+    // Remote MCP servers I added (Phase 7): their cached tools join the host at once.
+    let own_port = reqwest::Url::parse(&mcp.url()).ok().and_then(|u| u.port());
+    let remotes = remote::manager::Remotes::new(tool_host.clone(), store.clone(), Arc::new(google::secrets::KeychainSecrets), Arc::new(opener::SystemOpener(handle.clone())), own_port);
+    remotes.load(&config.mcp.servers);
     let bin = find_claude().unwrap_or_else(|| "claude".into());
     let runtime = Arc::new(ClaudeRuntime::new(paths.clone(), config.tiers.clone(), bin).with_hold(approvals.waiting()));
     let h = handle.clone();
@@ -162,7 +169,16 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
             let _ = h.emit("chat://compacting", on);
         })
     })
+    .with_tools_hash({
+        let h = tool_host.clone();
+        Arc::new(move || h.tools_hash())
+    })
     .into_arc();
+    let (r, h) = (remotes.clone(), handle.clone());
+    tauri::async_runtime::spawn(async move {
+        r.connect_all().await;
+        let _ = h.emit("connectors://changed", ());
+    });
     let c = chat.clone();
     tauri::async_runtime::spawn(async move {
         if c.runtime().health().await.ok() {
@@ -171,7 +187,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
             }
         }
     });
-    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, memory, _mcp: mcp };
+    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, memory, remotes, _mcp: mcp };
     Ok(Parts { state, google, calendar, watcher, triager })
 }
 
@@ -336,7 +352,14 @@ pub fn run() {
             memory_cmds::memory_set,
             memory_cmds::memory_compact_now,
             memory_cmds::memory_reveal,
-            memory_cmds::chat_context
+            memory_cmds::chat_context,
+            remote_cmds::connectors_list,
+            remote_cmds::remote_add,
+            remote_cmds::remote_sign_in,
+            remote_cmds::remote_cancel_sign_in,
+            remote_cmds::remote_set_tool,
+            remote_cmds::remote_remove,
+            remote_cmds::remote_refresh
         ])
         .run(tauri::generate_context!())
         .expect("error while running bleep");

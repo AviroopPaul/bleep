@@ -257,10 +257,10 @@ impl Connector for GmailConnector {
             "reply_to_thread_id": {"type": "string", "description": "thread_id from gmail_search, to reply in that thread."}
         }, "required": ["to", "body"]});
         vec![
-            ToolSpec { name: "gmail_search", description: "Search the user's Gmail with Gmail search syntax (for example is:unread newer_than:2d, from:priya). Returns threads with sender, subject and snippet.", schema: json!({"type": "object", "properties": {"query": {"type": "string"}, "max": {"type": "integer", "minimum": 1, "maximum": 20}}, "required": ["query"]}), risk: Risk::Read },
-            ToolSpec { name: "gmail_read_thread", description: "Read the messages of one Gmail thread (last 10).", schema: json!({"type": "object", "properties": {"thread_id": {"type": "string"}}, "required": ["thread_id"]}), risk: Risk::Read },
-            ToolSpec { name: "gmail_draft", description: "Save an email as a Gmail draft. Nothing is sent. Use this by default when the user wants a reply written.", schema: compose.clone(), risk: Risk::Safe },
-            ToolSpec { name: "gmail_send", description: "Send an email or a reply. The user sees a card with the exact email and must approve. Only when the user asks to send.", schema: compose, risk: Risk::Write },
+            ToolSpec { name: "gmail_search".into(), description: "Search the user's Gmail with Gmail search syntax (for example is:unread newer_than:2d, from:priya). Returns threads with sender, subject and snippet.".into(), schema: json!({"type": "object", "properties": {"query": {"type": "string"}, "max": {"type": "integer", "minimum": 1, "maximum": 20}}, "required": ["query"]}), risk: Risk::Read },
+            ToolSpec { name: "gmail_read_thread".into(), description: "Read the messages of one Gmail thread (last 10).".into(), schema: json!({"type": "object", "properties": {"thread_id": {"type": "string"}}, "required": ["thread_id"]}), risk: Risk::Read },
+            ToolSpec { name: "gmail_draft".into(), description: "Save an email as a Gmail draft. Nothing is sent. Use this by default when the user wants a reply written.".into(), schema: compose.clone(), risk: Risk::Safe },
+            ToolSpec { name: "gmail_send".into(), description: "Send an email or a reply. The user sees a card with the exact email and must approve. Only when the user asks to send.".into(), schema: compose, risk: Risk::Write },
         ]
     }
 
@@ -457,7 +457,8 @@ mod tests {
     fn tools_have_the_planned_names_and_risks() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let r = rt.block_on(rig(false));
-        let got: Vec<(&str, Risk)> = r.gm.tools().iter().map(|t| (t.name, t.risk)).collect();
+        let tools = r.gm.tools();
+        let got: Vec<(&str, Risk)> = tools.iter().map(|t| (t.name.as_ref(), t.risk)).collect();
         assert_eq!(got, vec![("gmail_search", Risk::Read), ("gmail_read_thread", Risk::Read), ("gmail_draft", Risk::Safe), ("gmail_send", Risk::Write)]);
     }
 }

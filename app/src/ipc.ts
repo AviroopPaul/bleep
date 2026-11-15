@@ -29,6 +29,50 @@ export type ConnectorStatus =
   | { state: "needs_sign_in" }
   | { state: "error"; message: string };
 
+export type ToolMode = "ask" | "auto" | "off";
+export type McpAuth = "none" | "oauth" | "token";
+
+export interface RemoteTool {
+  name: string;
+  description: string;
+  mode: ToolMode;
+  default_mode: ToolMode;
+  skipped: string | null;
+}
+
+export interface RemoteServer {
+  name: string;
+  url: string;
+  auth: McpAuth;
+  enabled: boolean;
+  status: ConnectorStatus;
+  tools: RemoteTool[];
+}
+
+export interface BuiltinConnector {
+  id: string;
+  label: string;
+  status: ConnectorStatus;
+}
+
+export interface ConnectorsView {
+  builtin: BuiltinConnector[];
+  servers: RemoteServer[];
+}
+
+export interface AddServer {
+  url: string;
+  name?: string | null;
+  token?: string | null;
+  client_id?: string | null;
+  client_secret?: string | null;
+}
+
+export type AddOutcome =
+  | ({ kind: "added" } & { name: string; url: string; auth: McpAuth })
+  | { kind: "needs_client_id" }
+  | { kind: "needs_token"; message: string };
+
 export interface GoogleState {
   client_id: string;
   has_secret: boolean;
@@ -223,6 +267,13 @@ export const api = {
   agentsSet: (autoApprove: boolean, screenshotCheck: boolean, codexWatch: boolean) =>
     invoke<AgentSettings>("agents_set", { autoApprove, screenshotCheck, codexWatch }),
   agentsRevealRules: () => invoke<void>("agents_reveal_rules"),
+  connectorsList: () => invoke<ConnectorsView>("connectors_list"),
+  remoteAdd: (req: AddServer) => invoke<AddOutcome>("remote_add", { req }),
+  remoteSignIn: (name: string, token?: string | null) => invoke<void>("remote_sign_in", { name, token: token ?? null }),
+  remoteCancelSignIn: () => invoke<boolean>("remote_cancel_sign_in"),
+  remoteSetTool: (name: string, tool: string, mode: ToolMode | null) => invoke<void>("remote_set_tool", { name, tool, mode }),
+  remoteRemove: (name: string) => invoke<void>("remote_remove", { name }),
+  remoteRefresh: (name: string) => invoke<void>("remote_refresh", { name }),
   memoryList: () => invoke<MemoryView>("memory_list"),
   memoryForget: (file: string, fact: string) => invoke<MemoryView>("memory_forget", { file, fact }),
   memorySuggestions: () => invoke<Proposal[]>("memory_suggestions"),
@@ -235,6 +286,8 @@ export const api = {
 };
 
 export const onCompacting = (cb: (on: boolean) => void): Promise<UnlistenFn> => listen<boolean>("chat://compacting", (e) => cb(e.payload));
+
+export const onConnectors = (cb: () => void): Promise<UnlistenFn> => listen("connectors://changed", () => cb());
 
 export const onAgents = (cb: () => void): Promise<UnlistenFn> => listen("agents://changed", () => cb());
 

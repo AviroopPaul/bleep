@@ -5,6 +5,8 @@ export interface CardView {
   rows: [string, string][];
   warn: string | null;
   doneText: string | null;
+  /** Full arguments as JSON, under "Details". Remote MCP tools only. */
+  details?: string | null;
 }
 
 type P = Record<string, any>;
@@ -62,8 +64,25 @@ function doneText(a: Approval): string | null {
   }
 }
 
+const isObj = (v: unknown): v is P => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** A tool from a server I added: `{server, tool, arguments}` from RemoteConnector.prepare. */
+function remoteView(a: Approval, p: P): CardView | null {
+  if (typeof p.server !== "string" || typeof p.tool !== "string" || !isObj(p.arguments) || !a.tool.startsWith(`${p.server}_`)) return null;
+  const rows: [string, string][] = Object.entries(p.arguments).map(([k, v]) => [k, cut(typeof v === "string" ? v : JSON.stringify(v))]);
+  return {
+    heading: `Run ${p.tool} on ${p.server}?`,
+    rows: rows.length ? rows : [["Arguments", "None"]],
+    warn: "A server you added asks to run this. bleep cannot check what it does.",
+    doneText: doneText(a),
+    details: JSON.stringify(p.arguments, null, 2),
+  };
+}
+
 export function approvalView(a: Approval, timeZone?: string): CardView {
   const p = (a.payload ?? {}) as P;
+  const remote = remoteView(a, p);
+  if (remote) return remote;
   const rows: [string, string][] = [];
   let heading: string;
   let warn: string | null = null;
