@@ -4,6 +4,7 @@ import { Activity } from "./Activity";
 import { AgentSettingsTab } from "./AgentSettings";
 import { MemorySettingsTab } from "./MemorySettings";
 import { ConnectorsSettingsTab } from "./ConnectorsSettings";
+import { ModelSettingsTab } from "./ModelSettings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onGoogleStatus, type GoogleState, type LinkName } from "../ipc";
 
@@ -147,9 +148,10 @@ export function GoogleSettings() {
   );
 }
 
-const TABS = ["Google", "Mail", "Memory", "Connectors", "Agents", "Activity"] as const;
+const TABS = ["Model", "Google", "Mail", "Memory", "Connectors", "Agents", "Activity"] as const;
 type Tab = (typeof TABS)[number];
 const BLURB: Record<Tab, string> = {
+  Model: "Provider and models",
   Google: "Account and calendar",
   Mail: "VIPs, mutes and lists",
   Memory: "Facts and compaction",
@@ -159,7 +161,7 @@ const BLURB: Record<Tab, string> = {
 };
 
 export function Settings() {
-  const [tab, setTab] = useState<Tab>("Google");
+  const [tab, setTab] = useState<Tab>("Model");
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const go = (i: number) => {
     const next = (i + TABS.length) % TABS.length;
@@ -199,6 +201,7 @@ export function Settings() {
       </div>
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-panel">
         <div className="set-page">
+          {tab === "Model" && <ModelSettingsTab />}
           {tab === "Google" && <GoogleSettings />}
           {tab === "Mail" && <MailSettings />}
           {tab === "Memory" && <MemorySettingsTab />}

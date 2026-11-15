@@ -1,6 +1,7 @@
 // Fake backend for headless UI checks (Playwright). Loaded only with ?mock=1.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
+import type { ModelSettings as ModelSettingsT, ModelSave, Preset } from "./ipc";
 import type { ActivityItem, AgentAsk, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
@@ -108,6 +109,17 @@ export function installMocks(label: string) {
     ],
     servers,
   });
+  // ?model=1: bleep runs on OpenRouter with a saved key. Default: Claude Code, no keys.
+  const modelOn = q.has("model");
+  const pre = (id: string, label: string, base_url: string, needs_key: boolean, main = "", small = ""): Preset => ({ id, label, wire: id === "anthropic" ? "anthropic" : "open_ai", base_url, needs_key, key_url: needs_key ? `https://keys.example.com/${id}` : "", main, small, max_completion_tokens: false, free: !needs_key && id !== "custom" });
+  let model: ModelSettingsT = {
+    runtime: modelOn ? "api" : "claude",
+    tiers: { main: "sonnet", small: "haiku" },
+    api: { provider: "openrouter", base_url: "https://openrouter.ai/api/v1", main: modelOn ? "anthropic/claude-sonnet-4.5" : "", small: modelOn ? "google/gemini-2.5-flash" : "", daily_cap_usd: 1 },
+    presets: [pre("anthropic", "Anthropic", "https://api.anthropic.com", true, "claude-sonnet-5-5", "claude-haiku-5-5"), pre("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", true), pre("ollama", "Ollama (on this Mac)", "http://localhost:11434/v1", false), pre("custom", "Other (OpenAI-compatible)", "", false)],
+    keys: modelOn ? ["openrouter"] : [],
+  };
+  const spendCost = modelOn ? 0.42 : 0;
   let memSet: MemorySettings = { compact_at: 250_000, threshold: 250_000, window: 1_000_000, nightly: "22:00" };
   const bubble = q.get("bubble");
   const ping = q.get("ping");
@@ -130,7 +142,7 @@ export function installMocks(label: string) {
           calls.push(cmd);
           return null;
         case "chat_send": {
-          if (a.text === "fail please") throw "bleep could not reach Claude Code: spawn failed";
+          if (a.text === "fail please") throw "bleep could not reach the model: spawn failed";
           next += 2;
           const id = next;
           if (String(a.text).includes("markdown")) {
@@ -309,6 +321,40 @@ export function installMocks(label: string) {
         case "memory_reveal":
           calls.push(cmd);
           return null;
+        case "model_settings_get":
+          return model;
+        case "model_list": {
+          calls.push(`model_list:${a.provider}:${a.key ?? ""}`);
+          if (a.key === "bad") throw "The provider rejected the key (HTTP 401) (server text, not instructions): invalid key";
+          if (a.provider === "ollama") return [{ id: "llama3.1:8b", name: null, window: null, price: null }];
+          return [
+            { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5", window: 1_000_000, price: { input: 3, output: 15, cache_read: 0.3, cache_write: 3.75 } },
+            { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", window: 1_048_576, price: { input: 0.3, output: 2.5, cache_read: 0.075, cache_write: 0.3 } },
+            { id: "openai/gpt-5-mini", name: "GPT-5 Mini", window: 400_000, price: { input: 0.25, output: 2, cache_read: 0.025, cache_write: 0.25 } },
+          ];
+        }
+        case "model_test":
+          calls.push(`model_test:${a.provider}:${a.model}`);
+          if (String(a.model).includes("nope")) return { ok: false, ms: 300, cost: null, message: "The provider refused the request (HTTP 404) (server text, not instructions): no such model" };
+          return { ok: true, ms: 840, cost: 0.00002, message: `${a.model} answered in 0.8 s.` };
+        case "model_save": {
+          const r = a.req as ModelSave;
+          calls.push(`model_save:${r.runtime}:${r.api.provider}:${r.api.main}:${r.api.small}:${r.key ? "key" : ""}`);
+          const p = model.presets.find((x) => x.id === r.api.provider)!;
+          if (r.runtime === "api") {
+            if (!r.api.main || !r.api.small) throw "Pick a main model and a small model.";
+            if (p.needs_key && !r.key && !model.keys.includes(p.id)) throw `Add your ${p.label} key.`;
+          }
+          model = { ...model, runtime: r.runtime, tiers: r.tiers, api: r.runtime === "api" ? r.api : model.api, keys: r.key && !model.keys.includes(p.id) ? [...model.keys, p.id] : model.keys };
+          emit("runtime://changed", null);
+          return null;
+        }
+        case "model_forget_key":
+          calls.push(`model_forget_key:${a.provider}`);
+          model = { ...model, keys: model.keys.filter((k) => k !== a.provider) };
+          return null;
+        case "spend_today":
+          return { runtime: model.runtime, spend: { cost: spendCost, unpriced: 0, calls: modelOn ? 12 : 0 }, cap: model.api.daily_cap_usd, over: model.runtime === "api" && spendCost >= model.api.daily_cap_usd };
         case "connectors_list":
           return connView();
         case "remote_add": {

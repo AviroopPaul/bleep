@@ -153,6 +153,24 @@ pub struct McpConfig {
     pub servers: Vec<McpServer>,
 }
 
+/// The API runtime (Phase 9). The key is in the Keychain at `api:<provider>:key`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ApiConfig {
+    pub provider: String,
+    pub base_url: String,
+    pub main: String,
+    pub small: String,
+    /// US dollars a day. When reached, proactive work stops until tomorrow.
+    pub daily_cap_usd: f64,
+}
+
+impl Default for ApiConfig {
+    fn default() -> Self {
+        Self { provider: "openrouter".into(), base_url: "https://openrouter.ai/api/v1".into(), main: String::new(), small: String::new(), daily_cap_usd: 1.0 }
+    }
+}
+
 /// `~/.bleep/config.toml`. Unknown keys are ignored so later phases can add fields.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -171,6 +189,7 @@ pub struct Config {
     pub agents: AgentsConfig,
     pub memory: MemoryConfig,
     pub mcp: McpConfig,
+    pub api: ApiConfig,
 }
 
 impl Default for Config {
@@ -189,6 +208,7 @@ impl Default for Config {
             agents: AgentsConfig::default(),
             memory: MemoryConfig::default(),
             mcp: McpConfig::default(),
+            api: ApiConfig::default(),
         }
     }
 }

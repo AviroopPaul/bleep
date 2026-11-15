@@ -6,7 +6,7 @@ use crate::store::{Kind, MsgStatus, NewMessage, Role, Session, Store};
 use futures::StreamExt;
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
@@ -98,6 +98,8 @@ pub struct ChatService {
     mcp: McpEndpoint,
     emit: Emit,
     session: Mutex<Option<(Session, SessionHandle)>>,
+    /// `runtime.instance()` when the cached session was started.
+    session_instance: AtomicU64,
     busy: Arc<AtomicBool>,
     turn: Mutex<Option<JoinHandle<()>>>,
     turns: TurnTracker,
@@ -144,7 +146,7 @@ impl Drop for BusyGuard {
 
 impl ChatService {
     pub fn new(store: Arc<Store>, runtime: Arc<dyn AgentRuntime>, mcp: McpEndpoint, emit: Emit, turns: TurnTracker) -> Self {
-        Self { store, runtime, mcp, emit, session: Mutex::new(None), busy: Default::default(), turn: Mutex::new(None), turns, memory: None, window_sink: None, memory_config: None, compact_sink: None,
+        Self { store, runtime, mcp, emit, session: Mutex::new(None), session_instance: Default::default(), busy: Default::default(), turn: Mutex::new(None), turns, memory: None, window_sink: None, memory_config: None, compact_sink: None,
             tools_hash: None, me: Default::default() }
     }
 
@@ -317,7 +319,8 @@ impl ChatService {
         let mut slot = self.session.lock().await;
         let hash = self.tools_hash.as_ref().map(|f| f());
         if let Some((s, _)) = slot.as_ref() {
-            if hash.is_none() || s.tools_hash == hash {
+            // A runtime switch in Settings, or new tools, needs another session.
+            if s.runtime == self.runtime.id() && self.session_instance.load(Ordering::SeqCst) == self.runtime.instance() && (hash.is_none() || s.tools_hash == hash) {
                 return Ok(());
             }
             *slot = None;
@@ -362,6 +365,7 @@ impl ChatService {
             }
             Err(e) => return Err(e),
         };
+        self.session_instance.store(self.runtime.instance(), Ordering::SeqCst);
         *slot = Some(handle);
         Ok(())
     }
@@ -397,7 +401,7 @@ impl ChatService {
         let stream = match self.runtime.send(&handle, UserMessage { text: sent }).await {
             Ok(s) => s,
             Err(e) => {
-                let msg = format!("bleep could not reach Claude Code: {e}");
+                let msg = format!("bleep could not reach the model: {e}");
                 self.store.finish_message(aid, &msg, &Value::Array(vec![]), None, MsgStatus::Error)?;
                 return Err(ChatError::Other(msg));
             }
@@ -536,6 +540,43 @@ mod tests {
         assert_eq!(r.store.current_session("claude").unwrap().unwrap().runtime_session_id.as_deref(), Some("s1"));
         assert_eq!(r.emitted.lock().unwrap().len(), 3);
         assert!(r.emitted.lock().unwrap().iter().all(|e| e.message_id == aid));
+    }
+
+    #[tokio::test]
+    async fn a_runtime_switch_starts_that_runtimes_session() {
+        let r = rig(vec![vec![done("s1")]]);
+        let switch = crate::runtime::switch::SwitchRuntime::new(r.rt.clone());
+        let e = r.emitted.clone();
+        let chat = ChatService::new(r.store.clone(), switch.clone(), McpEndpoint { url: "http://127.0.0.1:1/mcp".into(), token: "t".into() }, Arc::new(move |m| e.lock().unwrap().push(m)), r.turns.clone());
+        chat.send("a".into()).await.unwrap();
+        chat.wait_idle().await;
+        let mut api = FakeRuntime::new(vec![vec![done("api-1")]]);
+        api.id = "api";
+        let api = Arc::new(api);
+        switch.set(api.clone());
+        chat.send("b".into()).await.unwrap();
+        chat.wait_idle().await;
+        assert_eq!(api.sent.lock().unwrap().len(), 1, "the new runtime got the turn");
+        assert!(api.started.lock().unwrap()[0].resume_id.is_none(), "not the old runtime's session id");
+        assert_eq!(r.store.current_session("api").unwrap().unwrap().runtime_session_id.as_deref(), Some("api-1"));
+        assert_eq!(r.store.current_session("claude").unwrap().unwrap().runtime_session_id.as_deref(), Some("s1"), "the old session is kept for a switch back");
+    }
+
+    #[tokio::test]
+    async fn a_new_runtime_with_the_same_id_gets_its_own_start() {
+        let r = rig(vec![vec![done("s1")]]);
+        let switch = crate::runtime::switch::SwitchRuntime::new(r.rt.clone());
+        let e = r.emitted.clone();
+        let chat = ChatService::new(r.store.clone(), switch.clone(), McpEndpoint { url: "http://127.0.0.1:1/mcp".into(), token: "t".into() }, Arc::new(move |m| e.lock().unwrap().push(m)), r.turns.clone());
+        chat.send("a".into()).await.unwrap();
+        chat.wait_idle().await;
+        let again = Arc::new(FakeRuntime::new(vec![vec![done("s1")]]));
+        switch.set(again.clone());
+        chat.send("b".into()).await.unwrap();
+        chat.wait_idle().await;
+        let started = again.started.lock().unwrap();
+        assert_eq!(started.len(), 1, "a saved setting builds a new runtime, which needs its own start");
+        assert_eq!(started[0].resume_id.as_deref(), Some("s1"), "same runtime id: the session resumes");
     }
 
     #[tokio::test]

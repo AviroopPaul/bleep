@@ -40,6 +40,10 @@ test("dark mode: connectors text is readable", async ({ page }) => {
 test("dark mode: settings text is readable", async ({ page }) => {
   await page.goto("/?mock=1&g=builtin#settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  for (const sel of [".choice-opt b", ".choice-opt small", ".fields label"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+  await page.getByRole("tab", { name: "Google" }).click();
   for (const sel of [".settings h1", ".set-head h2", ".set-lead", ".pill", ".own summary"]) {
     expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
   }

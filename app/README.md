@@ -13,11 +13,25 @@ The droid appears bottom right. The menu bar icon has Show or hide droid, Open c
 
 ## Sign bleep's Claude in (once)
 
-bleep uses its own Claude Code login, kept in `~/.bleep/claude-home`, separate from your terminal's. Click **Sign in** in the chat, or run:
+If you run bleep on Claude Code (the default), it uses its own Claude Code login, kept in `~/.bleep/claude-home`, separate from your terminal's. Click **Sign in** in the chat, or run:
 
 ```bash
 CLAUDE_CONFIG_DIR=~/.bleep/claude-home claude auth login
 ```
+
+## Model: Claude Code or your own API key
+
+Settings, Model tab, picks what runs bleep.
+
+- **Claude Code:** your Claude subscription. Pick opus, sonnet or haiku for the main and small models.
+- **API key:** bleep runs its own tool loop and sends each turn to the provider. Pick a provider, paste its key, then pick a main model (chat and check-ins) and a small model (mail triage, quick checks). The model lists come from the provider. You can also type any model id. **Test** sends one tiny call. **Save** switches at once, with no restart.
+- **Providers:** Anthropic, OpenAI, Google Gemini, OpenRouter, Groq, Ollama and LM Studio on this Mac, or any other OpenAI-compatible server by its base URL. Two adapters cover all of them: Anthropic Messages and OpenAI Chat Completions.
+- **Keys:** one per provider, in the Keychain at `api:<provider>:key`, never in `config.toml` or the logs. A provider with its own key always uses its own address, so a key never follows a typed URL. Other servers take a base URL: `https://`, or `http://` on this Mac. Redirects are not followed.
+- **Same tools, same cards:** the loop lists and calls tools through bleep's own MCP server, so approval cards, connectors and untrusted marking work as they do on Claude Code. A turn takes at most 8 tool steps.
+- **Cost:** each call is priced from the provider's list (OpenRouter), a built-in table (common Anthropic, OpenAI and Gemini models), or -e for a model on this Mac. Activity and the Model tab show today's spend. When it reaches the daily cap (CLAUDE_CONFIG_DIR=~/.bleep/claude-home claude auth login
+```
+ by default), check-ins, mail triage, screenshot checks and nightly patterns stop until tomorrow. Chat still works.
+- **History:** the chat is kept in SQLite in a provider-neutral form, so switching providers keeps the conversation.
 
 ## Connect Google
 

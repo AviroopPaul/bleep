@@ -227,6 +227,67 @@ export interface RuntimeHealth {
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
+export interface Preset {
+  id: string;
+  label: string;
+  wire: "anthropic" | "open_ai";
+  base_url: string;
+  needs_key: boolean;
+  key_url: string;
+  main: string;
+  small: string;
+  max_completion_tokens: boolean;
+  free: boolean;
+}
+export interface ApiConfig {
+  provider: string;
+  base_url: string;
+  main: string;
+  small: string;
+  daily_cap_usd: number;
+}
+export interface Tiers {
+  main: string;
+  small: string;
+}
+export interface ModelSettings {
+  runtime: "claude" | "api";
+  tiers: Tiers;
+  api: ApiConfig;
+  presets: Preset[];
+  keys: string[];
+}
+export interface Price {
+  input: number;
+  output: number;
+  cache_read: number;
+  cache_write: number;
+}
+export interface ModelInfo {
+  id: string;
+  name: string | null;
+  window: number | null;
+  price: Price | null;
+}
+export interface TestResult {
+  ok: boolean;
+  ms: number;
+  cost: number | null;
+  message: string;
+}
+export interface SpendView {
+  runtime: string;
+  spend: { cost: number; unpriced: number; calls: number };
+  cap: number;
+  over: boolean;
+}
+export interface ModelSave {
+  runtime: "claude" | "api";
+  tiers: Tiers;
+  api: ApiConfig;
+  key: string | null;
+}
+
 export const api = {
   history: (beforeId: number | null, limit = 50) => invoke<Message[]>("chat_history", { beforeId, limit }),
   send: (text: string) => invoke<number>("chat_send", { text }),
@@ -283,9 +344,17 @@ export const api = {
   memoryCompactNow: () => invoke<void>("memory_compact_now"),
   memoryReveal: () => invoke<void>("memory_reveal"),
   chatContext: () => invoke<ChatContext>("chat_context"),
+  modelSettings: () => invoke<ModelSettings>("model_settings_get"),
+  modelList: (provider: string, baseUrl: string, key: string | null) => invoke<ModelInfo[]>("model_list", { provider, baseUrl, key }),
+  modelTest: (provider: string, baseUrl: string, key: string | null, model: string) => invoke<TestResult>("model_test", { provider, baseUrl, key, model }),
+  modelSave: (req: ModelSave) => invoke<void>("model_save", { req }),
+  modelForgetKey: (provider: string) => invoke<void>("model_forget_key", { provider }),
+  spendToday: () => invoke<SpendView>("spend_today"),
 };
 
 export const onCompacting = (cb: (on: boolean) => void): Promise<UnlistenFn> => listen<boolean>("chat://compacting", (e) => cb(e.payload));
+
+export const onRuntime = (cb: () => void): Promise<UnlistenFn> => listen("runtime://changed", () => cb());
 
 export const onConnectors = (cb: () => void): Promise<UnlistenFn> => listen("connectors://changed", () => cb());
 
