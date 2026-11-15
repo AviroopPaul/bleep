@@ -11,6 +11,7 @@ pub mod hotkey;
 pub mod mail;
 pub mod mcp;
 pub mod memory;
+pub mod memory_cmds;
 pub mod opener;
 pub mod paths;
 pub mod proactive;
@@ -326,7 +327,16 @@ pub fn run() {
             agents::agents_install_codex_notify,
             agents::agents_remove_codex_notify,
             agents::agents_set,
-            agents::agents_reveal_rules
+            agents::agents_reveal_rules,
+            memory_cmds::memory_list,
+            memory_cmds::memory_forget,
+            memory_cmds::memory_suggestions,
+            memory_cmds::memory_decide,
+            memory_cmds::memory_settings,
+            memory_cmds::memory_set,
+            memory_cmds::memory_compact_now,
+            memory_cmds::memory_reveal,
+            memory_cmds::chat_context
         ])
         .run(tauri::generate_context!())
         .expect("error while running bleep");
