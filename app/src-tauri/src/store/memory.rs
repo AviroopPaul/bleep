@@ -72,6 +72,25 @@ impl Store {
         Ok(rows)
     }
 
+    /// Compaction in one transaction: end the old session with its summary, start a new one
+    /// with the seed, and add the divider. On any error nothing changes. Returns the new id.
+    pub fn rollover_session(&self, old_id: i64, summary: &str, tokens: i64, runtime: &str, seed: &str, divider: &str) -> Result<i64> {
+        let mut db = self.db();
+        let tx = db.transaction()?;
+        tx.execute(
+            "UPDATE sessions SET ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), summary = ?2, tokens_at_end = ?3 WHERE id = ?1",
+            params![old_id, summary, tokens],
+        )?;
+        tx.execute("INSERT INTO sessions (runtime, seed) VALUES (?1, ?2)", params![runtime, seed])?;
+        let new_id = tx.last_insert_rowid();
+        tx.execute(
+            "INSERT INTO messages (role, kind, content, status, session_id) VALUES ('system', 'divider', ?1, 'done', ?2)",
+            params![divider, new_id],
+        )?;
+        tx.commit()?;
+        Ok(new_id)
+    }
+
     /// Every message of one session, oldest first.
     pub fn session_messages(&self, session_id: i64) -> Result<Vec<Message>> {
         let db = self.db();
@@ -252,6 +271,26 @@ mod tests {
         assert!(s.current_session("claude").unwrap().is_none());
         let (sum, tok): (String, i64) = s.db().query_row("SELECT summary, tokens_at_end FROM sessions WHERE id = ?1", params![a.id], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
         assert_eq!((sum.as_str(), tok), ("the summary", 250_000));
+    }
+
+    #[test]
+    fn rollover_is_one_step() {
+        let (_d, s) = store();
+        let a = s.create_session("claude").unwrap();
+        let b = s.rollover_session(a.id, "SUM", 250_000, "claude", "SEED", "Compacted").unwrap();
+        let cur = s.current_session("claude").unwrap().unwrap();
+        assert_eq!((cur.id, cur.seed.as_deref()), (b, Some("SEED")));
+        let div = s.page_messages(None, 5).unwrap();
+        assert_eq!((div[0].kind, div[0].session_id, div[0].content.as_str()), (Kind::Divider, Some(b), "Compacted"));
+    }
+
+    #[test]
+    fn rollover_failure_keeps_the_old_session() {
+        let (_d, s) = store();
+        let a = s.create_session("claude").unwrap();
+        s.db().execute_batch("ALTER TABLE messages RENAME TO gone").unwrap();
+        assert!(s.rollover_session(a.id, "SUM", 250_000, "claude", "SEED", "Compacted").is_err());
+        assert_eq!(s.current_session("claude").unwrap().unwrap().id, a.id, "nothing changed");
     }
 
     #[test]

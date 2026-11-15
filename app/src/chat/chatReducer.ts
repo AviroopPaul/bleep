@@ -82,7 +82,9 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case "history": {
       const merged = action.mode === "prepend" ? [...action.messages, ...state.messages] : [...action.messages];
       const streaming = merged.find((m) => m.status === "streaming");
-      return { ...state, messages: byId(merged), streamingId: streaming ? streaming.id : state.streamingId };
+      // A fresh page (after compaction, or on open) belongs to whatever session is current now.
+      const context = action.mode === "prepend" ? state.context : null;
+      return { ...state, messages: byId(merged), streamingId: streaming ? streaming.id : state.streamingId, context };
     }
     case "sent": {
       const have = state.messages.some((m) => m.id === action.assistantId);

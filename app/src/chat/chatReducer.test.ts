@@ -11,6 +11,12 @@ function sent(): ChatState {
 }
 
 describe("chatReducer", () => {
+  it("a fresh history drops the old context (after compaction)", () => {
+    let s = chatReducer(sent(), { type: "event", messageId: 2, event: { type: "context", used: 250_000, window: 1_000_000 } });
+    s = chatReducer(s, { type: "history", messages: [], mode: "replace" });
+    expect(s.context).toBeNull();
+  });
+
   it("context event keeps the message and sets the context", () => {
     let s = sent();
     s = chatReducer(s, { type: "event", messageId: 2, event: { type: "text_delta", text: "hi" } });

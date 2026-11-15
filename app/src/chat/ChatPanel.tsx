@@ -88,6 +88,11 @@ export function ChatPanel() {
     };
   }, [checkHealth]);
 
+  // After each reply the window may be known for the first time, which can move the threshold.
+  useEffect(() => {
+    if (state.streamingId === null) api.chatContext().then(setCtx).catch(() => {});
+  }, [state.streamingId]);
+
   // Keep the view pinned to the bottom while new text streams in, and steady when older pages load.
   useLayoutEffect(() => {
     const el = log.current;

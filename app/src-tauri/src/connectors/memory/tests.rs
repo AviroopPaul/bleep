@@ -39,7 +39,8 @@ async fn note_then_search_finds_it() {
     assert!(mem.daily_note(chrono::NaiveDate::from_ymd_opt(2026, 11, 15).unwrap()).contains("- 10:02 Sync means my 1:1 with Priya"));
     let v = c.call("memory_search", json!({"query": "sync priya"})).await.unwrap();
     assert_eq!(v["hits"][0]["source"], "note");
-    assert_eq!(v["hits"][0]["text"], "Sync means my 1:1 with Priya");
+    assert_eq!(v["hits"][0]["text_untrusted"], "Sync means my 1:1 with Priya", "notes and old chat may quote mail");
+    assert!(v["hits"][0].get("text").is_none());
     let v = c.call("memory_search", json!({"query": "nothing here"})).await.unwrap();
     assert_eq!(v["hits"], json!([]));
     assert!(v["note"].as_str().unwrap().contains("No matches"));

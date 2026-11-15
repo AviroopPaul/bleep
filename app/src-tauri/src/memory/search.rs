@@ -15,6 +15,8 @@ pub struct Hit {
     pub source: &'static str,
     /// For chat hits: "user" or "bleep".
     pub who: Option<&'static str>,
+    /// Notes and old chat can quote email, so the model treats this as data.
+    #[serde(rename = "text_untrusted")]
     pub text: String,
 }
 
