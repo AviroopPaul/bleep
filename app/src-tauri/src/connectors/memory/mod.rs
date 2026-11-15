@@ -41,20 +41,20 @@ impl Connector for MemoryConnector {
     fn tools(&self) -> Vec<ToolSpec> {
         vec![
             ToolSpec {
-                name: "memory_search",
-                description: "Search your daily notes and the earlier chat. Use it when the user says earlier, last week, or what did I say about, and before you say you do not know something they may have told you.",
+                name: "memory_search".into(),
+                description: "Search your daily notes and the earlier chat. Use it when the user says earlier, last week, or what did I say about, and before you say you do not know something they may have told you.".into(),
                 schema: json!({"type": "object", "properties": {"query": {"type": "string", "description": "A few key words"}}, "required": ["query"]}),
                 risk: Risk::Read,
             },
             ToolSpec {
-                name: "memory_note",
-                description: "Save one short line to today's daily note: something worth keeping that is not a lasting fact. Notes are found later with memory_search.",
+                name: "memory_note".into(),
+                description: "Save one short line to today's daily note: something worth keeping that is not a lasting fact. Notes are found later with memory_search.".into(),
                 schema: json!({"type": "object", "properties": {"text": {"type": "string", "description": "One line, at most 300 characters"}}, "required": ["text"]}),
                 risk: Risk::Safe,
             },
             ToolSpec {
-                name: "memory_promote",
-                description: "Add a lasting fact or preference the user stated to the memory you always see. The user gets a card with the exact fact and must approve it. One fact, one line. USER.md is about the user and their people, RULES.md is how you should behave, MEMORY.md is everything else.",
+                name: "memory_promote".into(),
+                description: "Add a lasting fact or preference the user stated to the memory you always see. The user gets a card with the exact fact and must approve it. One fact, one line. USER.md is about the user and their people, RULES.md is how you should behave, MEMORY.md is everything else.".into(),
                 schema: json!({"type": "object", "properties": {
                     "fact": {"type": "string", "description": "One line, at most 300 characters"},
                     "file": {"type": "string", "enum": ["MEMORY.md", "USER.md", "RULES.md"]}

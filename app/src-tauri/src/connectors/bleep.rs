@@ -25,8 +25,8 @@ impl Connector for BleepConnector {
 
     fn tools(&self) -> Vec<ToolSpec> {
         vec![ToolSpec {
-            name: "bleep_now",
-            description: "The current local date, time, weekday and time zone on this Mac. Use it whenever the answer depends on the time.",
+            name: "bleep_now".into(),
+            description: "The current local date, time, weekday and time zone on this Mac. Use it whenever the answer depends on the time.".into(),
             schema: json!({"type": "object", "properties": {}}),
             risk: Risk::Read,
         }]
