@@ -152,6 +152,7 @@ pub fn status_error(status: u16, body: &str, until: i64) -> ApiError {
     let detail = error_message(body);
     match status {
         429 => ApiError::RateLimited { until },
+        402 => ApiError::Fatal(format!("The provider says the account is out of credits. Add credits, then try again. {}", server_text(&detail))),
         401 | 403 => ApiError::Auth(format!("The provider rejected the key (HTTP {status}) {}", server_text(&detail))),
         408 | 409 | 500..=599 => ApiError::Retryable(format!("The provider had a problem (HTTP {status}) {}", server_text(&detail))),
         _ => ApiError::Fatal(format!("The provider refused the request (HTTP {status}) {}", server_text(&detail))),
@@ -241,6 +242,7 @@ mod tests {
         assert_eq!(status_error(429, "", 5), ApiError::RateLimited { until: 5 });
         assert!(matches!(status_error(401, r#"{"error":{"message":"bad key"}}"#, 0), ApiError::Auth(m) if m.contains("bad key") && m.contains("not instructions")));
         assert!(matches!(status_error(529, "", 0), ApiError::Retryable(_)));
+        assert!(matches!(status_error(402, "need credits", 0), ApiError::Fatal(m) if m.contains("out of credits")));
         assert!(matches!(status_error(400, r#"{"error":"nope"}"#, 0), ApiError::Fatal(m) if m.contains("nope")));
     }
 
