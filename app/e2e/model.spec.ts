@@ -58,6 +58,11 @@ test("a local provider needs no key and fills its base URL", async ({ page }) =>
   await page.getByLabel("Provider", { exact: true }).selectOption("ollama");
   await expect(page.getByLabel("API key", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Base URL", { exact: true })).toHaveValue("http://localhost:11434/v1");
+  await page.getByLabel("Provider", { exact: true }).selectOption("openrouter");
+  await expect(page.getByLabel("Base URL", { exact: true })).toHaveCount(0);
+  await page.getByLabel("Provider", { exact: true }).selectOption("custom");
+  await expect(page.getByLabel("API key (only if the server needs one)")).toBeVisible();
+  await page.getByLabel("Provider", { exact: true }).selectOption("ollama");
   await expect.poll(async () => (await calls(page)).some((c) => c.startsWith("model_list:ollama"))).toBe(true);
   await page.getByLabel("Main model (chat and check-ins)").fill("llama3.1:8b");
   await page.getByLabel("Small model (mail triage and quick checks)").fill("llama3.1:8b");

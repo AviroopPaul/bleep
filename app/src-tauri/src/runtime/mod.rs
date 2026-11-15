@@ -16,6 +16,11 @@ use std::pin::Pin;
 #[async_trait]
 pub trait AgentRuntime: Send + Sync {
     fn id(&self) -> &'static str;
+    /// Changes when the runtime behind this one is rebuilt (a Settings save), so the chat
+    /// knows to start its session again on the new one.
+    fn instance(&self) -> u64 {
+        0
+    }
     async fn health(&self) -> RuntimeHealth;
     async fn start_session(&self, cfg: SessionConfig) -> Result<SessionHandle>;
     async fn send(&self, s: &SessionHandle, msg: UserMessage) -> Result<EventStream>;

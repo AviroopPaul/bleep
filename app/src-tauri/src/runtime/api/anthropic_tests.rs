@@ -25,7 +25,10 @@ pub fn replay(bytes: &[u8], mut p: impl WireParser) -> Vec<Result<ModelEvent, Ap
             }
         }
     }
-    out.extend(p.finish().into_iter().map(Ok));
+    match p.finish() {
+        Ok(v) => out.extend(v.into_iter().map(Ok)),
+        Err(e) => out.push(Err(e)),
+    }
     out
 }
 
@@ -65,9 +68,10 @@ fn an_overload_mid_stream_is_retryable_and_ends_the_stream() {
 }
 
 #[test]
-fn a_stream_cut_short_still_ends_with_usage_and_stop() {
-    let ev = ok(replay(b"event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":3}}}\n\n", Parser::default()));
-    assert!(matches!(ev.last(), Some(ModelEvent::Stop(StopReason::Other(_)))));
+fn a_stream_cut_short_is_an_error() {
+    let ev = replay(b"event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":3}}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hal\"}}\n\n", Parser::default());
+    assert_eq!(ev[0], Ok(ModelEvent::TextDelta("Hal".into())));
+    assert!(matches!(ev.last(), Some(Err(ApiError::Retryable(m))) if m.contains("cut off")), "{ev:?}");
 }
 
 fn request(choice: ToolChoice) -> ModelRequest {

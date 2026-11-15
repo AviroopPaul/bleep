@@ -12,6 +12,10 @@ const TABLE: &[(&str, f64, f64, f64, f64)] = &[
     ("claude-3-7-sonnet", 3.0, 15.0, 0.3, 3.75),
     ("claude-haiku-4-5", 1.0, 5.0, 0.1, 1.25),
     ("claude-3-5-haiku", 0.8, 4.0, 0.08, 1.0),
+    // Newer Claude models by family, at the price Anthropic has kept for each tier.
+    ("claude-opus", 5.0, 25.0, 0.5, 6.25),
+    ("claude-sonnet", 3.0, 15.0, 0.3, 3.75),
+    ("claude-haiku", 1.0, 5.0, 0.1, 1.25),
     ("gpt-5-nano", 0.05, 0.4, 0.005, 0.0),
     ("gpt-5-mini", 0.25, 2.0, 0.025, 0.0),
     ("gpt-5", 1.25, 10.0, 0.125, 0.0),
@@ -41,6 +45,8 @@ mod tests {
         assert_eq!(builtin("anthropic/claude-opus-4.5").unwrap().input, 5.0, "4.5 is not the 4 price");
         assert_eq!(builtin("gpt-5-mini-2025-08-07").unwrap().output, 2.0, "mini before the plain prefix");
         assert_eq!(builtin("models/gemini-2.5-flash").unwrap().output, 2.5);
+        assert_eq!(builtin("claude-sonnet-5-5").unwrap().input, 3.0, "the Anthropic preset defaults have a price");
+        assert_eq!(builtin("claude-haiku-5-5").unwrap().input, 1.0);
         assert!(builtin("llama3.1:8b").is_none());
     }
 }

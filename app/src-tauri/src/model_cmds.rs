@@ -22,7 +22,8 @@ pub struct ModelSettings {
     pub keys: Vec<&'static str>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+/// No Debug: it can carry a key.
+#[derive(Deserialize, Clone)]
 pub struct ModelSave {
     pub runtime: String,
     pub tiers: Tiers,
@@ -48,7 +49,7 @@ pub struct SpendView {
 }
 
 pub fn saved_keys(secrets: &dyn Secrets) -> Vec<&'static str> {
-    PRESETS.iter().filter(|p| p.needs_key && secrets.get(&key_name(p.id)).is_some_and(|k| !k.is_empty())).map(|p| p.id).collect()
+    PRESETS.iter().filter(|p| crate::runtime::api::presets::takes_key(p) && secrets.get(&key_name(p.id)).is_some_and(|k| !k.is_empty())).map(|p| p.id).collect()
 }
 
 /// Checks a save and gives the config to write. The key is stored by the caller.
@@ -73,10 +74,9 @@ pub fn apply(cfg: &Config, req: &ModelSave, has_key: bool) -> Result<Config, Str
             }
             adapter(p.id, &a.base_url, "")?;
             if !(a.daily_cap_usd >= 0.0 && a.daily_cap_usd <= 1000.0) {
-                return Err("The daily cap must be between $0 and $1000.".into());
+                return Err("The daily cap must be between $0 and $1000. Use 0 for no cap.".into());
             }
-            let base = if a.base_url.trim() == p.base_url { String::new() } else { a.base_url.trim().trim_end_matches('/').to_string() };
-            out.api = ApiConfig { provider: p.id.into(), base_url: if base.is_empty() { p.base_url.into() } else { base }, main: a.main.trim().into(), small: a.small.trim().into(), daily_cap_usd: a.daily_cap_usd };
+            out.api = ApiConfig { provider: p.id.into(), base_url: crate::runtime::api::presets::base_for(p, &a.base_url).into(), main: a.main.trim().into(), small: a.small.trim().into(), daily_cap_usd: a.daily_cap_usd };
         }
         _ => return Err("Pick Claude Code or an API key.".into()),
     }
@@ -85,6 +85,9 @@ pub fn apply(cfg: &Config, req: &ModelSave, has_key: bool) -> Result<Config, Str
 }
 
 fn key_for(provider: &str, given: Option<String>) -> String {
+    if !preset(provider).is_some_and(crate::runtime::api::presets::takes_key) {
+        return String::new();
+    }
     given.filter(|k| !k.trim().is_empty()).map(|k| k.trim().to_string()).unwrap_or_else(|| KeychainSecrets.get(&key_name(provider)).unwrap_or_default())
 }
 
@@ -157,11 +160,9 @@ pub async fn model_save(app: AppHandle, state: tauri::State<'_, AppState>, req: 
             KeychainSecrets.set(&key_name(&provider), k.trim()).map_err(|e| format!("The key could not be saved in the Keychain: {e}"))?;
         }
     }
-    {
-        let mut c = state.config.lock().unwrap();
-        *c = cfg.clone();
-        c.save(&state.paths.config_file).map_err(|e| e.to_string())?;
-    }
+    // Write the file first; only then does the app use the new settings.
+    cfg.save(&state.paths.config_file).map_err(|e| e.to_string())?;
+    *state.config.lock().unwrap() = cfg.clone();
     state.runtime.set((state.make_runtime)(&cfg));
     let _ = app.emit("runtime://changed", ());
     let chat = state.chat.clone();
@@ -230,6 +231,13 @@ mod tests {
     }
 
     #[test]
+    fn a_keyed_provider_saves_its_own_address() {
+        let mut s = save("api", "openai", "m");
+        s.api.base_url = "https://x.io/v1".into();
+        assert_eq!(apply(&Config::default(), &s, true).unwrap().api.base_url, "https://api.openai.com/v1");
+    }
+
+    #[test]
     fn a_claude_save_takes_only_claude_models() {
         let c = Config::default();
         let out = apply(&c, &save("claude", "openrouter", ""), false).unwrap();
@@ -245,6 +253,8 @@ mod tests {
         let s = MemorySecrets::default();
         s.set("api:anthropic:key", "sk-secret").unwrap();
         s.set("api:openai:key", "").unwrap();
-        assert_eq!(saved_keys(&s), ["anthropic"]);
+        s.set("api:custom:key", "sk-c").unwrap();
+        s.set("api:ollama:key", "x").unwrap();
+        assert_eq!(saved_keys(&s), ["anthropic", "custom"]);
     }
 }

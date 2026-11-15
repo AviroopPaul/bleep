@@ -17,7 +17,7 @@ use crate::google::secrets::Secrets;
 use crate::store::Store;
 use adapter::ModelAdapter;
 use agent::{ApiChoice, ApiRuntime, Core};
-use presets::{preset, Wire};
+use presets::{base_for, preset, takes_key, Wire};
 use std::sync::Arc;
 
 pub fn key_name(provider: &str) -> String {
@@ -27,7 +27,7 @@ pub fn key_name(provider: &str) -> String {
 /// The adapter for a provider. `base_url` empty means the preset's.
 pub fn adapter(provider: &str, base_url: &str, key: &str) -> Result<Arc<dyn ModelAdapter>, String> {
     let p = preset(provider).ok_or_else(|| format!("Unknown provider: {provider}"))?;
-    let url = if base_url.trim().is_empty() { p.base_url } else { base_url.trim() };
+    let url = base_for(p, base_url);
     if url.is_empty() {
         return Err("Enter the server's base URL.".into());
     }
@@ -42,7 +42,7 @@ pub fn adapter(provider: &str, base_url: &str, key: &str) -> Result<Arc<dyn Mode
 /// health says what to fix.
 pub fn from_config(cfg: &ApiConfig, secrets: &dyn Secrets, store: Arc<Store>) -> ApiRuntime {
     let p = preset(&cfg.provider).or_else(|| preset("custom")).unwrap();
-    let key = secrets.get(&key_name(p.id)).unwrap_or_default();
+    let key = if takes_key(p) { secrets.get(&key_name(p.id)).unwrap_or_default() } else { String::new() };
     let has_key = !p.needs_key || !key.is_empty();
     let choice = ApiChoice { provider: p.id.into(), label: p.label.into(), main: cfg.main.clone(), small: cfg.small.clone(), has_key, free: p.free };
     let adapter = adapter(p.id, &cfg.base_url, &key).unwrap_or_else(|e| Arc::new(Broken(e)));
@@ -87,7 +87,8 @@ mod tests {
     #[test]
     fn adapter_checks_the_url() {
         assert!(adapter("custom", "", "").err().unwrap().contains("base URL"));
-        assert!(adapter("openai", "http://example.com/v1", "k").is_err());
+        assert!(adapter("custom", "http://example.com/v1", "k").is_err());
+        assert!(adapter("openai", "http://example.com/v1", "k").is_ok(), "a keyed provider ignores a typed URL");
         assert!(adapter("nope", "", "").is_err());
         assert!(adapter("openrouter", "", "k").is_ok());
     }

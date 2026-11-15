@@ -16,7 +16,7 @@ pub trait ModelAdapter: Send + Sync {
 pub trait WireParser: Send + 'static {
     fn on(&mut self, ev: &SseEvent) -> Result<Vec<ModelEvent>, ApiError>;
     /// The stream ended. Events not sent yet (a format that ends without a stop event).
-    fn finish(&mut self) -> Vec<ModelEvent>;
+    fn finish(&mut self) -> Result<Vec<ModelEvent>, ApiError>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -73,7 +73,10 @@ pub fn drive(resp: reqwest::Response, mut parser: impl WireParser) -> ModelStrea
             Some(Err(e)) => vec![Err(ApiError::Retryable(format!("The connection broke: {e}")))],
             None => {
                 let mut out = framer.rest().map(|e| collect(std::iter::once(parser.on(&e)))).unwrap_or_default();
-                out.extend(parser.finish().into_iter().map(Ok));
+                match parser.finish() {
+                    Ok(v) => out.extend(v.into_iter().map(Ok)),
+                    Err(e) => out.push(Err(e)),
+                }
                 out
             }
         }
@@ -126,8 +129,9 @@ where
     .flatten()
 }
 
+/// Redirects are not followed: a key in a custom header (Anthropic's `x-api-key`) would go along.
 pub fn http() -> reqwest::Client {
-    reqwest::Client::builder().connect_timeout(Duration::from_secs(15)).read_timeout(Duration::from_secs(120)).build().unwrap_or_default()
+    reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).connect_timeout(Duration::from_secs(15)).read_timeout(Duration::from_secs(120)).build().unwrap_or_default()
 }
 
 /// Sends a request and maps a non-2xx status to an ApiError.

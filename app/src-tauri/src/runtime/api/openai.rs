@@ -146,7 +146,7 @@ pub struct Parser {
 impl WireParser for Parser {
     fn on(&mut self, ev: &SseEvent) -> Result<Vec<ModelEvent>, ApiError> {
         if ev.data.trim() == "[DONE]" {
-            return self.end();
+            return self.end(StopReason::EndTurn);
         }
         let v: Value = match serde_json::from_str(&ev.data) {
             Ok(v) => v,
@@ -195,13 +195,20 @@ impl WireParser for Parser {
         Ok(out)
     }
 
-    fn finish(&mut self) -> Vec<ModelEvent> {
-        self.end().unwrap_or_default()
+    fn finish(&mut self) -> Result<Vec<ModelEvent>, ApiError> {
+        if self.ended {
+            return Ok(vec![]);
+        }
+        // Some servers end without [DONE]; a finish_reason still means the reply is whole.
+        if self.stop.is_none() {
+            return Err(ApiError::Retryable(super::anthropic::CUT_OFF.into()));
+        }
+        self.end(StopReason::EndTurn)
     }
 }
 
 impl Parser {
-    fn end(&mut self) -> Result<Vec<ModelEvent>, ApiError> {
+    fn end(&mut self, fallback: StopReason) -> Result<Vec<ModelEvent>, ApiError> {
         if std::mem::replace(&mut self.ended, true) {
             return Ok(vec![]);
         }
@@ -214,7 +221,7 @@ impl Parser {
         let stop = match self.stop.clone() {
             Some(StopReason::EndTurn) if !out.is_empty() => StopReason::ToolUse,
             Some(s) => s,
-            None => StopReason::Other("ended early".into()),
+            None => fallback,
         };
         out.push(ModelEvent::Usage(self.tokens));
         out.push(ModelEvent::Stop(stop));

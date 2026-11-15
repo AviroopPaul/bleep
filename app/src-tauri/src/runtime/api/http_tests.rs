@@ -35,6 +35,8 @@ async fn server() -> (String, Seen) {
             }),
         )
         .route("/limited/chat/completions", post(|| async { (StatusCode::TOO_MANY_REQUESTS, [("retry-after", "30")], r#"{"error":{"message":"slow down"}}"#) }))
+        .route("/redir/chat/completions", post(|| async { (StatusCode::TEMPORARY_REDIRECT, [("location", "/oa/chat/completions")], "") }))
+        .route("/empty/chat/completions", post(|| async { ([("content-type", "application/json")], r#"{"error":{"message":"No credits"}}"#) }))
         .route("/oa/models", get(|| async { axum::Json(json!({"data": [{"id": "gpt-5-mini"}]})) }));
     let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", l.local_addr().unwrap());
@@ -72,6 +74,21 @@ async fn a_429_is_rate_limited_until_retry_after() {
     let before = chrono::Utc::now().timestamp();
     let Err(e) = OpenAiAdapter::new(&format!("{url}/limited"), "", false).stream(&req()).await else { panic!("expected an error") };
     assert!(matches!(e, ApiError::RateLimited { until } if until >= before + 30 && until <= before + 32), "{e:?}");
+}
+
+#[tokio::test]
+async fn a_redirect_is_not_followed_so_the_key_stays_put() {
+    let (url, seen) = server().await;
+    let Err(e) = OpenAiAdapter::new(&format!("{url}/redir"), "sk", false).stream(&req()).await else { panic!() };
+    assert!(matches!(e, ApiError::Fatal(_)), "{e:?}");
+    assert!(seen.lock().unwrap().is_empty(), "the key never reached the redirect target");
+}
+
+#[tokio::test]
+async fn a_200_with_no_events_is_an_error_not_an_empty_reply() {
+    let (url, _) = server().await;
+    let ev: Vec<_> = OpenAiAdapter::new(&format!("{url}/empty"), "", false).stream(&req()).await.unwrap().collect().await;
+    assert!(matches!(ev.last(), Some(Err(ApiError::Retryable(_)))), "{ev:?}");
 }
 
 #[tokio::test]

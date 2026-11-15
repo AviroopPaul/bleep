@@ -123,7 +123,10 @@ impl Core {
             }
         }
         let tc = StreamableHttpClientTransportConfig::with_uri(url.to_string()).auth_header(token.to_string());
-        let live = client_info().serve(StreamableHttpClientTransport::from_config(tc)).await.map_err(|e| format!("bleep's tool server did not answer: {e}"))?;
+        let live = match tokio::time::timeout(Duration::from_secs(20), client_info().serve(StreamableHttpClientTransport::from_config(tc))).await {
+            Ok(r) => r.map_err(|e| format!("bleep's tool server did not answer: {e}"))?,
+            Err(_) => return Err("bleep's tool server did not answer within 20 seconds.".into()),
+        };
         let live = Arc::new(live);
         *g = Some((key, live.clone()));
         Ok(live)
@@ -247,8 +250,8 @@ impl Core {
             if !said.is_empty() {
                 parts.push(Part::Text { text: said });
             }
-            if failed.is_some() {
-                // A cut-off reply keeps its text but not half-made tool calls.
+            if failed.is_some() || step == MAX_STEPS {
+                // A cut-off reply keeps its text but not half-made tool calls, and the last step runs none.
                 calls.clear();
             }
             parts.extend(calls.iter().map(|(id, name, args)| Part::ToolCall { id: id.clone(), name: name.clone(), args: args.clone() }));
@@ -260,13 +263,18 @@ impl Core {
             if let Some(e) = failed {
                 return self.fail(e, &conv, total, &out).await;
             }
-            if calls.is_empty() {
+            // On the last step the model may not use tools; any it asks for anyway are not run.
+            if calls.is_empty() || step == MAX_STEPS {
                 break;
             }
             let mut results = vec![];
+            let mut stopped = false;
             for (id, name, args) in calls {
-                if !out(AgentEvent::ToolStart { id: id.clone(), name: name.clone(), args: args.clone() }).await {
-                    return;
+                // Stopped (the chat dropped the stream): the rest are not run, and what ran is kept.
+                if stopped || !out(AgentEvent::ToolStart { id: id.clone(), name: name.clone(), args: args.clone() }).await {
+                    stopped = true;
+                    results.push(Part::ToolResult { id, ok: false, text: "Not run: the turn was stopped.".into() });
+                    continue;
                 }
                 let (ok, text) = self.call(&cfg, &name, &args).await;
                 out(AgentEvent::ToolResult { id: id.clone(), ok, preview: preview(&text, 200) }).await;
@@ -274,6 +282,9 @@ impl Core {
             }
             let m = Msg { role: Role::User, parts: results };
             self.save(&conv, &m);
+            if stopped {
+                return;
+            }
             msgs.push(m);
         }
         out(AgentEvent::Usage { input: total.all_input(), output: total.output }).await;

@@ -151,9 +151,9 @@ export function ModelSettingsTab() {
             <select id="api-provider" value={cfg.provider} onChange={(e) => pickProvider(e.target.value)}>
               {s.presets.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
-            {preset?.needs_key && (
+            {preset && (preset.needs_key || preset.id === "custom") && (
               <>
-                <label htmlFor="api-key">API key</label>
+                <label htmlFor="api-key">{preset.needs_key ? "API key" : "API key (only if the server needs one)"}</label>
                 <input id="api-key" type="password" autoComplete="off" placeholder={saved ? "Saved in your Keychain" : "Paste your key"} value={key} onChange={(e) => (setKey(e.target.value), setTest(null))} />
                 <p className="hint">
                   {saved && <button type="button" className="linkbtn" onClick={() => void forget()}>Forget the saved key</button>}
@@ -162,8 +162,12 @@ export function ModelSettingsTab() {
                 </p>
               </>
             )}
-            <label htmlFor="api-base">Base URL</label>
-            <input id="api-base" type="url" placeholder="https://example.com/v1" value={cfg.base_url} onChange={(e) => set({ base_url: e.target.value })} />
+            {preset && !preset.needs_key && (
+              <>
+                <label htmlFor="api-base">Base URL</label>
+                <input id="api-base" type="url" placeholder="https://example.com/v1" value={cfg.base_url} onChange={(e) => set({ base_url: e.target.value })} />
+              </>
+            )}
             <label htmlFor="api-main">Main model (chat and check-ins)</label>
             <input id="api-main" list="api-models" autoComplete="off" placeholder="Pick or type a model id" value={cfg.main} onChange={(e) => set({ main: e.target.value })} />
             {info(cfg.main) && <p className="hint">{modelLine(info(cfg.main), !!preset?.free)}</p>}
@@ -176,7 +180,7 @@ export function ModelSettingsTab() {
             {listNote && <p className="hint" role="status">{listNote}</p>}
             <label htmlFor="api-cap">Daily spend cap (US dollars)</label>
             <input id="api-cap" type="number" min={0} step={0.5} value={cfg.daily_cap_usd} onChange={(e) => set({ daily_cap_usd: Number(e.target.value) })} />
-            <p className="hint">When today's spend reaches it, check-ins, mail triage and screenshot checks stop until tomorrow. Chat still works.</p>
+            <p className="hint">When today's spend reaches it, check-ins, mail triage and screenshot checks stop until tomorrow. Chat still works. Use 0 for no cap.</p>
           </div>
         </section>
       )}

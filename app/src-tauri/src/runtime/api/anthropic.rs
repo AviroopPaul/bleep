@@ -165,7 +165,7 @@ impl WireParser for Parser {
                 }
                 self.stop = v["delta"]["stop_reason"].as_str().map(stop_reason);
             }
-            "message_stop" => out.extend(self.end()),
+            "message_stop" => out.extend(self.end(StopReason::EndTurn)?),
             "error" => {
                 let e = &v["error"];
                 let msg = format!("The provider stopped with an error {}", server_text(e["message"].as_str().unwrap_or("")));
@@ -181,19 +181,30 @@ impl WireParser for Parser {
         Ok(out)
     }
 
-    fn finish(&mut self) -> Vec<ModelEvent> {
-        self.end()
+    fn finish(&mut self) -> Result<Vec<ModelEvent>, ApiError> {
+        self.end_of_body()
     }
 }
 
 impl Parser {
-    fn end(&mut self) -> Vec<ModelEvent> {
+    /// The stop event came: what is left to send. `fallback` when no stop reason was given.
+    fn end(&mut self, fallback: StopReason) -> Result<Vec<ModelEvent>, ApiError> {
         if std::mem::replace(&mut self.ended, true) {
-            return vec![];
+            return Ok(vec![]);
         }
-        vec![ModelEvent::Usage(self.tokens), ModelEvent::Stop(self.stop.clone().unwrap_or(StopReason::Other("ended early".into())))]
+        Ok(vec![ModelEvent::Usage(self.tokens), ModelEvent::Stop(self.stop.clone().unwrap_or(fallback))])
+    }
+
+    /// The body ended. Without a stop event the reply was cut off (or was never a stream).
+    fn end_of_body(&mut self) -> Result<Vec<ModelEvent>, ApiError> {
+        if self.ended {
+            return Ok(vec![]);
+        }
+        Err(ApiError::Retryable(CUT_OFF.into()))
     }
 }
+
+pub const CUT_OFF: &str = "The reply was cut off before it finished. Try again.";
 
 pub fn tool_call(id: String, name: String, raw: &str) -> Result<ModelEvent, ApiError> {
     let args = if raw.trim().is_empty() { json!({}) } else { serde_json::from_str(raw).map_err(|_| ApiError::Retryable(format!("The model sent broken arguments for {name}.")))? };

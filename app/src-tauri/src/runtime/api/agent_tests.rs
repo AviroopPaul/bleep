@@ -164,6 +164,8 @@ async fn a_model_that_never_stops_calling_tools_is_cut_off() {
     let ev = turn(&r, None, "loop").await;
     let reqs = r.mock.requests.lock().unwrap();
     assert_eq!(reqs.len(), MAX_STEPS + 1);
+    let starts = ev.iter().filter(|e| matches!(e, AgentEvent::ToolStart { .. })).count();
+    assert_eq!(starts, MAX_STEPS, "tools the model asks for on the last call are not run");
     assert_eq!(reqs[MAX_STEPS].choice, ToolChoice::None, "the last call may not use tools");
     assert!(matches!(ev.last(), Some(AgentEvent::Done { .. })));
 }
@@ -178,6 +180,38 @@ async fn an_error_mid_reply_keeps_the_text_and_the_history_stays_valid() {
     let msgs = &r.mock.requests.lock().unwrap()[1].msgs;
     assert_eq!(msgs[1], Msg { role: Role::Assistant, parts: vec![Part::Text { text: "Half".into() }] }, "no half-made tool call");
     assert_eq!(msgs.len(), 3);
+}
+
+#[tokio::test]
+async fn a_stopped_turn_keeps_the_results_of_tools_that_ran() {
+    let two = vec![
+        Ok(ModelEvent::ToolCall { id: "t1".into(), name: "bleep_now".into(), args: json!({}) }),
+        Ok(ModelEvent::ToolCall { id: "t2".into(), name: "bleep_now".into(), args: json!({}) }),
+        usage(10, 2),
+        Ok(ModelEvent::Stop(StopReason::ToolUse)),
+    ];
+    let r = rig(vec![Ok(two)]).await;
+    let h = r.rt.start_session(cfg(&r, None)).await.unwrap();
+    let conv = h.resume_id.clone().unwrap();
+    let mut s = r.rt.send(&h, UserMessage { text: "go".into() }).await.unwrap();
+    while let Some(e) = s.next().await {
+        if matches!(e, AgentEvent::ToolResult { .. }) {
+            break;
+        }
+    }
+    drop(s);
+    let mut last = None;
+    for _ in 0..200 {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        let msgs = r.store.api_messages(&conv).unwrap();
+        last = msgs.last().and_then(|m| serde_json::from_str::<Msg>(m).ok());
+        if last.as_ref().is_some_and(|m| m.role == Role::User && m.parts.len() == 2) {
+            break;
+        }
+    }
+    let last = last.unwrap();
+    assert!(matches!(&last.parts[0], Part::ToolResult { id, ok: true, .. } if id == "t1"), "the tool that ran keeps its real result: {last:?}");
+    assert!(matches!(&last.parts[1], Part::ToolResult { id, .. } if id == "t2"), "the other call has a result too (real, or not run if the stop came first)");
 }
 
 #[tokio::test]

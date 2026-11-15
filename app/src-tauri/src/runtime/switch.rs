@@ -9,15 +9,17 @@ use std::sync::{Arc, RwLock};
 
 pub struct SwitchRuntime {
     inner: RwLock<Arc<dyn AgentRuntime>>,
+    generation: std::sync::atomic::AtomicU64,
 }
 
 impl SwitchRuntime {
     pub fn new(rt: Arc<dyn AgentRuntime>) -> Arc<SwitchRuntime> {
-        Arc::new(SwitchRuntime { inner: RwLock::new(rt) })
+        Arc::new(SwitchRuntime { inner: RwLock::new(rt), generation: Default::default() })
     }
 
     pub fn set(&self, rt: Arc<dyn AgentRuntime>) {
         *self.inner.write().unwrap() = rt;
+        self.generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 
     pub fn current(&self) -> Arc<dyn AgentRuntime> {
@@ -29,6 +31,9 @@ impl SwitchRuntime {
 impl AgentRuntime for SwitchRuntime {
     fn id(&self) -> &'static str {
         self.current().id()
+    }
+    fn instance(&self) -> u64 {
+        self.generation.load(std::sync::atomic::Ordering::SeqCst)
     }
     async fn health(&self) -> RuntimeHealth {
         self.current().health().await
@@ -64,8 +69,9 @@ impl Budget {
 
     pub fn over(&self) -> bool {
         match (self.cap)() {
-            Some(cap) => self.store.spend_on(&(self.today)()).map(|s| s.cost >= cap).unwrap_or(false),
-            None => false,
+            // 0 (or a broken value) means no cap.
+            Some(cap) if cap.is_finite() && cap > 0.0 => self.store.spend_on(&(self.today)()).map(|s| s.cost >= cap).unwrap_or(false),
+            _ => false,
         }
     }
 }
@@ -85,6 +91,9 @@ impl CappedRuntime {
 impl AgentRuntime for CappedRuntime {
     fn id(&self) -> &'static str {
         self.inner.id()
+    }
+    fn instance(&self) -> u64 {
+        self.inner.instance()
     }
     async fn health(&self) -> RuntimeHealth {
         self.inner.health().await
@@ -147,5 +156,9 @@ mod tests {
         assert_eq!(fake.one_shots.lock().unwrap().len(), 1, "the capped call never reached the runtime");
         *cap.lock().unwrap() = None;
         assert!(!budget.over(), "no cap while Claude Code runs");
+        for odd in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            *cap.lock().unwrap() = Some(odd);
+            assert!(!budget.over(), "{odd} means no cap");
+        }
     }
 }
