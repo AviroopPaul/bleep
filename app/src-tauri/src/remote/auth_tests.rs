@@ -180,3 +180,25 @@ async fn forget_without_sign_in_still_clears() {
     forget("http://127.0.0.1:1/mcp", "dayblocks", r.secrets.clone()).await;
     assert!(ServerSecrets::new(r.secrets.clone(), "dayblocks").token().is_none());
 }
+
+#[tokio::test]
+async fn a_sign_in_link_that_is_not_https_is_never_opened() {
+    let r = rig().await;
+    r.mock.state.lock().unwrap().oauth.bad_authorize = true;
+    let e = sign_in_with_browser(&r, Duration::from_secs(2)).await.unwrap_err();
+    assert!(e.contains("not an https link"), "{e}");
+    assert!(r.opener.urls.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_rejected_token_without_expiry_is_refreshed_once() {
+    let r = rig().await;
+    r.mock.state.lock().unwrap().oauth.omit_expiry = true;
+    sign_in_with_browser(&r, Duration::from_secs(5)).await.unwrap();
+    let c = oauth_conn(&r);
+    c.connect().await.unwrap();
+    r.mock.state.lock().unwrap().token = Some("rotated".into());
+    c.call("dayblocks_list_tasks", json!({})).await.unwrap();
+    assert!(r.mock.state.lock().unwrap().oauth.grants.contains(&"refresh_token".to_string()));
+    assert_eq!(c.status(), ConnectorStatus::Connected { account: "127.0.0.1".into() });
+}

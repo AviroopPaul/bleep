@@ -10,7 +10,6 @@ use crate::remote::names::{check_server_name, check_url, server_name_from};
 use crate::remote::secrets::{Client, Secrets, ServerSecrets};
 use crate::store::Store;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -62,14 +61,7 @@ fn nonempty(s: Option<String>) -> Option<String> {
     s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
-fn default_mode(t: &Value) -> ToolMode {
-    let a = &t["annotations"];
-    if a["readOnlyHint"].as_bool() == Some(true) && a["destructiveHint"].as_bool() != Some(true) {
-        ToolMode::Auto
-    } else {
-        ToolMode::Ask
-    }
-}
+use crate::remote::tools::default_mode;
 
 pub struct Remotes {
     host: Arc<ToolHost>,
@@ -225,7 +217,7 @@ impl Remotes {
     }
 
     pub async fn refresh(&self, name: &str) -> Result<(), String> {
-        self.find(name)?.connect().await
+        self.find(name)?.refresh_tools().await
     }
 
     /// Sets my mode for one tool and returns the config to save.
@@ -241,7 +233,11 @@ impl Remotes {
         self.host.remove(name);
         self.list.lock().unwrap().retain(|x| x.id() != name);
         forget(&c.config().url, name, self.secrets.clone()).await;
-        self.store.delete_mcp_tools(name).map_err(|e| e.to_string())
+        // A cache row left behind is harmless; the server is gone from config either way.
+        if let Err(e) = self.store.delete_mcp_tools(name) {
+            eprintln!("bleep: remove {name}: cached tools stay: {e}");
+        }
+        Ok(())
     }
 
     pub fn views(&self) -> Vec<ServerView> {

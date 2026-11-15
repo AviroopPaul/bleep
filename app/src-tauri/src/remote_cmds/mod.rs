@@ -70,7 +70,11 @@ pub async fn remote_add(app: AppHandle, state: tauri::State<'_, AppState>, req: 
     let remotes = state.remotes.clone();
     let out = remotes.add(req, &taken).await?;
     if let Outcome::Added(cfg) = &out {
-        save(&app, &state, &cfg.name.clone(), Some(cfg.clone()))?;
+        // A server that is not in config would vanish at restart: undo the add instead.
+        if let Err(e) = save(&app, &state, &cfg.name.clone(), Some(cfg.clone())) {
+            let _ = remotes.remove(&cfg.name).await;
+            return Err(format!("Could not save the server: {e}"));
+        }
     }
     Ok(out)
 }

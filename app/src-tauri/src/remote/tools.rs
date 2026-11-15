@@ -11,6 +11,11 @@ pub const MAX_RESULT: usize = 20_000;
 /// Claude Code's limit for a full tool name.
 pub const MAX_FULL_NAME: usize = 64;
 pub const FULL_PREFIX: &str = "mcp__bleep__";
+/// Strings inside an input schema reach the model unmarked, so each is cut to this.
+pub const MAX_SCHEMA_TEXT: usize = 300;
+/// Set in the cached tool JSON when a tool became read-only after the server first listed
+/// it. Such a tool keeps asking until I set it to run at once.
+pub const PINNED: &str = "_bleep_ask";
 
 /// One remote tool as bleep lists it, and the server's own name for it.
 #[derive(Clone, Debug)]
@@ -40,19 +45,52 @@ pub fn tool_name(server: &str, remote: &str) -> String {
     format!("{server}_{}", safe(remote))
 }
 
-fn risk(t: &Value, mode: Option<ToolMode>) -> Risk {
-    match mode {
-        Some(ToolMode::Auto) => return Risk::Read,
-        Some(ToolMode::Ask) => return Risk::Write,
-        _ => {}
-    }
+/// The server says read-only and not destructive.
+pub fn hinted_read_only(t: &Value) -> bool {
     let a = &t["annotations"];
-    let read_only = a["readOnlyHint"].as_bool() == Some(true);
-    let destructive = a["destructiveHint"].as_bool() == Some(true);
-    if read_only && !destructive {
-        Risk::Read
+    a["readOnlyHint"].as_bool() == Some(true) && a["destructiveHint"].as_bool() != Some(true)
+}
+
+/// What a tool does when I have not chosen: run at once only when hinted read-only and
+/// not pinned.
+pub fn default_mode(t: &Value) -> ToolMode {
+    if hinted_read_only(t) && t[PINNED].as_bool() != Some(true) {
+        ToolMode::Auto
     } else {
-        Risk::Write
+        ToolMode::Ask
+    }
+}
+
+/// Marks tools that turned read-only (or appeared read-only) after the first listing.
+/// `old` is the cached list; an empty one is the first listing, which is trusted.
+pub fn pin_new_read_only(old: &[Value], new: &mut [Value]) {
+    if old.is_empty() {
+        return;
+    }
+    for t in new.iter_mut() {
+        if !hinted_read_only(t) {
+            continue;
+        }
+        let was_auto = old.iter().find(|o| o["name"] == t["name"]).map(|o| default_mode(o) == ToolMode::Auto).unwrap_or(false);
+        if !was_auto {
+            t[PINNED] = Value::Bool(true);
+        }
+    }
+}
+
+fn risk(t: &Value, mode: Option<ToolMode>) -> Risk {
+    match mode.unwrap_or_else(|| default_mode(t)) {
+        ToolMode::Auto => Risk::Read,
+        _ => Risk::Write,
+    }
+}
+
+fn cut_strings(v: &mut Value) {
+    match v {
+        Value::String(s) if s.chars().count() > MAX_SCHEMA_TEXT => *s = format!("{}…", s.chars().take(MAX_SCHEMA_TEXT).collect::<String>()),
+        Value::Array(a) => a.iter_mut().for_each(cut_strings),
+        Value::Object(o) => o.values_mut().for_each(cut_strings),
+        _ => {}
     }
 }
 
@@ -99,6 +137,8 @@ pub fn map_tools(server: &str, raw: &[Value], modes: &BTreeMap<String, ToolMode>
             set.skipped.push(skip("Its input schema is over 16 KB.".into()));
             continue;
         }
+        let mut schema = schema;
+        cut_strings(&mut schema);
         seen.insert(name.clone(), remote.clone());
         let spec = ToolSpec { name: name.into(), description: describe(server, t).into(), schema, risk: risk(t, mode) };
         set.tools.push(Mapped { spec, remote });

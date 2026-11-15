@@ -59,6 +59,8 @@ pub async fn sign_in(url: &str, name: &str, secrets: Arc<dyn Secrets>, opener: &
     }
     let session = AuthorizationSession::new(m, req).await.map_err(|(_, e)| format!("Sign-in failed: {name} did not register bleep. {e}"))?;
     let state = state_of(&session.auth_url).ok_or_else(|| "Sign-in failed: the sign-in link has no state.".to_string())?;
+    // The link comes from the server's metadata: open only https, or http on this Mac.
+    crate::remote::names::check_url(&session.auth_url, None).map_err(|_| format!("Sign-in failed: {name} gave a sign-in link that is not an https link. bleep did not open it."))?;
     opener.open(&session.auth_url).map_err(|e| format!("Could not open the browser: {e}"))?;
     let q: HashMap<String, String> = loopback::catch_at(listener, CALLBACK, &state, wait).await.map_err(|e| e.to_string())?;
     let code = q.get("code").cloned().unwrap_or_default();

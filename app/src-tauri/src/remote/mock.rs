@@ -22,6 +22,10 @@ pub struct MockState {
     pub calls: Vec<(String, Value)>,
     /// The Authorization header of every request.
     pub auth_seen: Vec<Option<String>>,
+    /// tools/call answers HTTP 500 with this body.
+    pub fail_call_body: Option<String>,
+    /// tools/call waits this long before it answers.
+    pub call_delay_ms: u64,
     pub oauth: OAuthMock,
 }
 
@@ -38,6 +42,10 @@ pub struct OAuthMock {
     /// Keep a challenge that no verifier matches.
     pub tamper_challenge: bool,
     pub expires_in: u64,
+    /// Leave expires_in out of token replies.
+    pub omit_expiry: bool,
+    /// Advertise an authorization endpoint that is not https or loopback.
+    pub bad_authorize: bool,
     pub refuse_refresh: bool,
     pub registrations: Vec<Value>,
     pub authorize_seen: Vec<HashMap<String, String>>,
@@ -57,6 +65,8 @@ impl Default for OAuthMock {
             broken_metadata: false,
             tamper_challenge: false,
             expires_in: 3600,
+            omit_expiry: false,
+            bad_authorize: false,
             refuse_refresh: false,
             registrations: vec![],
             authorize_seen: vec![],
@@ -123,35 +133,48 @@ fn rpc_result(id: &Value, result: Value) -> Response {
 }
 
 async fn mcp(State(ctx): State<Ctx>, headers: HeaderMap, body: Bytes) -> Response {
+    let (res, delay) = mcp_locked(&ctx, &headers, &body);
+    if delay > 0 {
+        tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+    }
+    res
+}
+
+/// Everything under the lock, with no await. Returns the reply and how long to wait first.
+fn mcp_locked(ctx: &Ctx, headers: &HeaderMap, body: &Bytes) -> (Response, u64) {
+    let r = |x: Response| (x, 0);
     let auth = headers.get("authorization").and_then(|v| v.to_str().ok()).map(str::to_string);
     let mut st = ctx.state.lock().unwrap();
     st.auth_seen.push(auth.clone());
     if st.down {
-        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+        return r(StatusCode::SERVICE_UNAVAILABLE.into_response());
     }
     if let Some(t) = &st.token {
         if auth.as_deref() != Some(&format!("Bearer {t}")) {
             let challenge = format!("Bearer resource_metadata=\"{}/.well-known/oauth-protected-resource/mcp\"", ctx.base);
-            return (StatusCode::UNAUTHORIZED, [("www-authenticate", challenge)]).into_response();
+            return r((StatusCode::UNAUTHORIZED, [("www-authenticate", challenge)]).into_response());
         }
     }
-    let Ok(req) = serde_json::from_slice::<Value>(&body) else { return StatusCode::BAD_REQUEST.into_response() };
-    let Some(id) = req.get("id").cloned() else { return StatusCode::ACCEPTED.into_response() };
+    let Ok(req) = serde_json::from_slice::<Value>(body) else { return r(StatusCode::BAD_REQUEST.into_response()) };
+    let Some(id) = req.get("id").cloned() else { return r(StatusCode::ACCEPTED.into_response()) };
     let params = req.get("params").cloned().unwrap_or(Value::Null);
     match req["method"].as_str().unwrap_or("") {
-        "initialize" => rpc_result(
+        "initialize" => r(rpc_result(
             &id,
             json!({"protocolVersion": params["protocolVersion"].as_str().unwrap_or("2025-06-18"), "capabilities": {"tools": {}}, "serverInfo": {"name": "mock", "version": "1"}}),
-        ),
-        "ping" => rpc_result(&id, json!({})),
-        "tools/list" => rpc_result(&id, json!({"tools": st.tools})),
+        )),
+        "ping" => r(rpc_result(&id, json!({}))),
+        "tools/list" => r(rpc_result(&id, json!({"tools": st.tools}))),
         "tools/call" => {
             let name = params["name"].as_str().unwrap_or("").to_string();
             st.calls.push((name.clone(), params.get("arguments").cloned().unwrap_or(json!({}))));
-            let r = st.results.get(&name).cloned().unwrap_or_else(|| json!({"content": [{"type": "text", "text": format!("ran {name}")}]}));
-            rpc_result(&id, r)
+            if let Some(body) = st.fail_call_body.clone() {
+                return r((StatusCode::INTERNAL_SERVER_ERROR, body).into_response());
+            }
+            let res = st.results.get(&name).cloned().unwrap_or_else(|| json!({"content": [{"type": "text", "text": format!("ran {name}")}]}));
+            (rpc_result(&id, res), st.call_delay_ms)
         }
-        _ => axum::Json(json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": "no such method"}})).into_response(),
+        _ => r(axum::Json(json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": "no such method"}})).into_response()),
     }
 }
 
@@ -167,7 +190,7 @@ async fn asm(State(ctx): State<Ctx>) -> Response {
     let b = &ctx.base;
     let mut m = json!({
         "issuer": b,
-        "authorization_endpoint": format!("{b}/authorize"),
+        "authorization_endpoint": if st.oauth.bad_authorize { "file:///etc/passwd".to_string() } else { format!("{b}/authorize") },
         "token_endpoint": format!("{b}/token"),
         "revocation_endpoint": format!("{b}/revoke"),
         "response_types_supported": ["code"],
@@ -215,7 +238,11 @@ fn issue(st: &mut MockState) -> Response {
     st.oauth.n += 1;
     let access = format!("at-{}", st.oauth.n);
     st.token = Some(access.clone());
-    axum::Json(json!({"access_token": access, "token_type": "Bearer", "expires_in": st.oauth.expires_in, "refresh_token": format!("rt-{}", st.oauth.n), "scope": "read write"})).into_response()
+    let mut t = json!({"access_token": access, "token_type": "Bearer", "expires_in": st.oauth.expires_in, "refresh_token": format!("rt-{}", st.oauth.n), "scope": "read write"});
+    if st.oauth.omit_expiry {
+        t.as_object_mut().unwrap().remove("expires_in");
+    }
+    axum::Json(t).into_response()
 }
 
 fn token_error(e: &str) -> Response {
