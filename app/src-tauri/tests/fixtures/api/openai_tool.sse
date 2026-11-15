@@ -1,0 +1,16 @@
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-1","provider":"Anthropic","choices":[{"index":0,"delta":{"role":"assistant","content":"Checking."},"finish_reason":null}]}
+
+data: {"id":"gen-1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_a","type":"function","function":{"name":"bleep_now","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"gen-1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"tz\": \"Asi"}}]},"finish_reason":null}]}
+
+data: {"id":"gen-1","choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"id":"call_b","type":"function","function":{"name":"calendar_list","arguments":"{}"}}]},"finish_reason":null}]}
+
+data: {"id":"gen-1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"a/Kolkata\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"gen-1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":40,"completion_tokens":22,"cost":0.0004}}
+
+data: [DONE]
+

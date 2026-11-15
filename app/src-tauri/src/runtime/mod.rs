@@ -1,5 +1,6 @@
 //! The agent runtime boundary. Chat, scheduler and compaction only see this trait,
 //! never which vendor runs. Nothing here assumes a child process or a CLI session.
+pub mod api;
 pub mod claude;
 pub mod contract;
 pub mod fake;

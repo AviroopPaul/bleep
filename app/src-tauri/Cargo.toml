@@ -37,11 +37,12 @@ objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSResponder"] }
 rusqlite = { version = "0.42", features = ["bundled"] }
 oauth2 = { version = "5", default-features = false, features = ["reqwest", "rustls-tls"] }
 keyring = { version = "3", features = ["apple-native"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 # rmcp's HTTP client type, for its OAuth-aware MCP transport.
 reqwest013 = { package = "reqwest", version = "0.13", default-features = false }
 tauri-plugin-opener = "2"
 base64 = "0.22"
+bytes = "1"
 regex = "1"
 tokio-tungstenite = "0.30.0"
 toml_edit = "0.25.19"
