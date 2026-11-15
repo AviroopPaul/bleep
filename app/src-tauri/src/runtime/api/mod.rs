@@ -5,3 +5,6 @@ pub mod openai;
 pub mod presets;
 pub mod prices;
 pub mod types;
+pub mod agent;
+#[cfg(test)]
+mod http_tests;

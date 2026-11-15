@@ -10,6 +10,7 @@ use crate::connectors::calendar::CalEvent;
 
 mod memory;
 pub use memory::*;
+pub mod api;
 mod remote;
 
 macro_rules! str_enum {
@@ -334,6 +335,27 @@ CREATE TABLE mcp_tools (
   PRIMARY KEY (server, pos)
 );
 ALTER TABLE sessions ADD COLUMN tools_hash TEXT;
+"#, r#"
+CREATE TABLE api_messages (
+  conv TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  msg TEXT NOT NULL,
+  PRIMARY KEY (conv, seq)
+);
+CREATE TABLE api_usage (
+  id INTEGER PRIMARY KEY,
+  day TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  tokens_in INTEGER NOT NULL,
+  cache_read INTEGER NOT NULL,
+  cache_write INTEGER NOT NULL,
+  tokens_out INTEGER NOT NULL,
+  cost REAL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX api_usage_day ON api_usage(day);
 "#];
 
 pub struct Store {
