@@ -3,3 +3,4 @@ pub mod cues;
 pub mod checkins;
 pub mod notifier;
 pub mod scheduler;
+pub mod patterns;

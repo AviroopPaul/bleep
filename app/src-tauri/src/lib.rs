@@ -244,7 +244,17 @@ pub fn run() {
             let notifier = proactive::notifier::Notifier::new(store.clone(), bar_ui, paused.clone(), mail_cfg, Arc::new(chrono::Utc::now));
             app.manage(notifier.clone());
             let pipeline = mail::pipeline::MailPipeline::new(watcher, triager, notifier.clone(), store.clone());
-            start_agent_watch(app, store.clone(), chat.runtime().clone(), notifier, paused.clone());
+            start_agent_watch(app, store.clone(), chat.runtime().clone(), notifier.clone(), paused.clone());
+            let h = app.handle().clone();
+            let patterns = proactive::patterns::PatternJob::new(proactive::patterns::PatternDeps {
+                store: store.clone(),
+                runtime: chat.runtime().clone(),
+                memory: app.state::<AppState>().memory.clone(),
+                nightly: Arc::new(move || h.state::<AppState>().config.lock().unwrap().memory.nightly.clone()),
+                paused: paused.clone(),
+                ping: notifier,
+                now: Arc::new(chrono::Local::now),
+            });
             let h = app.handle().clone();
             let checkins = proactive::checkins::CheckinRunner::new(
                 store,
@@ -262,6 +272,7 @@ pub fn run() {
                     every.tick().await;
                     pipeline.tick(chrono::Utc::now()).await;
                     checkins.tick().await;
+                    patterns.tick().await;
                 }
             });
             windows::setup_tray(app.handle())?;

@@ -117,6 +117,16 @@ impl Store {
         Ok(Some(db.query_row(&sql, params![id], row_to_proposal)?))
     }
 
+    /// A model call logged at a given time (tests of the hourly cap with a fixed clock).
+    #[cfg(test)]
+    pub fn log_llm_at(&self, purpose: &str, at: DateTime<Utc>) -> Result<()> {
+        self.db().execute(
+            "INSERT INTO llm_calls (runtime, tier, purpose, tokens_in, tokens_out, ok, created_at) VALUES ('claude', 'small', ?1, NULL, NULL, 1, ?2)",
+            params![purpose, ts(at)],
+        )?;
+        Ok(())
+    }
+
     pub fn index_note(&self, date: &str, time: &str, text: &str) -> Result<()> {
         self.db().execute("INSERT INTO note_fts (text, date, time) VALUES (?1, ?2, ?3)", params![text, date, time])?;
         Ok(())
