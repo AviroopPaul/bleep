@@ -137,7 +137,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let emit: chat::Emit = Arc::new(move |m: ChatEmit| {
         let _ = h.emit("chat://event", m);
     });
-    let chat = Arc::new(ChatService::new(store.clone(), runtime, McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns));
+    let chat = Arc::new(ChatService::new(store.clone(), runtime, McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns).with_memory(memory.clone()));
     let c = chat.clone();
     tauri::async_runtime::spawn(async move {
         if c.runtime().health().await.ok() {
