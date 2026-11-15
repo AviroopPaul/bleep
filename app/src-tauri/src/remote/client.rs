@@ -135,13 +135,21 @@ impl RemoteConnector {
     fn bearer(&self) -> Option<String> {
         match self.config().auth {
             McpAuth::Token => self.server_secrets().token(),
-            _ => None,
+            McpAuth::Oauth => crate::remote::auth::saved_access_token(self.secrets.as_ref(), &self.name),
+            McpAuth::None => None,
         }
     }
 
     async fn open(&self) -> Result<Live, String> {
         let cfg = self.config();
         let mut tc = StreamableHttpClientTransportConfig::with_uri(cfg.url.clone());
+        if cfg.auth == McpAuth::Oauth {
+            // rmcp's AuthClient adds the token to every request and refreshes it when it expires.
+            let m = crate::remote::auth::saved_manager(&cfg.url, &self.name, self.secrets.clone()).await?.ok_or_else(|| self.sign_in_text())?;
+            let client = rmcp::transport::auth::AuthClient::new(reqwest013::Client::default(), m);
+            let transport = StreamableHttpClientTransport::with_client(client, tc);
+            return client_info().serve(transport).await.map_err(|e| e.to_string());
+        }
         if let Some(t) = self.bearer() {
             tc = tc.auth_header(t);
         }
@@ -151,6 +159,12 @@ impl RemoteConnector {
 
     /// Works out why the server failed, sets the status, and gives the text for the model.
     async fn failed(&self, detail: &str) -> String {
+        // rmcp erases the error type on the way out, so its auth errors are known by their text.
+        let d = detail.to_lowercase();
+        if d.contains("auth required") || d.contains("authorization required") || d.contains("insufficient scope") || detail == self.sign_in_text() {
+            self.set_status(ConnectorStatus::NeedsSignIn);
+            return self.sign_in_text();
+        }
         match probe_with(&self.config().url, self.bearer().as_deref()).await {
             Probe::AuthRequired { .. } => {
                 self.set_status(ConnectorStatus::NeedsSignIn);

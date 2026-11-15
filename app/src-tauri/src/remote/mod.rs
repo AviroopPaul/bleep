@@ -3,6 +3,7 @@
 pub mod names;
 pub mod secrets;
 pub mod tools;
+pub mod auth;
 pub mod client;
 #[cfg(test)]
 pub mod mock;

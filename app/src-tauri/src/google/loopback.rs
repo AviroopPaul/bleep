@@ -19,20 +19,26 @@ fn page(text: &str) -> Html<String> {
 /// Serves `/` until one reply arrives, then stops. Returns the authorization code,
 /// or an error in plain words. A reply with the wrong `state` is refused.
 pub async fn catch(listener: TcpListener, state: &str, wait: Duration) -> anyhow::Result<String> {
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<Result<String, String>>(1);
+    let q = catch_at(listener, "/", state, wait).await?;
+    Ok(q.get("code").cloned().unwrap_or_default())
+}
+
+/// Like `catch` on any path, and returns the whole query (`code`, `state`, `iss`).
+pub async fn catch_at(listener: TcpListener, path: &str, state: &str, wait: Duration) -> anyhow::Result<HashMap<String, String>> {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Result<HashMap<String, String>, String>>(1);
     let expected = state.to_string();
     let app = axum::Router::new().route(
-        "/",
+        path,
         axum::routing::get(move |Query(q): Query<HashMap<String, String>>| {
             let (tx, expected) = (tx.clone(), expected.clone());
             async move {
-                let (res, text): (Result<String, String>, &str) = if q.get("state") != Some(&expected) {
+                let (res, text): (Result<HashMap<String, String>, String>, &str) = if q.get("state") != Some(&expected) {
                     (Err(MISMATCH.into()), MISMATCH)
                 } else if let Some(e) = q.get("error") {
                     let why = if e == "access_denied" { CANCELLED.to_string() } else { format!("Sign-in failed: {e}.") };
                     (Err(why), CANCELLED)
-                } else if let Some(code) = q.get("code") {
-                    (Ok(code.clone()), DONE)
+                } else if q.contains_key("code") {
+                    (Ok(q.clone()), DONE)
                 } else {
                     (Err(MISMATCH.into()), MISMATCH)
                 };
@@ -50,7 +56,7 @@ pub async fn catch(listener: TcpListener, state: &str, wait: Duration) -> anyhow
     stop.cancel();
     match got {
         Err(_) | Ok(None) => bail!("No answer from the browser in {} minutes.", wait.as_secs().div_ceil(60).max(1)),
-        Ok(Some(Ok(code))) => Ok(code),
+        Ok(Some(Ok(q))) => Ok(q),
         Ok(Some(Err(why))) => bail!(why),
     }
 }
