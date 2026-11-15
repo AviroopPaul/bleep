@@ -10,6 +10,7 @@ use crate::connectors::calendar::CalEvent;
 
 mod memory;
 pub use memory::*;
+mod remote;
 
 macro_rules! str_enum {
     ($name:ident { $($v:ident = $s:literal),+ $(,)? }) => {
@@ -170,6 +171,8 @@ pub struct Session {
     pub memory_known: Option<String>,
     /// Context size after the last turn, in tokens.
     pub context_used: Option<i64>,
+    /// Hash of the tool set this session started with (Phase 7).
+    pub tools_hash: Option<String>,
 }
 
 const MIGRATIONS: &[&str] = &[r#"
@@ -322,6 +325,15 @@ CREATE TRIGGER msg_fts_au AFTER UPDATE ON messages BEGIN
 END;
 INSERT INTO msg_fts(rowid, content) SELECT id, content FROM messages WHERE status = 'done' AND role IN ('user', 'assistant');
 CREATE VIRTUAL TABLE note_fts USING fts5(text, date UNINDEXED, time UNINDEXED);
+"#, r#"
+CREATE TABLE mcp_tools (
+  server TEXT NOT NULL,
+  pos INTEGER NOT NULL,
+  spec TEXT NOT NULL,
+  fetched_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (server, pos)
+);
+ALTER TABLE sessions ADD COLUMN tools_hash TEXT;
 "#];
 
 pub struct Store {
@@ -417,7 +429,7 @@ pub const UNFINISHED: &str = "bleep closed before this finished. Check your cale
 const APPROVAL_COLS: &str = "id, tool, payload, status, turn_message_id, result, created_at, decided_at";
 
 fn row_to_session(r: &Row) -> rusqlite::Result<Session> {
-    Ok(Session { id: r.get(0)?, runtime: r.get(1)?, runtime_session_id: r.get(2)?, started_at: r.get(3)?, ended_at: r.get(4)?, seed: r.get(5)?, memory_known: r.get(6)?, context_used: r.get(7)? })
+    Ok(Session { id: r.get(0)?, runtime: r.get(1)?, runtime_session_id: r.get(2)?, started_at: r.get(3)?, ended_at: r.get(4)?, seed: r.get(5)?, memory_known: r.get(6)?, context_used: r.get(7)?, tools_hash: r.get(8)? })
 }
 
 const AGENT_COLS: &str = "id, tool, project, title, transcript_path, state, last_ask, updated";
@@ -457,7 +469,7 @@ fn row_to_ask(r: &Row) -> rusqlite::Result<AgentAsk> {
 }
 
 const MSG_COLS: &str = "id, role, kind, content, tool_steps, tokens, status, session_id, created_at";
-const SESSION_COLS: &str = "id, runtime, runtime_session_id, started_at, ended_at, seed, memory_known, context_used";
+const SESSION_COLS: &str = "id, runtime, runtime_session_id, started_at, ended_at, seed, memory_known, context_used, tools_hash";
 
 impl Store {
     pub fn open(path: &Path) -> Result<Store> {

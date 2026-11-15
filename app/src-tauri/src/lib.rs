@@ -15,6 +15,7 @@ pub mod memory_cmds;
 pub mod opener;
 pub mod paths;
 pub mod proactive;
+pub mod remote;
 pub mod runtime;
 pub mod settings;
 pub mod setup;

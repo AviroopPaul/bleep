@@ -22,7 +22,7 @@ anyhow = "1"
 async-trait = "0.1"
 futures = "0.3"
 tokio = { version = "1", features = ["full"] }
-rmcp = { version = "3.9", features = ["server", "macros", "transport-streamable-http-server"] }
+rmcp = { version = "3.9", features = ["server", "macros", "transport-streamable-http-server", "client", "transport-streamable-http-client-reqwest", "reqwest", "auth"] }
 axum = "0.8"
 tokio-util = "0.7"
 chrono = "0.4"
