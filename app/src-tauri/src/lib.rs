@@ -41,8 +41,14 @@ pub struct AppState {
     pub approvals: Arc<approvals::Approvals>,
     pub memory: Arc<memory::Memory>,
     pub remotes: Arc<remote::manager::Remotes>,
+    /// The runtime everything uses; Settings swaps what is inside (Phase 9).
+    pub runtime: Arc<runtime::switch::SwitchRuntime>,
+    pub make_runtime: RuntimeFactory,
+    pub budget: Arc<runtime::switch::Budget>,
     pub _mcp: mcp::McpServer,
 }
+
+pub type RuntimeFactory = Arc<dyn Fn(&Config) -> Arc<dyn runtime::AgentRuntime> + Send + Sync>;
 
 const GMAIL_API: &str = "https://gmail.googleapis.com/gmail/v1";
 
@@ -53,6 +59,8 @@ struct Parts {
     calendar: Arc<connectors::calendar::CalendarConnector>,
     watcher: Arc<mail::watch::MailWatcher>,
     triager: Arc<mail::triage::Triager>,
+    /// The runtime for proactive work, stopped by the spend cap.
+    capped: Arc<dyn runtime::AgentRuntime>,
 }
 
 /// Approve or Decline on a card.
@@ -138,15 +146,39 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let own_port = reqwest::Url::parse(&mcp.url()).ok().and_then(|u| u.port());
     let remotes = remote::manager::Remotes::new(tool_host.clone(), store.clone(), Arc::new(google::secrets::KeychainSecrets), Arc::new(opener::SystemOpener(handle.clone())), own_port);
     remotes.load(&config.mcp.servers);
-    let bin = find_claude().unwrap_or_else(|| "claude".into());
-    let runtime = Arc::new(ClaudeRuntime::new(paths.clone(), config.tiers.clone(), bin).with_hold(approvals.waiting()));
+    let make_runtime: RuntimeFactory = {
+        let (paths, store, hold) = (paths.clone(), store.clone(), approvals.waiting());
+        let bin = find_claude().unwrap_or_else(|| "claude".into());
+        Arc::new(move |cfg: &Config| -> Arc<dyn runtime::AgentRuntime> {
+            if cfg.runtime == "api" {
+                let rt = runtime::api::from_config(&cfg.api, &google::secrets::KeychainSecrets, store.clone());
+                let r = rt.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = r.load_models().await {
+                        eprintln!("bleep: model list: {e}");
+                    }
+                });
+                Arc::new(rt)
+            } else {
+                Arc::new(ClaudeRuntime::new(paths.clone(), cfg.tiers.clone(), bin.clone()).with_hold(hold.clone()))
+            }
+        })
+    };
+    let runtime = runtime::switch::SwitchRuntime::new(make_runtime(&config));
     let h = handle.clone();
-    let triager = mail::triage::Triager::new(runtime.clone(), store.clone(), Arc::new(move || h.state::<AppState>().config.lock().unwrap().mail.clone()));
+    let budget = runtime::switch::Budget::new(store.clone(), Arc::new(move || {
+        let c = h.state::<AppState>().config.lock().unwrap().clone();
+        (c.runtime == "api").then_some(c.api.daily_cap_usd)
+    }));
+    // Proactive work stops for the day at the API spend cap. Chat does not.
+    let capped: Arc<dyn runtime::AgentRuntime> = runtime::switch::CappedRuntime::new(runtime.clone(), budget.clone());
+    let h = handle.clone();
+    let triager = mail::triage::Triager::new(capped.clone(), store.clone(), Arc::new(move || h.state::<AppState>().config.lock().unwrap().mail.clone()));
     let h = handle.clone();
     let emit: chat::Emit = Arc::new(move |m: ChatEmit| {
         let _ = h.emit("chat://event", m);
     });
-    let chat = (ChatService::new(store.clone(), runtime, McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns).with_memory(memory.clone()).with_window_sink({
+    let chat = (ChatService::new(store.clone(), runtime.clone(), McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns).with_memory(memory.clone()).with_window_sink({
         let h = handle.clone();
         Arc::new(move |w| {
             let st = h.state::<AppState>();
@@ -183,12 +215,12 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     tauri::async_runtime::spawn(async move {
         if c.runtime().health().await.ok() {
             if let Err(e) = c.ensure_session().await {
-                eprintln!("bleep: could not start the Claude session: {e}");
+                eprintln!("bleep: could not start the chat session: {e}");
             }
         }
     });
-    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, memory, remotes, _mcp: mcp };
-    Ok(Parts { state, google, calendar, watcher, triager })
+    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, memory, remotes, runtime, make_runtime, budget, _mcp: mcp };
+    Ok(Parts { state, google, calendar, watcher, triager, capped })
 }
 
 /// Agent watch (Phase 4): the hook socket, the hub, and the Codex client.
@@ -235,7 +267,8 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            let Parts { state, google, calendar, watcher, triager } = init(app)?;
+            let Parts { state, google, calendar, watcher, triager, capped } = init(app)?;
+            let budget = state.budget.clone();
             let chat = state.chat.clone();
             let cfg = state.config.lock().unwrap().clone();
             let store = state.store.clone();
@@ -261,11 +294,11 @@ pub fn run() {
             let notifier = proactive::notifier::Notifier::new(store.clone(), bar_ui, paused.clone(), mail_cfg, Arc::new(chrono::Utc::now));
             app.manage(notifier.clone());
             let pipeline = mail::pipeline::MailPipeline::new(watcher, triager, notifier.clone(), store.clone());
-            start_agent_watch(app, store.clone(), chat.runtime().clone(), notifier.clone(), paused.clone());
+            start_agent_watch(app, store.clone(), capped.clone(), notifier.clone(), paused.clone());
             let h = app.handle().clone();
             let patterns = proactive::patterns::PatternJob::new(proactive::patterns::PatternDeps {
                 store: store.clone(),
-                runtime: chat.runtime().clone(),
+                runtime: capped,
                 memory: app.state::<AppState>().memory.clone(),
                 nightly: Arc::new(move || h.state::<AppState>().config.lock().unwrap().memory.nightly.clone()),
                 paused: paused.clone(),
@@ -281,6 +314,7 @@ pub fn run() {
                 Arc::new(chrono::Utc::now),
                 Arc::new(|t: chrono::DateTime<chrono::Utc>| t.with_timezone(&chrono::Local).naive_local()),
             );
+            checkins.set_budget(budget);
             // Mail every 2 minutes and check-ins, on one 30 s clock.
             tauri::async_runtime::spawn(async move {
                 let mut every = tokio::time::interval(proactive::scheduler::TICK);

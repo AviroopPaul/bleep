@@ -40,7 +40,7 @@ test("a failed send is shown and the text is kept", async ({ page }) => {
   await expect(page.locator(".msg.me")).toHaveText(["hello"]);
   await box.fill("fail please");
   await box.press("Enter");
-  await expect(page.locator(".msg.sys.err")).toContainText("could not reach Claude Code");
+  await expect(page.locator(".msg.sys.err")).toContainText("could not reach the model");
   await expect(box).toBeEnabled();
   await expect(box).toHaveValue("fail please");
 });

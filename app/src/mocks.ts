@@ -130,7 +130,7 @@ export function installMocks(label: string) {
           calls.push(cmd);
           return null;
         case "chat_send": {
-          if (a.text === "fail please") throw "bleep could not reach Claude Code: spawn failed";
+          if (a.text === "fail please") throw "bleep could not reach the model: spawn failed";
           next += 2;
           const id = next;
           if (String(a.text).includes("markdown")) {

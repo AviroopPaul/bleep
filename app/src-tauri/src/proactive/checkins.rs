@@ -121,16 +121,22 @@ pub struct CheckinRunner {
     paused: Arc<AtomicBool>,
     now: Clock,
     local: LocalTime,
+    /// API spend cap (Phase 9): over it, no check-in today.
+    budget: std::sync::OnceLock<Arc<crate::runtime::switch::Budget>>,
 }
 
 impl CheckinRunner {
     pub fn new(store: Arc<Store>, chat: Arc<ChatService>, cfg: Arc<dyn Fn() -> CheckinConfig + Send + Sync>, paused: Arc<AtomicBool>, now: Clock, local: LocalTime) -> Arc<CheckinRunner> {
-        Arc::new(CheckinRunner { store, chat, cfg, paused, now, local })
+        Arc::new(CheckinRunner { store, chat, cfg, paused, now, local, budget: Default::default() })
+    }
+
+    pub fn set_budget(&self, b: Arc<crate::runtime::switch::Budget>) {
+        let _ = self.budget.set(b);
     }
 
     /// Runs the due check-in, if any. Returns its label when a turn was sent.
     pub async fn tick(&self) -> Option<String> {
-        if self.paused.load(Ordering::SeqCst) {
+        if self.paused.load(Ordering::SeqCst) || self.budget.get().is_some_and(|b| b.over()) {
             return None;
         }
         let now = (self.now)();
@@ -280,6 +286,15 @@ mod tests {
         r.r.paused.store(true, Ordering::SeqCst);
         assert_eq!(r.r.tick().await, None);
         assert!(!r.store.has_ping(KIND, "2026-11-12@13:00").unwrap(), "not consumed while paused");
+    }
+
+    #[tokio::test]
+    async fn over_the_spend_cap_runs_nothing() {
+        let r = rig(vec![vec![done()]]);
+        bill_due(&r.store, "b1", "2026-11-13");
+        r.r.set_budget(crate::runtime::switch::Budget::with_today(r.store.clone(), Arc::new(|| Some(0.0)), Arc::new(|| "2026-11-12".into())));
+        assert_eq!(r.r.tick().await, None);
+        assert!(!r.store.has_ping(KIND, "2026-11-12@13:00").unwrap(), "not consumed while over the cap");
     }
 
     #[test]

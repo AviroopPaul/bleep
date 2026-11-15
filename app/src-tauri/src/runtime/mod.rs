@@ -2,6 +2,7 @@
 //! never which vendor runs. Nothing here assumes a child process or a CLI session.
 pub mod api;
 pub mod claude;
+pub mod switch;
 pub mod contract;
 pub mod fake;
 

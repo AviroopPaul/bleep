@@ -22,6 +22,7 @@ pub struct FakeRuntime {
     pub one_shot_images: Mutex<Vec<usize>>,
     /// Each `one_shot` waits this long first (tests of work that holds the chat).
     pub one_shot_delay_ms: std::sync::atomic::AtomicU64,
+    pub id: &'static str,
 }
 
 impl FakeRuntime {
@@ -39,6 +40,7 @@ impl FakeRuntime {
             one_shots: Mutex::new(vec![]),
             one_shot_images: Mutex::new(vec![]),
             one_shot_delay_ms: Default::default(),
+            id: "claude",
         }
     }
 }
@@ -46,7 +48,7 @@ impl FakeRuntime {
 #[async_trait]
 impl AgentRuntime for FakeRuntime {
     fn id(&self) -> &'static str {
-        "claude"
+        self.id
     }
 
     async fn health(&self) -> RuntimeHealth {
