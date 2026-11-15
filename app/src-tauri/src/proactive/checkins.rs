@@ -292,7 +292,8 @@ mod tests {
     async fn over_the_spend_cap_runs_nothing() {
         let r = rig(vec![vec![done()]]);
         bill_due(&r.store, "b1", "2026-11-13");
-        r.r.set_budget(crate::runtime::switch::Budget::with_today(r.store.clone(), Arc::new(|| Some(0.0)), Arc::new(|| "2026-11-12".into())));
+        r.store.log_api_usage(&crate::store::api::ApiUsage { day: "2026-11-12", provider: "p", model: "m", purpose: "chat", tokens_in: 1, cache_read: 0, cache_write: 0, tokens_out: 1, cost: Some(1.5) }).unwrap();
+        r.r.set_budget(crate::runtime::switch::Budget::with_today(r.store.clone(), Arc::new(|| Some(1.0)), Arc::new(|| "2026-11-12".into())));
         assert_eq!(r.r.tick().await, None);
         assert!(!r.store.has_ping(KIND, "2026-11-12@13:00").unwrap(), "not consumed while over the cap");
     }
