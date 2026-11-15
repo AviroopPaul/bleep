@@ -49,7 +49,7 @@ function moved(b: P, c: P, tz?: string): string {
 
 const cut = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const REPLY: Record<string, string> = { accepted: "Yes", declined: "No", tentative: "Maybe" };
-const DONE: Record<string, string> = { calendar_create: "Added", calendar_update: "Changed", calendar_delete: "Deleted", calendar_respond: "Sent", gmail_send: "Sent" };
+const DONE: Record<string, string> = { calendar_create: "Added", calendar_update: "Changed", calendar_delete: "Deleted", calendar_respond: "Sent", gmail_send: "Sent", memory_promote: "Saved" };
 
 function doneText(a: Approval): string | null {
   switch (a.status) {
@@ -114,6 +114,11 @@ export function approvalView(a: Approval, timeZone?: string): CardView {
       rows.push(["Subject", String(p.subject ?? "")], ["Body", String(p.body ?? "")]);
       const fresh = list("new_recipients");
       if (fresh.length) warn = `${fresh.length === 1 ? "New recipient" : "New recipients"}: ${fresh.join(", ")}`;
+      break;
+    }
+    case "memory_promote": {
+      heading = "Remember this?";
+      rows.push(["Fact", String(p.fact ?? "")], ["Saved in", String(p.file ?? "MEMORY.md")]);
       break;
     }
     default:

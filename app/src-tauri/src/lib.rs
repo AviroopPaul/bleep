@@ -3,12 +3,15 @@ pub mod agentwatch;
 pub mod approvals;
 pub mod bar;
 pub mod chat;
+pub mod compaction;
 pub mod config;
 pub mod connectors;
 pub mod google;
 pub mod hotkey;
 pub mod mail;
 pub mod mcp;
+pub mod memory;
+pub mod memory_cmds;
 pub mod opener;
 pub mod paths;
 pub mod proactive;
@@ -34,6 +37,7 @@ pub struct AppState {
     pub store: Arc<Store>,
     pub chat: Arc<ChatService>,
     pub approvals: Arc<approvals::Approvals>,
+    pub memory: Arc<memory::Memory>,
     pub _mcp: mcp::McpServer,
 }
 
@@ -115,8 +119,17 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let approvals = approvals::Approvals::new(store.clone(), Arc::new(move |a| {
         let _ = h.emit("approval://changed", a);
     }), approvals::WAIT);
+    let memory = Arc::new(memory::Memory::new(paths.clone(), store.clone()));
+    if let Err(e) = memory.ensure() {
+        eprintln!("bleep: memory files: {e}");
+    }
+    match memory.reindex_notes() {
+        Ok(n) => eprintln!("bleep: indexed {n} daily-note lines"),
+        Err(e) => eprintln!("bleep: daily-note index: {e}"),
+    }
+    let memory_tools = Arc::new(connectors::memory::MemoryConnector::new(memory.clone(), Arc::new(chrono::Local::now)));
     let turns = mcp::host::TurnTracker::default();
-    let tool_host = mcp::host::ToolHost::new_logged(vec![Arc::new(connectors::bleep::BleepConnector), calendar.clone(), gmail], approvals.clone(), turns.clone(), store.clone());
+    let tool_host = mcp::host::ToolHost::new_logged(vec![Arc::new(connectors::bleep::BleepConnector), calendar.clone(), gmail, memory_tools], approvals.clone(), turns.clone(), store.clone());
     let mcp = tauri::async_runtime::block_on(mcp::McpServer::start(mcp::new_token(), tool_host))?;
     let bin = find_claude().unwrap_or_else(|| "claude".into());
     let runtime = Arc::new(ClaudeRuntime::new(paths.clone(), config.tiers.clone(), bin).with_hold(approvals.waiting()));
@@ -126,7 +139,30 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let emit: chat::Emit = Arc::new(move |m: ChatEmit| {
         let _ = h.emit("chat://event", m);
     });
-    let chat = Arc::new(ChatService::new(store.clone(), runtime, McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns));
+    let chat = (ChatService::new(store.clone(), runtime, McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns).with_memory(memory.clone()).with_window_sink({
+        let h = handle.clone();
+        Arc::new(move |w| {
+            let st = h.state::<AppState>();
+            let mut cfg = st.config.lock().unwrap();
+            if cfg.memory.context_window != Some(w) {
+                cfg.memory.context_window = Some(w);
+                if let Err(e) = cfg.save(&st.paths.config_file) {
+                    eprintln!("bleep: save config: {e}");
+                }
+            }
+        })
+    }))
+    .with_memory_config({
+        let h = handle.clone();
+        Arc::new(move || h.state::<AppState>().config.lock().unwrap().memory.clone())
+    })
+    .with_compact_sink({
+        let h = handle.clone();
+        Arc::new(move |on: bool| {
+            let _ = h.emit("chat://compacting", on);
+        })
+    })
+    .into_arc();
     let c = chat.clone();
     tauri::async_runtime::spawn(async move {
         if c.runtime().health().await.ok() {
@@ -135,7 +171,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
             }
         }
     });
-    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, _mcp: mcp };
+    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, memory, _mcp: mcp };
     Ok(Parts { state, google, calendar, watcher, triager })
 }
 
@@ -209,7 +245,17 @@ pub fn run() {
             let notifier = proactive::notifier::Notifier::new(store.clone(), bar_ui, paused.clone(), mail_cfg, Arc::new(chrono::Utc::now));
             app.manage(notifier.clone());
             let pipeline = mail::pipeline::MailPipeline::new(watcher, triager, notifier.clone(), store.clone());
-            start_agent_watch(app, store.clone(), chat.runtime().clone(), notifier, paused.clone());
+            start_agent_watch(app, store.clone(), chat.runtime().clone(), notifier.clone(), paused.clone());
+            let h = app.handle().clone();
+            let patterns = proactive::patterns::PatternJob::new(proactive::patterns::PatternDeps {
+                store: store.clone(),
+                runtime: chat.runtime().clone(),
+                memory: app.state::<AppState>().memory.clone(),
+                nightly: Arc::new(move || h.state::<AppState>().config.lock().unwrap().memory.nightly.clone()),
+                paused: paused.clone(),
+                ping: notifier,
+                now: Arc::new(chrono::Local::now),
+            });
             let h = app.handle().clone();
             let checkins = proactive::checkins::CheckinRunner::new(
                 store,
@@ -227,6 +273,7 @@ pub fn run() {
                     every.tick().await;
                     pipeline.tick(chrono::Utc::now()).await;
                     checkins.tick().await;
+                    patterns.tick().await;
                 }
             });
             windows::setup_tray(app.handle())?;
@@ -280,7 +327,16 @@ pub fn run() {
             agents::agents_install_codex_notify,
             agents::agents_remove_codex_notify,
             agents::agents_set,
-            agents::agents_reveal_rules
+            agents::agents_reveal_rules,
+            memory_cmds::memory_list,
+            memory_cmds::memory_forget,
+            memory_cmds::memory_suggestions,
+            memory_cmds::memory_decide,
+            memory_cmds::memory_settings,
+            memory_cmds::memory_set,
+            memory_cmds::memory_compact_now,
+            memory_cmds::memory_reveal,
+            memory_cmds::chat_context
         ])
         .run(tauri::generate_context!())
         .expect("error while running bleep");

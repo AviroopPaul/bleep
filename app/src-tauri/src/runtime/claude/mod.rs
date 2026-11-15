@@ -105,7 +105,7 @@ impl ClaudeRuntime {
     fn spawn(&self, cfg: &SessionConfig) -> anyhow::Result<Warm> {
         let files = write_run_files(&self.paths, cfg)?;
         let log = std::fs::OpenOptions::new().create(true).append(true).open(self.paths.logs.join("claude.log"))?;
-        let mut child = base_command(&self.bin, &self.paths)
+        let mut child = chat_command(&self.bin, &self.paths)
             .args(chat_args(cfg, &files, &self.tiers))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

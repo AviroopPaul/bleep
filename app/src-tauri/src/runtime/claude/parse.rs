@@ -7,7 +7,10 @@ use serde_json::Value;
 pub const TOOL_PREFIX: &str = "mcp__bleep__";
 
 #[derive(Default)]
-pub struct ClaudeParser;
+pub struct ClaudeParser {
+    /// Input of the latest model call in this turn (input + cache creation + cache read).
+    last_input: Option<u64>,
+}
 
 fn tool_result_text(content: &Value) -> String {
     match content {
@@ -43,7 +46,11 @@ impl ClaudeParser {
                     _ => vec![],
                 }
             }
-            Some("assistant") => content()
+            Some("assistant") => {
+                if let Some(us) = v.pointer("/message/usage") {
+                    self.last_input = Some(u(us, "input_tokens") + u(us, "cache_creation_input_tokens") + u(us, "cache_read_input_tokens"));
+                }
+                content()
                 .iter()
                 .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_use"))
                 .map(|b| {
@@ -54,7 +61,8 @@ impl ClaudeParser {
                         args: b.get("input").cloned().unwrap_or(Value::Null),
                     }
                 })
-                .collect(),
+                .collect()
+            }
             Some("user") => content()
                 .iter()
                 .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_result"))
@@ -85,7 +93,10 @@ impl ClaudeParser {
                 } else {
                     let us = &v["usage"];
                     let input = u(us, "input_tokens") + u(us, "cache_creation_input_tokens") + u(us, "cache_read_input_tokens");
-                    vec![AgentEvent::Usage { input, output: u(us, "output_tokens") }, AgentEvent::Done { runtime_session_id: sid }]
+                    // `usage` adds up every call in the turn; the context is the last call.
+                    let used = self.last_input.take().unwrap_or(input);
+                    let window = v.get("modelUsage").and_then(Value::as_object).and_then(|m| m.values().filter_map(|x| x.get("contextWindow").and_then(Value::as_u64)).max());
+                    vec![AgentEvent::Context { used, window }, AgentEvent::Usage { input, output: u(us, "output_tokens") }, AgentEvent::Done { runtime_session_id: sid }]
                 }
             }
             _ => vec![],
@@ -111,6 +122,22 @@ mod tests {
         assert_text_turn(&ev, "hi there");
         assert!(ev.contains(&AgentEvent::Usage { input: 3557, output: 5 }));
         assert_eq!(ev.last(), Some(&AgentEvent::Done { runtime_session_id: Some("b5b2cc90-ab10-43ed-b1af-333853209ad8".into()) }));
+    }
+
+    #[test]
+    fn context_is_the_last_call_not_the_turn_sum() {
+        let ev = fixture("turn_with_tools.jsonl");
+        assert!(ev.contains(&AgentEvent::Context { used: 2 + 78 + 4827, window: Some(1_000_000) }), "{ev:?}");
+        assert!(ev.contains(&AgentEvent::Usage { input: 6 + 4905 + 9576, output: 147 }), "Usage keeps the turn sum for cost");
+        let ctx = ev.iter().position(|e| matches!(e, AgentEvent::Context { .. })).unwrap();
+        let done = ev.iter().position(|e| matches!(e, AgentEvent::Done { .. })).unwrap();
+        assert!(ctx < done);
+    }
+
+    #[test]
+    fn context_without_model_usage_has_no_window() {
+        let ev = fixture("text_turn.jsonl");
+        assert!(ev.iter().any(|e| matches!(e, AgentEvent::Context { used, .. } if *used > 0)), "{ev:?}");
     }
 
     #[test]

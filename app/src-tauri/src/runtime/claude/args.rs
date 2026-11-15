@@ -120,9 +120,27 @@ pub fn base_command(bin: &Path, paths: &BleepPaths) -> tokio::process::Command {
     c
 }
 
+/// The chat process: `base_command`, with Claude Code's own compaction off, because bleep
+/// compacts the chat itself (build plan D9). Found in Claude Code 2.1.325.
+pub fn chat_command(bin: &Path, paths: &BleepPaths) -> tokio::process::Command {
+    let mut c = base_command(bin, paths);
+    c.env("DISABLE_AUTO_COMPACT", "1");
+    c
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_chat_turns_off_auto_compact() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = crate::paths::BleepPaths::from_root(dir.path().into());
+        let env = |c: &tokio::process::Command| c.as_std().get_envs().map(|(k, v)| (k.to_os_string(), v.map(|v| v.to_os_string()))).collect::<Vec<_>>();
+        assert!(env(&chat_command(Path::new("/bin/echo"), &paths)).contains(&("DISABLE_AUTO_COMPACT".into(), Some("1".into()))));
+        assert!(env(&chat_command(Path::new("/bin/echo"), &paths)).contains(&("MCP_TOOL_TIMEOUT".into(), Some("660000".into()))));
+        assert!(!env(&base_command(Path::new("/bin/echo"), &paths)).iter().any(|(k, _)| k == "DISABLE_AUTO_COMPACT"));
+    }
 
     #[test]
     fn child_env_sets_mcp_tool_timeout() {

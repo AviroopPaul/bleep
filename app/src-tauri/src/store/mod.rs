@@ -8,6 +8,9 @@ use std::sync::Mutex;
 use chrono::{DateTime, Utc};
 use crate::connectors::calendar::CalEvent;
 
+mod memory;
+pub use memory::*;
+
 macro_rules! str_enum {
     ($name:ident { $($v:ident = $s:literal),+ $(,)? }) => {
         #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -161,6 +164,12 @@ pub struct Session {
     pub runtime_session_id: Option<String>,
     pub started_at: String,
     pub ended_at: Option<String>,
+    /// Carry-over from the session before compaction, appended to the system prompt.
+    pub seed: Option<String>,
+    /// The memory text this session's model last saw.
+    pub memory_known: Option<String>,
+    /// Context size after the last turn, in tokens.
+    pub context_used: Option<i64>,
 }
 
 const MIGRATIONS: &[&str] = &[r#"
@@ -286,6 +295,33 @@ CREATE TABLE agent_asks (
   decided_at TEXT
 );
 CREATE INDEX agent_asks_session ON agent_asks(session_id, created_at);
+"#, r#"
+ALTER TABLE sessions ADD COLUMN seed TEXT;
+ALTER TABLE sessions ADD COLUMN memory_known TEXT;
+ALTER TABLE sessions ADD COLUMN context_used INTEGER;
+CREATE TABLE memory_proposals (
+  id INTEGER PRIMARY KEY,
+  fact TEXT NOT NULL,
+  norm TEXT NOT NULL,
+  source TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  decided_at TEXT
+);
+CREATE INDEX memory_proposals_norm ON memory_proposals(norm);
+CREATE VIRTUAL TABLE msg_fts USING fts5(content, content='messages', content_rowid='id');
+CREATE TRIGGER msg_fts_ai AFTER INSERT ON messages BEGIN
+  INSERT INTO msg_fts(rowid, content) SELECT new.id, new.content WHERE new.status = 'done' AND new.role IN ('user', 'assistant');
+END;
+CREATE TRIGGER msg_fts_ad AFTER DELETE ON messages BEGIN
+  INSERT INTO msg_fts(msg_fts, rowid, content) SELECT 'delete', old.id, old.content WHERE old.status = 'done' AND old.role IN ('user', 'assistant');
+END;
+CREATE TRIGGER msg_fts_au AFTER UPDATE ON messages BEGIN
+  INSERT INTO msg_fts(msg_fts, rowid, content) SELECT 'delete', old.id, old.content WHERE old.status = 'done' AND old.role IN ('user', 'assistant');
+  INSERT INTO msg_fts(rowid, content) SELECT new.id, new.content WHERE new.status = 'done' AND new.role IN ('user', 'assistant');
+END;
+INSERT INTO msg_fts(rowid, content) SELECT id, content FROM messages WHERE status = 'done' AND role IN ('user', 'assistant');
+CREATE VIRTUAL TABLE note_fts USING fts5(text, date UNINDEXED, time UNINDEXED);
 "#];
 
 pub struct Store {
@@ -381,7 +417,7 @@ pub const UNFINISHED: &str = "bleep closed before this finished. Check your cale
 const APPROVAL_COLS: &str = "id, tool, payload, status, turn_message_id, result, created_at, decided_at";
 
 fn row_to_session(r: &Row) -> rusqlite::Result<Session> {
-    Ok(Session { id: r.get(0)?, runtime: r.get(1)?, runtime_session_id: r.get(2)?, started_at: r.get(3)?, ended_at: r.get(4)? })
+    Ok(Session { id: r.get(0)?, runtime: r.get(1)?, runtime_session_id: r.get(2)?, started_at: r.get(3)?, ended_at: r.get(4)?, seed: r.get(5)?, memory_known: r.get(6)?, context_used: r.get(7)? })
 }
 
 const AGENT_COLS: &str = "id, tool, project, title, transcript_path, state, last_ask, updated";
@@ -421,7 +457,7 @@ fn row_to_ask(r: &Row) -> rusqlite::Result<AgentAsk> {
 }
 
 const MSG_COLS: &str = "id, role, kind, content, tool_steps, tokens, status, session_id, created_at";
-const SESSION_COLS: &str = "id, runtime, runtime_session_id, started_at, ended_at";
+const SESSION_COLS: &str = "id, runtime, runtime_session_id, started_at, ended_at, seed, memory_known, context_used";
 
 impl Store {
     pub fn open(path: &Path) -> Result<Store> {
@@ -645,7 +681,7 @@ impl Store {
 
     /// Background model calls since `t`. Chat turns (`purpose = "chat"`) do not count.
     pub fn llm_calls_since(&self, t: DateTime<Utc>) -> Result<usize> {
-        let n: i64 = self.db().query_row("SELECT COUNT(*) FROM llm_calls WHERE purpose != 'chat' AND created_at >= ?1", params![ts(t)], |r| r.get(0))?;
+        let n: i64 = self.db().query_row("SELECT COUNT(*) FROM llm_calls WHERE purpose NOT IN ('chat', 'compaction') AND created_at >= ?1", params![ts(t)], |r| r.get(0))?;
         Ok(n as usize)
     }
 

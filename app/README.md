@@ -69,6 +69,14 @@ Until Google verifies the app, users see an "unverified app" warning and Google 
 - **Screenshots:** when a Claude Code session ends a turn with a screenshot and "Does this look right?", a small model compares it with your ask. Only a confident match says "go on", at most twice an hour per session.
 - **Fail closed:** if bleep is closed or takes over 20 seconds, the hook prints nothing and the agent shows its normal prompt.
 
+## Memory
+
+- **What bleep always sees:** `~/.bleep/memory/USER.md` (about you), `RULES.md` (how bleep should behave) and `MEMORY.md` (what it learned). One fact per line, starting with `- `. Edit them in any editor; bleep reads them fresh and only adds or removes its own line. Together they are cut at about 3K tokens.
+- **How facts get in:** tell bleep something lasting ("Sync means my 1:1 with Priya") and it shows a "Remember this?" card with the exact fact. Nothing goes into `MEMORY.md` without your yes. Small things go to a daily note (`memory/daily/2026-11-15.md`), which bleep only searches (`memory_search`, along with old chat).
+- **Suggestions:** at 22:00 one small model call reads the day and may suggest up to 3 patterns; compaction suggests facts too. They wait in Settings, Memory tab, with Add and Dismiss.
+- **Forget:** Settings, Memory tab, lists every fact with Forget.
+- **Compaction:** when the chat passes the limit (250K tokens by default, or 80% of the model's window if that is lower), bleep saves facts, writes a summary, and goes on in a fresh session that holds the summary, the approval cards still waiting and the last 10 turns. A divider shows in the chat; nothing leaves view. Claude Code's own auto-compact is off for bleep's chat. The thin line under the chat header shows how full it is. For testing, `[memory] compact_at = 20000` in `config.toml` compacts early; "Compact now" in the Memory tab does it at once.
+
 ## Build
 
 ```bash
@@ -92,4 +100,4 @@ npm run e2e                    # Playwright, headless Chromium, mocked backend
 
 ## Data
 
-Everything lives in `~/.bleep/` (`BLEEP_HOME` overrides it): `bleep.db`, `config.toml`, `claude-home/`, `claude-work/`, `run/` (MCP config with a per-launch token and `bleep.sock` for the hooks, mode 700), `bin/bleep-hook`, `agent-rules.toml`, `logs/`.
+Everything lives in `~/.bleep/` (`BLEEP_HOME` overrides it): `bleep.db`, `config.toml`, `claude-home/`, `claude-work/`, `run/` (MCP config with a per-launch token and `bleep.sock` for the hooks, mode 700), `bin/bleep-hook`, `agent-rules.toml`, `memory/` (the memory files and daily notes), `logs/`.

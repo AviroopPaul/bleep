@@ -13,6 +13,13 @@ const create = (extra: Record<string, unknown> = {}) =>
   });
 
 describe("approvalView", () => {
+  it("memory card shows the exact fact and where it goes", () => {
+    const v = approvalView(card("memory_promote", { fact: "Sync means my 1:1 with Priya", file: "MEMORY.md" }));
+    expect(v.heading).toBe("Remember this?");
+    expect(v.rows).toEqual([["Fact", "Sync means my 1:1 with Priya"], ["Saved in", "MEMORY.md"]]);
+    expect(approvalView(card("memory_promote", { fact: "x", file: "MEMORY.md" }, "done")).doneText).toBe("Saved");
+  });
+
   it("create card shows title, day and time range", () => {
     const v = approvalView(create(), TZ);
     expect(v.heading).toBe("Add to your calendar?");

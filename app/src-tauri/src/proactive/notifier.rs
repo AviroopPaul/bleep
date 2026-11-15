@@ -10,6 +10,10 @@ use std::sync::Arc;
 pub const KIND: &str = "mail";
 /// Agent pings share the hourly budget with mail pings.
 pub const AGENT_KIND: &str = "agent";
+/// The nightly "memory suggestions" bubble.
+pub const MEMORY_KIND: &str = "memory";
+/// Every ping kind counts against the same hourly budget.
+pub const BUDGET_KINDS: &[&str] = &[KIND, AGENT_KIND, MEMORY_KIND];
 /// "Not useful" taps on one sender before bleep suggests muting them.
 pub const MUTE_AFTER: usize = 3;
 
@@ -98,7 +102,7 @@ impl Notifier {
                 _ => text,
             };
             let last = self.store.last_ping(KIND, &format!("{}@", m.thread_id)).ok().flatten();
-            let in_hour = self.store.pings_since_kinds(&[KIND, AGENT_KIND], now - Duration::hours(1)).unwrap_or(usize::MAX);
+            let in_hour = self.store.pings_since_kinds(BUDGET_KINDS, now - Duration::hours(1)).unwrap_or(usize::MAX);
             if may_ping(&self.calm, local.naive_local(), in_hour, last, now, self.paused.load(Ordering::SeqCst)) != Verdict::Send {
                 continue;
             }
@@ -127,7 +131,7 @@ impl crate::agentwatch::hub::AgentPing for Notifier {
         let local = now.with_timezone(&chrono::Local);
         let ref_id = format!("ask:{ask_id}");
         let last = self.store.last_ping(AGENT_KIND, &ref_id).ok().flatten();
-        let in_hour = self.store.pings_since_kinds(&[KIND, AGENT_KIND], now - Duration::hours(1)).unwrap_or(usize::MAX);
+        let in_hour = self.store.pings_since_kinds(BUDGET_KINDS, now - Duration::hours(1)).unwrap_or(usize::MAX);
         if may_ping(&self.calm, local.naive_local(), in_hour, last, now, self.paused.load(Ordering::SeqCst)) != Verdict::Send {
             return;
         }
@@ -135,6 +139,27 @@ impl crate::agentwatch::hub::AgentPing for Notifier {
         let text = if waiting_now >= 2 { format!("{waiting_now} agents need you") } else { cut(&format!("{folder}: {summary}"), 80) };
         if let Ok(Some(_)) = self.store.record_ping_from(AGENT_KIND, &ref_id, None) {
             self.ui.bubble(&text);
+        }
+    }
+}
+
+pub fn suggestion_text(n: usize) -> String {
+    if n == 1 { "I have a memory suggestion for you.".into() } else { format!("I have {n} memory suggestions for you.") }
+}
+
+impl crate::proactive::patterns::SuggestPing for Notifier {
+    /// One bubble a day at most, under the calm rules. Settings > Memory lists them.
+    fn suggestions(&self, n: usize) {
+        let now = (self.now)();
+        let local = now.with_timezone(&chrono::Local);
+        let ref_id = format!("suggest:{}", local.date_naive());
+        let last = self.store.last_ping(MEMORY_KIND, &ref_id).ok().flatten();
+        let in_hour = self.store.pings_since_kinds(BUDGET_KINDS, now - Duration::hours(1)).unwrap_or(usize::MAX);
+        if last.is_some() || may_ping(&self.calm, local.naive_local(), in_hour, last, now, self.paused.load(Ordering::SeqCst)) != Verdict::Send {
+            return;
+        }
+        if let Ok(Some(_)) = self.store.record_ping_from(MEMORY_KIND, &ref_id, None) {
+            self.ui.bubble(&suggestion_text(n));
         }
     }
 }
@@ -283,6 +308,18 @@ mod tests {
         assert_eq!(r.ui.0.lock().unwrap().as_slice(), ["shop: wants to run git push --force"]);
         crate::agentwatch::hub::AgentPing::waiting(&*r.n, "/Users/me/code/shop", "wants to run git push --force", 7, 1);
         assert_eq!(r.ui.0.lock().unwrap().len(), 1, "one ping per ask");
+    }
+
+    #[test]
+    fn memory_suggestions_bubble_once_and_share_the_budget() {
+        let r = rig();
+        crate::proactive::patterns::SuggestPing::suggestions(&*r.n, 2);
+        assert_eq!(r.ui.0.lock().unwrap().as_slice(), ["I have 2 memory suggestions for you."]);
+        crate::proactive::patterns::SuggestPing::suggestions(&*r.n, 1);
+        assert_eq!(r.ui.0.lock().unwrap().len(), 1, "one a day");
+        assert_eq!(suggestion_text(1), "I have a memory suggestion for you.");
+        assert_eq!(r.store.pings_since_kinds(BUDGET_KINDS, now() - Duration::hours(1)).unwrap(), 1);
+        assert!(BUDGET_KINDS.contains(&MEMORY_KIND) && BUDGET_KINDS.contains(&KIND) && BUDGET_KINDS.contains(&AGENT_KIND));
     }
 
     #[test]

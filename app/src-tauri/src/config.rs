@@ -67,6 +67,43 @@ impl Default for AgentsConfig {
     }
 }
 
+/// Memory and compaction (Phase 5).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MemoryConfig {
+    /// Compact when the context passes this many tokens (capped by the window, see `threshold`).
+    pub compact_at: u64,
+    /// Local "HH:MM" for the nightly suggestions job.
+    pub nightly: String,
+    /// The window the runtime last reported, in tokens.
+    pub context_window: Option<u64>,
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self { compact_at: 250_000, nightly: "22:00".into(), context_window: None }
+    }
+}
+
+pub const MIN_COMPACT_AT: u64 = 20_000;
+pub const DEFAULT_WINDOW: u64 = 200_000;
+
+impl MemoryConfig {
+    pub fn window(&self) -> u64 {
+        self.context_window.filter(|w| *w > 0).unwrap_or(DEFAULT_WINDOW)
+    }
+
+    /// The lower of `compact_at` and 80% of the window, never below 20K.
+    pub fn threshold(&self) -> u64 {
+        self.compact_at.min(self.window() * 8 / 10).max(MIN_COMPACT_AT)
+    }
+
+    /// Past 95% of the window bleep starts fresh even without a summary.
+    pub fn hard_stop(&self) -> u64 {
+        self.window() * 95 / 100
+    }
+}
+
 /// `~/.bleep/config.toml`. Unknown keys are ignored so later phases can add fields.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -83,6 +120,7 @@ pub struct Config {
     pub mail: MailConfig,
     pub checkin: CheckinConfig,
     pub agents: AgentsConfig,
+    pub memory: MemoryConfig,
 }
 
 impl Default for Config {
@@ -99,6 +137,7 @@ impl Default for Config {
             mail: MailConfig::default(),
             checkin: CheckinConfig::default(),
             agents: AgentsConfig::default(),
+            memory: MemoryConfig::default(),
         }
     }
 }
@@ -131,6 +170,29 @@ mod tests {
     use super::*;
     use crate::paths::{resolve_root, BleepPaths};
     use std::path::PathBuf;
+
+    #[test]
+    fn memory_defaults_and_threshold() {
+        let c: Config = toml::from_str("").unwrap();
+        assert_eq!(c.memory, MemoryConfig { compact_at: 250_000, nightly: "22:00".into(), context_window: None });
+        assert_eq!(c.memory.threshold(), 160_000, "unknown window counts as 200K");
+        let m = |compact_at, w| MemoryConfig { compact_at, nightly: "22:00".into(), context_window: w };
+        assert_eq!(m(250_000, Some(1_000_000)).threshold(), 250_000);
+        assert_eq!(m(300_000, Some(200_000)).threshold(), 160_000);
+        assert_eq!(m(5_000, Some(1_000_000)).threshold(), 20_000, "never below 20K");
+        assert_eq!(m(250_000, Some(1_000_000)).hard_stop(), 950_000);
+        let c: Config = toml::from_str("[memory]\ncompact_at = 20000").unwrap();
+        assert_eq!((c.memory.compact_at, c.memory.nightly.as_str()), (20_000, "22:00"));
+    }
+
+    #[test]
+    fn paths_have_memory_files() {
+        let p = BleepPaths::from_root(PathBuf::from("/x"));
+        assert_eq!(p.memory_file(crate::paths::MemFile::Memory), PathBuf::from("/x/memory/MEMORY.md"));
+        assert_eq!(p.memory_file(crate::paths::MemFile::User), PathBuf::from("/x/memory/USER.md"));
+        assert_eq!(p.memory_file(crate::paths::MemFile::Rules), PathBuf::from("/x/memory/RULES.md"));
+        assert_eq!(p.daily, PathBuf::from("/x/memory/daily"));
+    }
 
     #[test]
     fn config_agents_defaults_off() {

@@ -1,12 +1,37 @@
 use std::io;
 use std::path::PathBuf;
 
+/// The three memory files that go into the system prompt (build plan 8.7).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum MemFile {
+    User,
+    Rules,
+    Memory,
+}
+
+impl MemFile {
+    pub const ALL: [MemFile; 3] = [MemFile::User, MemFile::Rules, MemFile::Memory];
+
+    pub fn file_name(self) -> &'static str {
+        match self {
+            MemFile::User => "USER.md",
+            MemFile::Rules => "RULES.md",
+            MemFile::Memory => "MEMORY.md",
+        }
+    }
+
+    pub fn from_name(s: &str) -> Option<MemFile> {
+        MemFile::ALL.into_iter().find(|f| f.file_name().eq_ignore_ascii_case(s))
+    }
+}
+
 /// Every place bleep keeps data on disk. Root is `$BLEEP_HOME` or `~/.bleep`.
 #[derive(Clone, Debug)]
 pub struct BleepPaths {
     pub root: PathBuf,
     pub db: PathBuf,
     pub memory: PathBuf,
+    pub daily: PathBuf,
     pub claude_home: PathBuf,
     pub claude_work: PathBuf,
     pub run: PathBuf,
@@ -34,6 +59,7 @@ impl BleepPaths {
         Self {
             db: root.join("bleep.db"),
             memory: root.join("memory"),
+            daily: root.join("memory").join("daily"),
             claude_home: root.join("claude-home"),
             claude_work: root.join("claude-work"),
             run: root.join("run"),
@@ -47,9 +73,13 @@ impl BleepPaths {
         }
     }
 
+    pub fn memory_file(&self, f: MemFile) -> PathBuf {
+        self.memory.join(f.file_name())
+    }
+
     pub fn ensure(&self) -> io::Result<()> {
         use std::os::unix::fs::PermissionsExt;
-        for d in [&self.root, &self.memory, &self.claude_home, &self.claude_work, &self.run, &self.logs, &self.bin] {
+        for d in [&self.root, &self.memory, &self.daily, &self.claude_home, &self.claude_work, &self.run, &self.logs, &self.bin] {
             std::fs::create_dir_all(d)?;
         }
         std::fs::set_permissions(&self.run, std::fs::Permissions::from_mode(0o700))?;
