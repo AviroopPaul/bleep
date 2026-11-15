@@ -35,6 +35,7 @@ pub struct AppState {
     pub store: Arc<Store>,
     pub chat: Arc<ChatService>,
     pub approvals: Arc<approvals::Approvals>,
+    pub memory: Arc<memory::Memory>,
     pub _mcp: mcp::McpServer,
 }
 
@@ -116,8 +117,17 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let approvals = approvals::Approvals::new(store.clone(), Arc::new(move |a| {
         let _ = h.emit("approval://changed", a);
     }), approvals::WAIT);
+    let memory = Arc::new(memory::Memory::new(paths.clone(), store.clone()));
+    if let Err(e) = memory.ensure() {
+        eprintln!("bleep: memory files: {e}");
+    }
+    match memory.reindex_notes() {
+        Ok(n) => eprintln!("bleep: indexed {n} daily-note lines"),
+        Err(e) => eprintln!("bleep: daily-note index: {e}"),
+    }
+    let memory_tools = Arc::new(connectors::memory::MemoryConnector::new(memory.clone(), Arc::new(chrono::Local::now)));
     let turns = mcp::host::TurnTracker::default();
-    let tool_host = mcp::host::ToolHost::new_logged(vec![Arc::new(connectors::bleep::BleepConnector), calendar.clone(), gmail], approvals.clone(), turns.clone(), store.clone());
+    let tool_host = mcp::host::ToolHost::new_logged(vec![Arc::new(connectors::bleep::BleepConnector), calendar.clone(), gmail, memory_tools], approvals.clone(), turns.clone(), store.clone());
     let mcp = tauri::async_runtime::block_on(mcp::McpServer::start(mcp::new_token(), tool_host))?;
     let bin = find_claude().unwrap_or_else(|| "claude".into());
     let runtime = Arc::new(ClaudeRuntime::new(paths.clone(), config.tiers.clone(), bin).with_hold(approvals.waiting()));
@@ -136,7 +146,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
             }
         }
     });
-    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, _mcp: mcp };
+    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, memory, _mcp: mcp };
     Ok(Parts { state, google, calendar, watcher, triager })
 }
 

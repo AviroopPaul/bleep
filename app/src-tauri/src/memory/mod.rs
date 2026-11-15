@@ -1,6 +1,7 @@
 //! bleep's memory on disk (build plan 8.7): USER.md, RULES.md and MEMORY.md go into the
 //! system prompt; daily notes are only searched. The files are mine to edit, so bleep reads
 //! them fresh, changes only the line it adds or removes, and writes atomically.
+pub mod search;
 
 use crate::paths::{BleepPaths, MemFile};
 use crate::store::{norm_fact, Store};
