@@ -122,6 +122,19 @@ impl ToolHost {
         list.len() != n
     }
 
+    /// Changes when a tool the model sees is added, removed, renamed, or gets a new
+    /// description or schema. Not when only its risk changes: the model does not see that.
+    pub fn tools_hash(&self) -> String {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        for t in self.specs() {
+            t.name.hash(&mut h);
+            t.description.hash(&mut h);
+            t.schema.to_string().hash(&mut h);
+        }
+        format!("{:016x}", h.finish())
+    }
+
     pub fn connector(&self, id: &str) -> Option<Arc<dyn Connector>> {
         self.snapshot().into_iter().find(|c| c.id() == id)
     }
@@ -379,6 +392,18 @@ pub mod tests {
         assert_eq!(h.call("wiki_read", json!({})).await.unwrap_err(), "Unknown tool: wiki_read");
         assert!(!h.remove("wiki"), "already gone");
         assert!(h.connector("fake").is_some() && h.connector("wiki").is_none());
+    }
+
+    #[tokio::test]
+    async fn tools_hash_follows_what_the_model_sees() {
+        let (h, _) = host(FakeConnector::new(), FakeGate::new(Decision::Approved));
+        let a = h.tools_hash();
+        assert_eq!(a, h.tools_hash(), "stable");
+        h.add(named("wiki", &["wiki_ask"], 0));
+        let b = h.tools_hash();
+        assert_ne!(a, b);
+        h.remove("wiki");
+        assert_eq!(h.tools_hash(), a);
     }
 
     #[tokio::test]

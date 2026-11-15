@@ -27,6 +27,12 @@ export function ApprovalCard({ a }: { a: Approval }) {
         ))}
       </dl>
       {v.warn && <p className="card-warn">{v.warn}</p>}
+      {v.details && (
+        <details className="card-details">
+          <summary>Details</summary>
+          <pre>{v.details}</pre>
+        </details>
+      )}
       {pending ? (
         <div className="acts">
           <button className="btn pri" disabled={busy} onClick={() => decide(true)}>Approve</button>
