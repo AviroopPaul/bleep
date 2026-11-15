@@ -681,7 +681,7 @@ impl Store {
 
     /// Background model calls since `t`. Chat turns (`purpose = "chat"`) do not count.
     pub fn llm_calls_since(&self, t: DateTime<Utc>) -> Result<usize> {
-        let n: i64 = self.db().query_row("SELECT COUNT(*) FROM llm_calls WHERE purpose != 'chat' AND created_at >= ?1", params![ts(t)], |r| r.get(0))?;
+        let n: i64 = self.db().query_row("SELECT COUNT(*) FROM llm_calls WHERE purpose NOT IN ('chat', 'compaction') AND created_at >= ?1", params![ts(t)], |r| r.get(0))?;
         Ok(n as usize)
     }
 

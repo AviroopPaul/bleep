@@ -98,6 +98,23 @@ pub struct ChatService {
     turns: TurnTracker,
     memory: Option<Arc<crate::memory::Memory>>,
     window_sink: Option<WindowSink>,
+    memory_config: Option<MemoryConfigFn>,
+    compact_sink: Option<CompactSink>,
+    /// Set by `into_arc`, so a turn can compact the chat when it ends.
+    me: std::sync::OnceLock<std::sync::Weak<ChatService>>,
+}
+
+pub type MemoryConfigFn = Arc<dyn Fn() -> crate::config::MemoryConfig + Send + Sync>;
+/// Told `true` when compaction starts and `false` when it ends.
+pub type CompactSink = Arc<dyn Fn(bool) + Send + Sync>;
+
+struct CompactEnd(Option<CompactSink>);
+impl Drop for CompactEnd {
+    fn drop(&mut self) {
+        if let Some(s) = &self.0 {
+            s(false);
+        }
+    }
 }
 
 /// Told the model's context window whenever a turn reports it.
@@ -121,7 +138,7 @@ impl Drop for BusyGuard {
 
 impl ChatService {
     pub fn new(store: Arc<Store>, runtime: Arc<dyn AgentRuntime>, mcp: McpEndpoint, emit: Emit, turns: TurnTracker) -> Self {
-        Self { store, runtime, mcp, emit, session: Mutex::new(None), busy: Default::default(), turn: Mutex::new(None), turns, memory: None, window_sink: None }
+        Self { store, runtime, mcp, emit, session: Mutex::new(None), busy: Default::default(), turn: Mutex::new(None), turns, memory: None, window_sink: None, memory_config: None, compact_sink: None, me: Default::default() }
     }
 
     /// A turn bleep starts itself (for example "Prep me"): the chat shows `label`,
@@ -133,6 +150,114 @@ impl ChatService {
     pub fn with_memory(mut self, memory: Arc<crate::memory::Memory>) -> Self {
         self.memory = Some(memory);
         self
+    }
+
+    pub fn with_memory_config(mut self, f: MemoryConfigFn) -> Self {
+        self.memory_config = Some(f);
+        self
+    }
+
+    pub fn with_compact_sink(mut self, sink: CompactSink) -> Self {
+        self.compact_sink = Some(sink);
+        self
+    }
+
+    /// Shares the service and lets each turn compact the chat when it ends.
+    pub fn into_arc(self) -> Arc<Self> {
+        let a = Arc::new(self);
+        let _ = a.me.set(Arc::downgrade(&a));
+        a
+    }
+
+    /// Compacts now, below the threshold too (Settings > Memory). Busy while a turn runs.
+    pub async fn compact_now(&self) -> Result<(), ChatError> {
+        if self.busy.swap(true, Ordering::SeqCst) {
+            return Err(ChatError::Busy);
+        }
+        let _guard = BusyGuard(self.busy.clone());
+        let used = self.context().await.unwrap_or(0);
+        self.compact(used, crate::compaction::Trigger::Compact).await.map_err(ChatError::from)
+    }
+
+    /// After a turn, while the chat is still busy: compact when the session is full.
+    async fn after_turn(&self) {
+        let Some(cfg) = self.memory_config.as_ref().map(|f| f()) else { return };
+        let Some(used) = self.context().await else { return };
+        let t = crate::compaction::trigger(used, &cfg);
+        if t == crate::compaction::Trigger::None {
+            return;
+        }
+        if let Err(e) = self.compact(used, t).await {
+            eprintln!("bleep: compaction did not finish, will try after the next turn: {e}");
+        }
+    }
+
+    async fn compact(&self, used: u64, trig: crate::compaction::Trigger) -> anyhow::Result<()> {
+        use crate::compaction as c;
+        use crate::runtime::OneShot;
+        if let Some(s) = &self.compact_sink {
+            s(true);
+        }
+        let _end = CompactEnd(self.compact_sink.clone());
+        let rid = self.runtime.id();
+        let old = match self.session.lock().await.as_ref() {
+            Some((s, _)) => s.clone(),
+            None => self.store.current_session(rid)?.ok_or_else(|| anyhow::anyhow!("no session to compact"))?,
+        };
+        let msgs = self.store.session_messages(old.id)?;
+        let trans = c::transcript(old.seed.as_deref(), &msgs);
+
+        // 1. Facts (optional): suggestions for MEMORY.md and lines in today's note.
+        let facts = self.runtime.one_shot(OneShot { prompt: format!("{}{trans}", c::FACTS_PROMPT), schema: c::facts_schema(), tier: Tier::Small, images: vec![] }).await;
+        let _ = self.store.log_llm(rid, "small", "compaction", None, None, facts.is_ok());
+        match facts {
+            Ok(v) => {
+                let list = v.get("facts").and_then(Value::as_array).cloned().unwrap_or_default();
+                for f in list.iter().filter_map(Value::as_str).take(c::MAX_FACTS) {
+                    let Some(m) = &self.memory else { continue };
+                    let Ok(f) = m.check_fact(f) else { continue };
+                    if m.is_known(&f) {
+                        continue;
+                    }
+                    if self.store.add_proposal(&f, "compaction")?.is_some() {
+                        let _ = m.append_note(chrono::Local::now(), &format!("From chat: {f}"));
+                    }
+                }
+            }
+            Err(e) => eprintln!("bleep: compaction facts: {e}"),
+        }
+
+        // 2. Summary. Without one, only a hard stop goes on.
+        let summary = self.runtime.one_shot(OneShot { prompt: format!("{}{trans}", c::SUMMARY_PROMPT), schema: c::summary_schema(), tier: Tier::Main, images: vec![] }).await;
+        let _ = self.store.log_llm(rid, "main", "compaction", None, None, summary.is_ok());
+        let summary = match summary {
+            Ok(v) => v.get("summary").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(String::from),
+            Err(e) => {
+                eprintln!("bleep: compaction summary: {e}");
+                None
+            }
+        };
+        let pending = self.store.pending_approvals()?;
+        let (seed, divider, kept) = match (&summary, trig) {
+            (Some(s), _) => (c::seed(Some(s), &pending, &msgs), c::divider_text(used, s.chars().count().min(c::SUMMARY_CHARS)), s.clone()),
+            (None, c::Trigger::HardStop) => {
+                let fresh = c::seed(None, &pending, &msgs);
+                let seed = match old.seed.as_deref().filter(|s| !s.trim().is_empty()) {
+                    Some(o) => format!("## Earlier summary\n{}\n\n{fresh}", o.trim()),
+                    None => fresh,
+                };
+                (seed, c::hard_stop_text(used), String::new())
+            }
+            (None, _) => anyhow::bail!("no summary"),
+        };
+
+        // 3. New session with the seed. The old one ends; every message stays in view.
+        self.store.end_session_with(old.id, &kept, used as i64)?;
+        let new = self.store.create_session(rid)?;
+        self.store.set_session_seed(new.id, &seed)?;
+        self.store.insert_message(NewMessage { role: Role::System, kind: Kind::Divider, content: divider, status: MsgStatus::Done, session_id: Some(new.id) })?;
+        *self.session.lock().await = None;
+        self.ensure_session().await
     }
 
     pub fn with_window_sink(mut self, sink: WindowSink) -> Self {
@@ -242,10 +367,17 @@ impl ChatService {
             }
         }
         let (store, emit, rid, sink) = (self.store.clone(), self.emit.clone(), self.runtime.id(), self.window_sink.clone());
+        let me = self.me.get().cloned();
         let task = tokio::spawn(async move {
             let _guard = guard;
-            let _turn_end = turn_end;
-            run_turn(store, emit, rid, session_id, aid, stream, sink).await;
+            {
+                let _turn_end = turn_end;
+                run_turn(store, emit, rid, session_id, aid, stream, sink).await;
+            }
+            // Still busy: no new turn starts while the chat compacts.
+            if let Some(me) = me.and_then(|w| w.upgrade()) {
+                me.after_turn().await;
+            }
         });
         *self.turn.lock().await = Some(task);
         Ok(aid)
@@ -629,6 +761,138 @@ mod tests {
         assert_eq!(seen.lock().unwrap().as_slice(), [1_000_000]);
         let chat2 = service(&r);
         assert_eq!(chat2.context().await, Some(42_000), "survives a restart");
+    }
+
+    fn ctx(used: u64) -> AgentEvent {
+        AgentEvent::Context { used, window: Some(1_000_000) }
+    }
+
+    /// A chat that compacts at 20K, with memory, attached for after-turn work.
+    fn compacting(r: &Rig) -> (Arc<ChatService>, Arc<crate::memory::Memory>, Arc<StdMutex<Vec<bool>>>) {
+        let (c, mem) = service_mem(r);
+        let flags = Arc::new(StdMutex::new(vec![]));
+        let f = flags.clone();
+        let c = c
+            .with_memory_config(Arc::new(|| crate::config::MemoryConfig { compact_at: 20_000, nightly: "22:00".into(), context_window: Some(1_000_000) }))
+            .with_compact_sink(Arc::new(move |b| f.lock().unwrap().push(b)))
+            .into_arc();
+        (c, mem, flags)
+    }
+
+    fn replies(r: &Rig, v: Vec<Result<serde_json::Value, String>>) {
+        *r.rt.one_shot_replies.lock().unwrap() = v.into();
+    }
+
+    fn dividers(r: &Rig) -> Vec<String> {
+        r.store.page_messages(None, 100).unwrap().into_iter().filter(|m| m.kind == Kind::Divider).map(|m| m.content).collect()
+    }
+
+    #[tokio::test]
+    async fn compaction_full_run() {
+        let r = rig(vec![vec![AgentEvent::TextDelta { text: "Noted.".into() }, ctx(30_000), done("s1")], vec![done("s2")]]);
+        let (chat, mem, flags) = compacting(&r);
+        let old = r.store.create_session("claude").unwrap();
+        r.store.insert_approval("calendar_create", &serde_json::json!({"title": "Pay electricity bill"}), None).unwrap();
+        replies(&r, vec![Ok(serde_json::json!({"facts": ["Sync means the user's 1:1 with Priya"]})), Ok(serde_json::json!({"summary": "Open loops: pay the electricity bill by 14 Nov."}))]);
+        chat.send("sync means my 1:1 with Priya".into()).await.unwrap();
+        chat.wait_idle().await;
+
+        let cur = r.store.current_session("claude").unwrap().unwrap();
+        assert_ne!(cur.id, old.id, "a new session");
+        let seed = cur.seed.unwrap();
+        assert!(seed.contains("Open loops: pay the electricity bill") && seed.contains("calendar_create") && seed.contains("user: sync means my 1:1 with Priya"), "{seed}");
+        assert_eq!(dividers(&r), [crate::compaction::divider_text(30_000, 47)]);
+        assert_eq!(r.store.pending_proposals().unwrap()[0].fact, "Sync means the user's 1:1 with Priya");
+        assert!(mem.daily_note(chrono::Local::now().date_naive()).contains("Sync means the user's 1:1 with Priya"));
+        assert_eq!(flags.lock().unwrap().as_slice(), [true, false]);
+        let started = r.rt.started.lock().unwrap().clone();
+        let last = started.last().unwrap();
+        assert!(last.resume_id.is_none() && last.system_prompt.contains("Open loops: pay the electricity bill"));
+        assert!(r.rt.one_shots.lock().unwrap()[1].starts_with(crate::compaction::SUMMARY_PROMPT));
+        assert_eq!(r.store.llm_calls_since(chrono::DateTime::UNIX_EPOCH).unwrap(), 0, "compaction is not background work");
+        assert_eq!(r.store.page_messages(None, 100).unwrap().iter().filter(|m| m.role != Role::System).count(), 2, "nothing removed from view");
+
+        chat.send("next".into()).await.unwrap();
+        chat.wait_idle().await;
+        assert_eq!(r.rt.started.lock().unwrap().len(), started.len(), "the next turn uses the new session");
+    }
+
+    #[tokio::test]
+    async fn under_threshold_does_nothing() {
+        let r = rig(vec![vec![ctx(19_000), done("s1")]]);
+        let (chat, _m, flags) = compacting(&r);
+        chat.send("hi".into()).await.unwrap();
+        chat.wait_idle().await;
+        assert!(flags.lock().unwrap().is_empty() && r.rt.one_shots.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn failed_facts_still_compact() {
+        let r = rig(vec![vec![ctx(30_000), done("s1")]]);
+        let (chat, _m, _f) = compacting(&r);
+        replies(&r, vec![Err("boom".into()), Ok(serde_json::json!({"summary": "S"}))]);
+        chat.send("hi".into()).await.unwrap();
+        chat.wait_idle().await;
+        assert_eq!(dividers(&r).len(), 1);
+        assert!(r.store.pending_proposals().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn failed_summary_keeps_the_session_and_retries_next_turn() {
+        let r = rig(vec![vec![ctx(30_000), done("s1")], vec![ctx(31_000), done("s1")]]);
+        let (chat, _m, flags) = compacting(&r);
+        replies(&r, vec![Ok(serde_json::json!({"facts": []})), Err("limit".into()), Ok(serde_json::json!({"facts": []})), Ok(serde_json::json!({"summary": "  "}))]);
+        chat.send("one".into()).await.unwrap();
+        chat.wait_idle().await;
+        let s1 = r.store.current_session("claude").unwrap().unwrap();
+        assert_eq!(s1.runtime_session_id.as_deref(), Some("s1"));
+        assert!(dividers(&r).is_empty());
+        chat.send("two".into()).await.unwrap();
+        chat.wait_idle().await;
+        assert_eq!(r.rt.one_shots.lock().unwrap().len(), 4, "tried again after the next turn");
+        assert_eq!(r.store.current_session("claude").unwrap().unwrap().id, s1.id, "an empty summary also fails");
+        assert_eq!(flags.lock().unwrap().as_slice(), [true, false, true, false]);
+    }
+
+    #[tokio::test]
+    async fn hard_stop_starts_fresh_without_a_summary() {
+        let r = rig(vec![vec![ctx(960_000), done("s1")]]);
+        let (chat, _m, _f) = compacting(&r);
+        let old = r.store.create_session("claude").unwrap();
+        r.store.set_session_seed(old.id, "OLD SEED").unwrap();
+        replies(&r, vec![Ok(serde_json::json!({"facts": []})), Err("too long".into())]);
+        chat.send("hi".into()).await.unwrap();
+        chat.wait_idle().await;
+        let cur = r.store.current_session("claude").unwrap().unwrap();
+        assert_ne!(cur.id, old.id);
+        let seed = cur.seed.unwrap();
+        assert!(seed.contains("OLD SEED") && seed.contains("user: hi") && !seed.contains("## Summary"), "{seed}");
+        assert_eq!(dividers(&r), [crate::compaction::hard_stop_text(960_000)]);
+    }
+
+    #[tokio::test]
+    async fn send_during_compaction_is_busy() {
+        let r = rig(vec![vec![ctx(30_000), done("s1")]]);
+        let (chat, _m, _f) = compacting(&r);
+        r.rt.one_shot_delay_ms.store(300, Ordering::SeqCst);
+        replies(&r, vec![Ok(serde_json::json!({"facts": []})), Ok(serde_json::json!({"summary": "S"}))]);
+        chat.send("one".into()).await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        assert!(matches!(chat.send("two".into()).await, Err(ChatError::Busy)));
+        assert!(matches!(chat.compact_now().await, Err(ChatError::Busy)));
+        chat.wait_idle().await;
+        assert_eq!(dividers(&r).len(), 1);
+    }
+
+    #[tokio::test]
+    async fn compact_now_runs_under_the_threshold() {
+        let r = rig(vec![vec![ctx(5_000), done("s1")]]);
+        let (chat, _m, _f) = compacting(&r);
+        chat.send("hi".into()).await.unwrap();
+        chat.wait_idle().await;
+        replies(&r, vec![Ok(serde_json::json!({"facts": []})), Ok(serde_json::json!({"summary": "S"}))]);
+        chat.compact_now().await.unwrap();
+        assert_eq!(dividers(&r).len(), 1);
     }
 
     #[tokio::test]

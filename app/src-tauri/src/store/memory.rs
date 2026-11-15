@@ -65,6 +65,13 @@ impl Store {
         Ok(())
     }
 
+    pub fn pending_approvals(&self) -> Result<Vec<Approval>> {
+        let db = self.db();
+        let sql = format!("SELECT {APPROVAL_COLS} FROM approvals WHERE status = 'pending' ORDER BY id");
+        let rows = db.prepare(&sql)?.query_map([], row_to_approval)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
     /// Every message of one session, oldest first.
     pub fn session_messages(&self, session_id: i64) -> Result<Vec<Message>> {
         let db = self.db();

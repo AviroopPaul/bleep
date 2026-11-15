@@ -3,6 +3,7 @@ pub mod agentwatch;
 pub mod approvals;
 pub mod bar;
 pub mod chat;
+pub mod compaction;
 pub mod config;
 pub mod connectors;
 pub mod google;
@@ -137,7 +138,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let emit: chat::Emit = Arc::new(move |m: ChatEmit| {
         let _ = h.emit("chat://event", m);
     });
-    let chat = Arc::new(ChatService::new(store.clone(), runtime, McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns).with_memory(memory.clone()).with_window_sink({
+    let chat = (ChatService::new(store.clone(), runtime, McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns).with_memory(memory.clone()).with_window_sink({
         let h = handle.clone();
         Arc::new(move |w| {
             let st = h.state::<AppState>();
@@ -149,7 +150,18 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
                 }
             }
         })
-    }));
+    }))
+    .with_memory_config({
+        let h = handle.clone();
+        Arc::new(move || h.state::<AppState>().config.lock().unwrap().memory.clone())
+    })
+    .with_compact_sink({
+        let h = handle.clone();
+        Arc::new(move |on: bool| {
+            let _ = h.emit("chat://compacting", on);
+        })
+    })
+    .into_arc();
     let c = chat.clone();
     tauri::async_runtime::spawn(async move {
         if c.runtime().health().await.ok() {

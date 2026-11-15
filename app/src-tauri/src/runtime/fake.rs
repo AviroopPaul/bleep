@@ -20,6 +20,8 @@ pub struct FakeRuntime {
     pub one_shots: Mutex<Vec<String>>,
     /// How many images each `one_shot` carried.
     pub one_shot_images: Mutex<Vec<usize>>,
+    /// Each `one_shot` waits this long first (tests of work that holds the chat).
+    pub one_shot_delay_ms: std::sync::atomic::AtomicU64,
 }
 
 impl FakeRuntime {
@@ -36,6 +38,7 @@ impl FakeRuntime {
             one_shot_replies: Mutex::new(VecDeque::new()),
             one_shots: Mutex::new(vec![]),
             one_shot_images: Mutex::new(vec![]),
+            one_shot_delay_ms: Default::default(),
         }
     }
 }
@@ -85,6 +88,10 @@ impl AgentRuntime for FakeRuntime {
     }
 
     async fn one_shot(&self, req: OneShot) -> Result<Value> {
+        let wait = self.one_shot_delay_ms.load(Ordering::SeqCst);
+        if wait > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
+        }
         self.one_shots.lock().unwrap().push(req.prompt);
         self.one_shot_images.lock().unwrap().push(req.images.len());
         match self.one_shot_replies.lock().unwrap().pop_front() {
