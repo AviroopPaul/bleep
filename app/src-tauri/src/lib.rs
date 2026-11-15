@@ -17,6 +17,7 @@ pub mod paths;
 pub mod proactive;
 pub mod remote;
 pub mod remote_cmds;
+mod model_cmds;
 pub mod runtime;
 pub mod settings;
 pub mod setup;
@@ -387,6 +388,12 @@ pub fn run() {
             memory_cmds::memory_compact_now,
             memory_cmds::memory_reveal,
             memory_cmds::chat_context,
+            model_cmds::model_settings_get,
+            model_cmds::model_list,
+            model_cmds::model_test,
+            model_cmds::model_save,
+            model_cmds::model_forget_key,
+            model_cmds::spend_today,
             remote_cmds::connectors_list,
             remote_cmds::remote_add,
             remote_cmds::remote_sign_in,
