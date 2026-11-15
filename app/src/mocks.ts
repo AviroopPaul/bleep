@@ -1,7 +1,7 @@
 // Fake backend for headless UI checks (Playwright). Loaded only with ?mock=1.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
-import type { ActivityItem, AgentAsk, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal } from "./ipc";
+import type { ActivityItem, AgentAsk, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
   id, role, kind: "chat", content, tool_steps: [], tokens: null, status: "done", session_id: 1, created_at: "",
@@ -84,6 +84,30 @@ export function installMocks(label: string) {
         { id: 2, fact: "Priya leads the design team", source: "compaction", status: "pending", created_at: "" },
       ]
     : [];
+  // ?connectors=1: one connected server with three tools, one that needs sign-in.
+  const connOn = q.has("connectors");
+  const dayblocks = (): RemoteServer => ({
+    name: "dayblocks", url: "https://dayblocks.vercel.app/api/mcp", auth: "oauth", enabled: true,
+    status: { state: "connected", account: "dayblocks.vercel.app" },
+    tools: [
+      { name: "list_tasks", description: "List open tasks for a day.", mode: "auto", default_mode: "auto", skipped: null },
+      { name: "move_task", description: "Move a task to another day.", mode: "ask", default_mode: "ask", skipped: null },
+      { name: "delete_everything_in_the_account_forever_and_ever_please", description: "", mode: "ask", default_mode: "ask", skipped: "Its name is too long." },
+    ],
+  });
+  let servers: RemoteServer[] = connOn
+    ? [dayblocks(), { name: "wiki", url: "https://mcp.example.com/mcp", auth: "token", enabled: true, status: { state: "needs_sign_in" }, tools: [] }]
+    : [];
+  let cancelAdd: (() => void) | null = null;
+  const connView = (): ConnectorsView => ({
+    builtin: [
+      { id: "gmail", label: "Gmail", status: { state: "connected", account: "me@example.com" } },
+      { id: "calendar", label: "Google Calendar", status: { state: "connected", account: "me@example.com" } },
+      { id: "memory", label: "Memory", status: { state: "connected", account: "this Mac" } },
+      { id: "bleep", label: "Date and time", status: { state: "connected", account: "this Mac" } },
+    ],
+    servers,
+  });
   let memSet: MemorySettings = { compact_at: 250_000, threshold: 250_000, window: 1_000_000, nightly: "22:00" };
   const bubble = q.get("bubble");
   const ping = q.get("ping");
@@ -284,6 +308,56 @@ export function installMocks(label: string) {
           return null;
         case "memory_reveal":
           calls.push(cmd);
+          return null;
+        case "connectors_list":
+          return connView();
+        case "remote_add": {
+          const r = a.req as { url: string; name?: string | null; token?: string | null; client_id?: string | null };
+          calls.push(`remote_add:${r.url}:${r.name ?? ""}:${r.client_id ?? ""}`);
+          if (r.url.includes("down")) throw "Could not reach down. It could not be reached.";
+          if (r.url.includes("noreg") && !r.client_id) return { kind: "needs_client_id" };
+          if (r.url.includes("tokenonly") && !r.token) return { kind: "needs_token", message: "tokenonly needs sign-in, but it does not offer a sign-in bleep can use. Paste a token for it instead." };
+          const name = r.name || new URL(r.url).hostname.split(".").find((l) => !["www", "api", "mcp", "app"].includes(l)) || "server";
+          const added = (): RemoteServer => ({ name, url: r.url, auth: r.token ? "token" : r.url.includes("oauth") ? "oauth" : "none", enabled: true, status: { state: "connected", account: new URL(r.url).hostname }, tools: [{ name: "ask", description: "Ask a question.", mode: "ask", default_mode: "ask", skipped: null }] });
+          if (r.url.includes("slow")) {
+            return new Promise((resolve, reject) => {
+              const t = setTimeout(() => {
+                servers = [...servers, added()];
+                resolve({ kind: "added", ...added() });
+              }, 1500);
+              cancelAdd = () => {
+                clearTimeout(t);
+                reject("Sign-in was cancelled.");
+              };
+            });
+          }
+          servers = [...servers, added()];
+          return { kind: "added", ...added() };
+        }
+        case "remote_cancel_sign_in":
+          calls.push(cmd);
+          if (cancelAdd) {
+            cancelAdd();
+            cancelAdd = null;
+            return true;
+          }
+          return false;
+        case "remote_set_tool": {
+          calls.push(`remote_set_tool:${a.name}:${a.tool}:${a.mode ?? "default"}`);
+          servers = servers.map((sv) => (sv.name !== a.name ? sv : { ...sv, tools: sv.tools.map((t) => (t.name !== a.tool ? t : { ...t, mode: (a.mode as ToolMode | null) ?? t.default_mode })) }));
+          later(10, () => void emit("connectors://changed", {}));
+          return null;
+        }
+        case "remote_remove":
+          calls.push(`remote_remove:${a.name}`);
+          servers = servers.filter((sv) => sv.name !== a.name);
+          later(10, () => void emit("connectors://changed", {}));
+          return null;
+        case "remote_refresh":
+        case "remote_sign_in":
+          calls.push(`${cmd}:${a.name}`);
+          if (cmd === "remote_sign_in") servers = servers.map((sv) => (sv.name !== a.name ? sv : { ...sv, status: { state: "connected", account: "mcp.example.com" } }));
+          later(10, () => void emit("connectors://changed", {}));
           return null;
         case "chat_context":
           return { used: memOn ? 120_000 : null, threshold: memSet.threshold, window: memSet.window };

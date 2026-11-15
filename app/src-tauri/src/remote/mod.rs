@@ -5,6 +5,7 @@ pub mod secrets;
 pub mod tools;
 pub mod auth;
 pub mod client;
+pub mod manager;
 #[cfg(test)]
 pub mod mock;
 

@@ -300,3 +300,22 @@ button { font: inherit; color: inherit; }
 .meter i { display: block; height: 2px; background: var(--blue-2); border-radius: 0 2px 2px 0; transition: width 0.3s; }
 .meter.high i { background: var(--rust); }
 .mem-empty { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+
+/* ---------- settings: connectors ---------- */
+.conn-list { display: flex; flex-direction: column; gap: 10px; }
+.conn-card { padding: 12px 14px 12px; }
+.conn-name { margin: 0; font: 600 15px/1.2 var(--display); color: var(--ink); overflow-wrap: anywhere; }
+.conn-url { margin: 4px 0 0; font: 500 11.5px/1.4 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.conn-meta { margin: 6px 0 8px; }
+.conn-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.conn-confirm { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font: 600 12.5px/1.4 var(--sans); color: var(--rust); }
+.btn.danger { background: var(--rust); border-color: var(--rust); color: #fff; }
+.conn-adv { justify-self: start; margin-top: 4px; }
+.conn-tools { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.conn-tools li { display: flex; align-items: center; gap: 8px; }
+.conn-tool { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.conn-tool-name { font: 600 12.5px/1.3 var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+.conn-tool-desc { font: 500 12px/1.35 var(--sans); color: var(--ink-2); overflow-wrap: anywhere; }
+.conn-tool-skip { font: 600 11.5px/1.35 var(--sans); color: var(--rust); }
+.conn-tools select { flex: none; max-width: 46%; font: 600 12.5px var(--sans); padding: 5px 8px; border-radius: 9px; border: 1px solid var(--line); background: var(--field); color: var(--ink); min-height: 30px; }
+.pill.error { background: rgba(176, 84, 52, 0.14); color: var(--rust); max-width: 60%; }

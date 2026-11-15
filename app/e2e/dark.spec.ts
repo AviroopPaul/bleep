@@ -28,6 +28,15 @@ async function contrast(page: Page, selector: string): Promise<number> {
   });
 }
 
+test("dark mode: connectors text is readable", async ({ page }) => {
+  await page.goto("/?mock=1&g=builtin&connectors=1#settings");
+  await page.getByRole("tab", { name: "Connectors" }).click();
+  await expect(page.getByRole("group", { name: "dayblocks" })).toBeVisible();
+  for (const sel of [".conn-name", ".conn-url", ".conn-tool-name", ".conn-tool-desc", ".conn-tool-skip", ".conn-tools select", ".pill.needs_sign_in"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
 test("dark mode: settings text is readable", async ({ page }) => {
   await page.goto("/?mock=1&g=builtin#settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
