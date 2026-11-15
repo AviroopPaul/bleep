@@ -97,7 +97,11 @@ pub struct ChatService {
     turn: Mutex<Option<JoinHandle<()>>>,
     turns: TurnTracker,
     memory: Option<Arc<crate::memory::Memory>>,
+    window_sink: Option<WindowSink>,
 }
+
+/// Told the model's context window whenever a turn reports it.
+pub type WindowSink = Arc<dyn Fn(u64) + Send + Sync>;
 
 /// Ends the tracked turn when the turn task ends, even if it panics.
 struct TurnEnd(TurnTracker);
@@ -117,7 +121,7 @@ impl Drop for BusyGuard {
 
 impl ChatService {
     pub fn new(store: Arc<Store>, runtime: Arc<dyn AgentRuntime>, mcp: McpEndpoint, emit: Emit, turns: TurnTracker) -> Self {
-        Self { store, runtime, mcp, emit, session: Mutex::new(None), busy: Default::default(), turn: Mutex::new(None), turns, memory: None }
+        Self { store, runtime, mcp, emit, session: Mutex::new(None), busy: Default::default(), turn: Mutex::new(None), turns, memory: None, window_sink: None }
     }
 
     /// A turn bleep starts itself (for example "Prep me"): the chat shows `label`,
@@ -129,6 +133,17 @@ impl ChatService {
     pub fn with_memory(mut self, memory: Arc<crate::memory::Memory>) -> Self {
         self.memory = Some(memory);
         self
+    }
+
+    pub fn with_window_sink(mut self, sink: WindowSink) -> Self {
+        self.window_sink = Some(sink);
+        self
+    }
+
+    /// Context size after the last turn of the current session.
+    pub async fn context(&self) -> Option<u64> {
+        let s = self.store.current_session(self.runtime.id()).ok().flatten()?;
+        s.context_used.map(|u| u as u64)
     }
 
     pub fn runtime(&self) -> &Arc<dyn AgentRuntime> {
@@ -226,11 +241,11 @@ impl ChatService {
                 s.memory_known = Some(mem);
             }
         }
-        let (store, emit, rid) = (self.store.clone(), self.emit.clone(), self.runtime.id());
+        let (store, emit, rid, sink) = (self.store.clone(), self.emit.clone(), self.runtime.id(), self.window_sink.clone());
         let task = tokio::spawn(async move {
             let _guard = guard;
             let _turn_end = turn_end;
-            run_turn(store, emit, rid, session_id, aid, stream).await;
+            run_turn(store, emit, rid, session_id, aid, stream, sink).await;
         });
         *self.turn.lock().await = Some(task);
         Ok(aid)
@@ -244,7 +259,7 @@ impl ChatService {
     }
 }
 
-async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i64, aid: i64, mut stream: crate::runtime::EventStream) {
+async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i64, aid: i64, mut stream: crate::runtime::EventStream, sink: Option<WindowSink>) {
     let mut usage: Option<(i64, i64)> = None;
     let mut text = String::new();
     let mut steps: Vec<Value> = vec![];
@@ -266,6 +281,12 @@ async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i
             AgentEvent::Usage { input, output } => {
                 tokens = Some((input + output) as i64);
                 usage = Some((input as i64, output as i64));
+            }
+            AgentEvent::Context { used, window } => {
+                let _ = store.set_session_context(session_id, used as i64);
+                if let (Some(w), Some(sink)) = (window, &sink) {
+                    sink(w);
+                }
             }
             AgentEvent::RateLimited { .. } => {}
             AgentEvent::Error { message, .. } => {
@@ -593,6 +614,21 @@ mod tests {
         chat.wait_idle().await;
         let sent = r.rt.sent.lock().unwrap().clone();
         assert!(sent[0].starts_with("[memory changed]"), "a resumed session never saw this memory: {}", sent[0]);
+    }
+
+    #[tokio::test]
+    async fn turn_records_context_and_reports_the_window() {
+        let r = rig(vec![vec![AgentEvent::Context { used: 42_000, window: Some(1_000_000) }, AgentEvent::Usage { input: 90_000, output: 5 }, done("s1")]]);
+        let seen = Arc::new(StdMutex::new(vec![]));
+        let s2 = seen.clone();
+        let chat = service(&r).with_window_sink(Arc::new(move |w| s2.lock().unwrap().push(w)));
+        chat.send("hi".into()).await.unwrap();
+        chat.wait_idle().await;
+        assert_eq!(chat.context().await, Some(42_000));
+        assert_eq!(r.store.current_session("claude").unwrap().unwrap().context_used, Some(42_000));
+        assert_eq!(seen.lock().unwrap().as_slice(), [1_000_000]);
+        let chat2 = service(&r);
+        assert_eq!(chat2.context().await, Some(42_000), "survives a restart");
     }
 
     #[tokio::test]

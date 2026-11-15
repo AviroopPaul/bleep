@@ -137,7 +137,19 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let emit: chat::Emit = Arc::new(move |m: ChatEmit| {
         let _ = h.emit("chat://event", m);
     });
-    let chat = Arc::new(ChatService::new(store.clone(), runtime, McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns).with_memory(memory.clone()));
+    let chat = Arc::new(ChatService::new(store.clone(), runtime, McpEndpoint { url: mcp.url(), token: mcp.token().into() }, emit, turns).with_memory(memory.clone()).with_window_sink({
+        let h = handle.clone();
+        Arc::new(move |w| {
+            let st = h.state::<AppState>();
+            let mut cfg = st.config.lock().unwrap();
+            if cfg.memory.context_window != Some(w) {
+                cfg.memory.context_window = Some(w);
+                if let Err(e) = cfg.save(&st.paths.config_file) {
+                    eprintln!("bleep: save config: {e}");
+                }
+            }
+        })
+    }));
     let c = chat.clone();
     tauri::async_runtime::spawn(async move {
         if c.runtime().health().await.ok() {

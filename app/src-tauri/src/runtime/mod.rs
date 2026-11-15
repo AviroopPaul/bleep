@@ -31,6 +31,9 @@ pub enum AgentEvent {
     ToolResult { id: String, ok: bool, preview: String },
     /// `input` = input + cache_creation + cache_read tokens.
     Usage { input: u64, output: u64 },
+    /// How full the session is after this turn: the last model call's input, and the
+    /// model's context window when the runtime reports it.
+    Context { used: u64, window: Option<u64> },
     /// Unix seconds when the limit resets.
     RateLimited { until: i64 },
     Done { runtime_session_id: Option<String> },

@@ -168,6 +168,8 @@ pub struct Session {
     pub seed: Option<String>,
     /// The memory text this session's model last saw.
     pub memory_known: Option<String>,
+    /// Context size after the last turn, in tokens.
+    pub context_used: Option<i64>,
 }
 
 const MIGRATIONS: &[&str] = &[r#"
@@ -296,6 +298,7 @@ CREATE INDEX agent_asks_session ON agent_asks(session_id, created_at);
 "#, r#"
 ALTER TABLE sessions ADD COLUMN seed TEXT;
 ALTER TABLE sessions ADD COLUMN memory_known TEXT;
+ALTER TABLE sessions ADD COLUMN context_used INTEGER;
 CREATE TABLE memory_proposals (
   id INTEGER PRIMARY KEY,
   fact TEXT NOT NULL,
@@ -414,7 +417,7 @@ pub const UNFINISHED: &str = "bleep closed before this finished. Check your cale
 const APPROVAL_COLS: &str = "id, tool, payload, status, turn_message_id, result, created_at, decided_at";
 
 fn row_to_session(r: &Row) -> rusqlite::Result<Session> {
-    Ok(Session { id: r.get(0)?, runtime: r.get(1)?, runtime_session_id: r.get(2)?, started_at: r.get(3)?, ended_at: r.get(4)?, seed: r.get(5)?, memory_known: r.get(6)? })
+    Ok(Session { id: r.get(0)?, runtime: r.get(1)?, runtime_session_id: r.get(2)?, started_at: r.get(3)?, ended_at: r.get(4)?, seed: r.get(5)?, memory_known: r.get(6)?, context_used: r.get(7)? })
 }
 
 const AGENT_COLS: &str = "id, tool, project, title, transcript_path, state, last_ask, updated";
@@ -454,7 +457,7 @@ fn row_to_ask(r: &Row) -> rusqlite::Result<AgentAsk> {
 }
 
 const MSG_COLS: &str = "id, role, kind, content, tool_steps, tokens, status, session_id, created_at";
-const SESSION_COLS: &str = "id, runtime, runtime_session_id, started_at, ended_at, seed, memory_known";
+const SESSION_COLS: &str = "id, runtime, runtime_session_id, started_at, ended_at, seed, memory_known, context_used";
 
 impl Store {
     pub fn open(path: &Path) -> Result<Store> {

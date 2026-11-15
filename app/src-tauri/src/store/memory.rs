@@ -51,6 +51,11 @@ impl Store {
         Ok(())
     }
 
+    pub fn set_session_context(&self, id: i64, used: i64) -> Result<()> {
+        self.db().execute("UPDATE sessions SET context_used = ?2 WHERE id = ?1", params![id, used])?;
+        Ok(())
+    }
+
     /// Ends a session that was compacted, keeping its summary and size.
     pub fn end_session_with(&self, id: i64, summary: &str, tokens: i64) -> Result<()> {
         self.db().execute(
