@@ -85,3 +85,13 @@ test("dark mode: agents view and agents tab are readable", async ({ page }) => {
     expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
   }
 });
+
+test("dark mode: memory tab, divider and meter are readable", async ({ page }) => {
+  await page.goto("/?mock=1&g=builtin&memory=1#settings");
+  await page.getByRole("tab", { name: "Memory" }).click();
+  for (const sel of [".mail-h", ".mem-file-h", ".mem-file-name", ".mem-fact", ".mem-src", ".mem-empty", ".set-lead", ".range"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+  await page.goto("/?mock=1&memory=1#chat");
+  expect(await contrast(page, ".divider"), ".divider").toBeGreaterThanOrEqual(4.5);
+});

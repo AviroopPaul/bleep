@@ -127,9 +127,43 @@ export type AgentEvent =
   | { type: "tool_start"; id: string; name: string; args: unknown }
   | { type: "tool_result"; id: string; ok: boolean; preview: string }
   | { type: "usage"; input: number; output: number }
+  | { type: "context"; used: number; window: number | null }
   | { type: "rate_limited"; until: number }
   | { type: "done"; runtime_session_id: string | null }
   | { type: "error"; message: string; retryable: boolean };
+
+export interface MemoryFile {
+  file: "USER.md" | "RULES.md" | "MEMORY.md";
+  facts: string[];
+}
+
+export interface MemoryView {
+  files: MemoryFile[];
+  /** Characters the files take in the prompt, and the budget. */
+  size: number;
+  budget: number;
+}
+
+export interface Proposal {
+  id: number;
+  fact: string;
+  source: "compaction" | "nightly";
+  status: string;
+  created_at: string;
+}
+
+export interface MemorySettings {
+  compact_at: number;
+  threshold: number;
+  window: number | null;
+  nightly: string;
+}
+
+export interface ChatContext {
+  used: number | null;
+  threshold: number;
+  window: number | null;
+}
 
 export interface ChatEmit {
   message_id: number;
@@ -189,7 +223,18 @@ export const api = {
   agentsSet: (autoApprove: boolean, screenshotCheck: boolean, codexWatch: boolean) =>
     invoke<AgentSettings>("agents_set", { autoApprove, screenshotCheck, codexWatch }),
   agentsRevealRules: () => invoke<void>("agents_reveal_rules"),
+  memoryList: () => invoke<MemoryView>("memory_list"),
+  memoryForget: (file: string, fact: string) => invoke<MemoryView>("memory_forget", { file, fact }),
+  memorySuggestions: () => invoke<Proposal[]>("memory_suggestions"),
+  memoryDecide: (id: number, add: boolean) => invoke<Proposal[]>("memory_decide", { id, add }),
+  memorySettings: () => invoke<MemorySettings>("memory_settings"),
+  memorySet: (compactAt: number) => invoke<MemorySettings>("memory_set", { compactAt }),
+  memoryCompactNow: () => invoke<void>("memory_compact_now"),
+  memoryReveal: () => invoke<void>("memory_reveal"),
+  chatContext: () => invoke<ChatContext>("chat_context"),
 };
+
+export const onCompacting = (cb: (on: boolean) => void): Promise<UnlistenFn> => listen<boolean>("chat://compacting", (e) => cb(e.payload));
 
 export const onAgents = (cb: () => void): Promise<UnlistenFn> => listen("agents://changed", () => cb());
 

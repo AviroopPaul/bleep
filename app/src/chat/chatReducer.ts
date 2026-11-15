@@ -6,6 +6,8 @@ export interface ChatState {
   rateLimitedUntil: number | null;
   /** Cards whose turn is not on screen yet. */
   loose: Approval[];
+  /** How full the session is after the last turn. */
+  context: { used: number; window: number | null } | null;
 }
 
 export type ChatAction =
@@ -14,7 +16,7 @@ export type ChatAction =
   | { type: "event"; messageId: number; event: AgentEvent }
   | { type: "approval"; approval: Approval };
 
-export const emptyChat: ChatState = { messages: [], streamingId: null, rateLimitedUntil: null, loose: [] };
+export const emptyChat: ChatState = { messages: [], streamingId: null, rateLimitedUntil: null, loose: [], context: null };
 
 const STEP_LABELS: Record<string, string> = {
   bleep_now: "Checked the time",
@@ -29,6 +31,9 @@ const STEP_LABELS: Record<string, string> = {
   gmail_read_thread: "Read an email thread",
   gmail_draft: "Saved a draft",
   gmail_send: "Sending an email",
+  memory_search: "Searched your memory",
+  memory_note: "Saved a note",
+  memory_promote: "Remembering a fact",
 };
 export const stepLabel = (name: string) => STEP_LABELS[name] ?? name;
 
@@ -67,6 +72,7 @@ function applyEvent(m: Message, ev: AgentEvent): Message {
     case "done":
       return { ...m, status: m.status === "error" ? "error" : "done" };
     case "rate_limited":
+    case "context":
       return m;
   }
 }
@@ -93,6 +99,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         messages,
         streamingId: event.type === "done" ? null : event.type === "rate_limited" ? state.streamingId : messageId,
         rateLimitedUntil: event.type === "rate_limited" ? event.until : state.rateLimitedUntil,
+        context: event.type === "context" ? { used: event.used, window: event.window } : state.context,
       };
     }
     case "approval": {

@@ -1,7 +1,7 @@
 // Fake backend for headless UI checks (Playwright). Loaded only with ?mock=1.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
-import type { ActivityItem, AgentAsk, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, GoogleState, MailConfig, Message } from "./ipc";
+import type { ActivityItem, AgentAsk, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
   id, role, kind: "chat", content, tool_steps: [], tokens: null, status: "done", session_id: 1, created_at: "",
@@ -65,6 +65,26 @@ export function installMocks(label: string) {
       ]
     : [];
   let agentSet: AgentSettings = { claude_hooks: false, codex_notify: false, codex_running: true, auto_approve: false, screenshot_check: true, codex_watch: false, rules_path: "/Users/me/.bleep/agent-rules.toml" };
+  // ?memory=1: facts, suggestions, a compaction divider and a nearly full chat.
+  const memOn = q.has("memory");
+  if (memOn) history.push({ ...row(3, "system", "Compacted 250K into a 3K summary. Facts saved to memory."), kind: "divider" });
+  if (memOn) next = 4;
+  let memView: MemoryView = {
+    files: [
+      { file: "USER.md", facts: memOn ? ["My name is Aviroop"] : [] },
+      { file: "RULES.md", facts: [] },
+      { file: "MEMORY.md", facts: memOn ? ["Sync means my 1:1 with Priya", "Standup is at 10:00"] : [] },
+    ],
+    size: memOn ? 120 : 0,
+    budget: 12_000,
+  };
+  let sugs: Proposal[] = memOn
+    ? [
+        { id: 1, fact: "You pay bills the evening they are due", source: "nightly", status: "pending", created_at: "" },
+        { id: 2, fact: "Priya leads the design team", source: "compaction", status: "pending", created_at: "" },
+      ]
+    : [];
+  let memSet: MemorySettings = { compact_at: 250_000, threshold: 250_000, window: 1_000_000, nightly: "22:00" };
   const bubble = q.get("bubble");
   const ping = q.get("ping");
   if (bubble) setTimeout(() => emit("bubble://text", { text: bubble, ping_id: ping ? Number(ping) : null }), 200);
@@ -95,6 +115,16 @@ export function installMocks(label: string) {
             later(200, () => chatEv(id, { type: "done", runtime_session_id: "s1" }));
             return id;
           }
+          if (String(a.text).includes("remember")) {
+            card = {
+              id: 51, tool: "memory_promote", status: "pending", turn_message_id: id, result: null, created_at: "", decided_at: null,
+              payload: { fact: "Sync means my 1:1 with Priya", file: "MEMORY.md" },
+            };
+            const c = card;
+            later(100, () => chatEv(id, { type: "tool_start", id: "t2", name: "memory_promote", args: { fact: "Sync means my 1:1 with Priya" } }));
+            later(200, () => emit("approval://changed", c));
+            return id;
+          }
           if (String(a.text).includes("rent")) {
             card = {
               id: 50, tool: "calendar_create", status: "pending", turn_message_id: id, result: null, created_at: "", decided_at: null,
@@ -110,6 +140,7 @@ export function installMocks(label: string) {
             { type: "tool_result", id: "t1", ok: true, preview: "{}" },
             { type: "text_delta", text: "It is 8:05 PM in Tokyo." },
             { type: "usage", input: 1200, output: 14 },
+            ...(memOn ? [{ type: "context", used: 215_000, window: 1_000_000 } as const] : []),
             { type: "done", runtime_session_id: "s1" },
           ];
           steps.forEach((event, i) => setTimeout(() => emit("chat://event", { message_id: id, event }), 150 * (i + 1)));
@@ -222,6 +253,40 @@ export function installMocks(label: string) {
           later(260, () => chatEv(id, { type: "done", runtime_session_id: "s1" }));
           return null;
         }
+        case "memory_list":
+          return memView;
+        case "memory_forget": {
+          calls.push(`memory_forget:${a.file}:${a.fact}`);
+          memView = { ...memView, files: memView.files.map((f) => (f.file === a.file ? { ...f, facts: f.facts.filter((x) => x !== a.fact) } : f)) };
+          return memView;
+        }
+        case "memory_suggestions":
+          return sugs;
+        case "memory_decide": {
+          calls.push(`memory_decide:${a.id}:${a.add}`);
+          const p = sugs.find((x) => x.id === a.id);
+          sugs = sugs.filter((x) => x.id !== a.id);
+          if (p && a.add) memView = { ...memView, files: memView.files.map((f) => (f.file === "MEMORY.md" ? { ...f, facts: [...f.facts, p.fact] } : f)) };
+          return sugs;
+        }
+        case "memory_settings":
+          return memSet;
+        case "memory_set": {
+          const c = Number(a.compactAt);
+          memSet = { ...memSet, compact_at: c, threshold: Math.min(c, 800_000) };
+          calls.push(`memory_set:${c}`);
+          return memSet;
+        }
+        case "memory_compact_now":
+          calls.push(cmd);
+          later(10, () => void emit("chat://compacting", true));
+          later(800, () => void emit("chat://compacting", false));
+          return null;
+        case "memory_reveal":
+          calls.push(cmd);
+          return null;
+        case "chat_context":
+          return { used: memOn ? 120_000 : null, threshold: memSet.threshold, window: memSet.window };
         default:
           return null;
       }

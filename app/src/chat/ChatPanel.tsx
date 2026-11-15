@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, healthOk, onApproval, onChatEvent, onNotice, type Message, type RuntimeHealth } from "../ipc";
+import { api, healthOk, onApproval, onChatEvent, onCompacting, onNotice, type ChatContext, type Message, type RuntimeHealth } from "../ipc";
+import { meterLabel, meterLevel } from "../settings/memoryText";
 import { chatReducer, emptyChat, formatBackAt } from "./chatReducer";
 import { ToolSteps } from "./ToolSteps";
 import { ApprovalCard } from "./ApprovalCard";
@@ -12,6 +13,7 @@ const PAGE = 50;
 const SUGGESTIONS = ["What time is it in Tokyo?", "What day is it today?"];
 
 function Bubble({ m }: { m: Message }) {
+  if (m.kind === "divider") return <div className="divider" role="separator" aria-label={m.content}><span>{m.content}</span></div>;
   if (m.role === "system") return <div className="msg sys">{m.content}</div>;
   if (m.role === "user" && m.kind === "scheduled") return <div className="msg sched"><span className="tag">scheduled</span>{m.content}</div>;
   if (m.role === "user") return <div className="msg me">{m.content}</div>;
@@ -38,6 +40,8 @@ export function ChatPanel() {
   const [noMore, setNoMore] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [compacting, setCompacting] = useState(false);
+  const [ctx, setCtx] = useState<ChatContext | null>(null);
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -57,6 +61,15 @@ export function ChatPanel() {
     const un = onChatEvent(({ message_id, event }) => dispatch({ type: "event", messageId: message_id, event }));
     const unApproval = onApproval((approval) => dispatch({ type: "approval", approval }));
     const unNotice = onNotice(setNotice);
+    api.chatContext().then(setCtx).catch(() => {});
+    const unCompact = onCompacting((on) => {
+      setCompacting(on);
+      if (!on) {
+        // The divider and the new session are in the store now.
+        api.history(null, PAGE).then((messages) => dispatch({ type: "history", messages, mode: "replace" })).catch(() => {});
+        api.chatContext().then(setCtx).catch(() => {});
+      }
+    });
     const unFocus = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
       if (focused) {
         input.current?.focus();
@@ -69,6 +82,7 @@ export function ChatPanel() {
       void un.then((f) => f());
       void unApproval.then((f) => f());
       void unNotice.then((f) => f());
+      void unCompact.then((f) => f());
       void unFocus.then((f) => f());
       window.removeEventListener("keydown", onKey);
     };
@@ -101,7 +115,9 @@ export function ChatPanel() {
   };
 
   const ok = healthOk(health);
-  const busy = sending || state.streamingId !== null;
+  const busy = sending || compacting || state.streamingId !== null;
+  const used = state.context?.used ?? ctx?.used ?? null;
+  const meter = ctx ? meterLabel(used, ctx.threshold) : "";
   const canSend = ok && !busy && draft.trim().length > 0;
 
   const send = async (text: string) => {
@@ -154,6 +170,20 @@ export function ChatPanel() {
         <button className="iconbtn" aria-label="Close chat" title="Close (Esc)" onClick={() => void api.hideChat()}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
         </button>
+        {meter && (
+          <div
+            className={`meter ${meterLevel(used ?? 0, ctx!.threshold)}`}
+            role="meter"
+            aria-label="Chat context"
+            aria-valuemin={0}
+            aria-valuemax={ctx!.threshold}
+            aria-valuenow={used ?? 0}
+            aria-valuetext={meter}
+            title={`Chat context: ${meter}. bleep compacts the chat at the second number.`}
+          >
+            <i style={{ width: `${Math.min(100, ((used ?? 0) / ctx!.threshold) * 100)}%` }} />
+          </div>
+        )}
       </header>
 
       {view === "agents" && <AgentsView view={agents.view} refresh={() => void agents.refresh()} />}
@@ -176,6 +206,7 @@ export function ChatPanel() {
         {limited && <div className="msg sys">{formatBackAt(state.rateLimitedUntil!)}</div>}
         {sendError && <div className="msg sys err" role="alert">{sendError}</div>}
         {notice && <div className="msg sys" role="status">{notice}</div>}
+        {compacting && <div className="msg sys" role="status">Compacting... Facts go to memory first. Your history stays here.</div>}
       </div>
 
       {view === "chat" && ok && state.messages.length === 0 && (
@@ -191,7 +222,7 @@ export function ChatPanel() {
           ref={input}
           rows={1}
           value={draft}
-          placeholder={ok ? "Ask bleep" : "Sign in to chat"}
+          placeholder={compacting ? "Compacting..." : ok ? "Ask bleep" : "Sign in to chat"}
           disabled={!ok || busy}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}

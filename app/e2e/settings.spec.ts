@@ -85,6 +85,8 @@ test("tabs work with the keyboard", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Mail" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tabpanel")).toContainText("VIPs");
   await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Memory" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: "Agents" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");

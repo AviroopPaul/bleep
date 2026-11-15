@@ -11,6 +11,16 @@ function sent(): ChatState {
 }
 
 describe("chatReducer", () => {
+  it("context event keeps the message and sets the context", () => {
+    let s = sent();
+    s = chatReducer(s, { type: "event", messageId: 2, event: { type: "text_delta", text: "hi" } });
+    s = chatReducer(s, { type: "event", messageId: 2, event: { type: "context", used: 42_000, window: 1_000_000 } });
+    expect(s.messages[1].content).toBe("hi");
+    expect(s.context).toEqual({ used: 42_000, window: 1_000_000 });
+    expect(stepLabel("memory_promote")).toBe("Remembering a fact");
+    expect(stepLabel("memory_search")).toBe("Searched your memory");
+  });
+
   it("text deltas append to the streaming message", () => {
     let s = sent();
     expect(s.streamingId).toBe(2);
