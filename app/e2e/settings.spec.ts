@@ -5,6 +5,7 @@ const calls = (page: Page) => page.evaluate(() => (window as unknown as { __call
 
 test("with bleep's built-in app, Connect is one click and no setup shows", async ({ page }) => {
   await page.goto("/?mock=1&g=builtin#settings");
+  await page.getByRole("tab", { name: "Google" }).click();
   await expect(page.getByRole("status")).toHaveText("Ready to connect");
   await expect(page.getByRole("button", { name: "Create a Google Cloud project" })).toBeHidden();
   await expect(page.getByLabel("Client ID")).toBeHidden();
@@ -14,6 +15,7 @@ test("with bleep's built-in app, Connect is one click and no setup shows", async
 
 test("your own app can go back to bleep's app", async ({ page }) => {
   await page.goto("/?mock=1&g=own#settings");
+  await page.getByRole("tab", { name: "Google" }).click();
   await page.getByText("Use your own Google Cloud app").click();
   await expect(page.getByLabel("Client ID")).toHaveValue("cid.apps.googleusercontent.com");
   await page.getByRole("button", { name: "Use bleep's app" }).click();
@@ -23,6 +25,7 @@ test("your own app can go back to bleep's app", async ({ page }) => {
 
 test("Save is disabled until both fields have text", async ({ page }) => {
   await page.goto("/?mock=1&g=setup#settings");
+  await page.getByRole("tab", { name: "Google" }).click();
   await expect(page.getByRole("status")).toHaveText("Not set up");
   const save = page.getByRole("button", { name: "Save" });
   await expect(save).toBeDisabled();
@@ -40,6 +43,7 @@ test("Connect shows the waiting text, then Connected as me@example.com", async (
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/?mock=1&g=ready#settings");
+  await page.getByRole("tab", { name: "Google" }).click();
   await page.getByRole("button", { name: "Connect Google" }).click();
   await expect(page.getByRole("button", { name: "Finish sign-in in your browser…" })).toBeDisabled();
   await expect(page.getByRole("status")).toHaveText("Connected as me@example.com");
@@ -50,6 +54,7 @@ test("Connect shows the waiting text, then Connected as me@example.com", async (
 
 test("a failed sign-in shows why", async ({ page }) => {
   await page.goto("/?mock=1&g=ready&fail=1#settings");
+  await page.getByRole("tab", { name: "Google" }).click();
   await page.getByRole("button", { name: "Connect Google" }).click();
   await expect(page.getByRole("alert")).toHaveText("Sign-in was cancelled.");
   await expect(page.getByRole("button", { name: "Connect Google" })).toBeEnabled();
@@ -57,12 +62,14 @@ test("a failed sign-in shows why", async ({ page }) => {
 
 test("expired status shows Connect again", async ({ page }) => {
   await page.goto("/?mock=1&g=expired#settings");
+  await page.getByRole("tab", { name: "Google" }).click();
   await expect(page.getByRole("status")).toHaveText("Sign-in expired. Connect again.");
   await expect(page.getByRole("button", { name: "Connect again" })).toBeVisible();
 });
 
 test("step links call open_link with fixed names", async ({ page }) => {
   await page.goto("/?mock=1&g=setup#settings");
+  await page.getByRole("tab", { name: "Google" }).click();
   for (const name of ["Create a Google Cloud project", "Turn on the Calendar API", "Turn on the Gmail API", "Open the consent screen", "Create an OAuth client"]) {
     await page.getByRole("button", { name }).click();
   }
@@ -71,6 +78,7 @@ test("step links call open_link with fixed names", async ({ page }) => {
 
 test("no em dash on the page and no sideways scroll", async ({ page }) => {
   await page.goto("/?mock=1&g=setup#settings");
+  await page.getByRole("tab", { name: "Google" }).click();
   await expect(page.getByRole("heading", { name: "Google" })).toBeVisible();
   expect(await page.evaluate(() => document.body.innerText)).not.toMatch(/—/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(460);
@@ -78,6 +86,7 @@ test("no em dash on the page and no sideways scroll", async ({ page }) => {
 
 test("the setting list works with the keyboard", async ({ page }) => {
   await page.goto("/?mock=1&g=builtin#settings");
+  await page.getByRole("tab", { name: "Google" }).click();
   await expect(page.getByRole("tablist")).toHaveAttribute("aria-orientation", "vertical");
   const google = page.getByRole("tab", { name: "Google" });
   await expect(google).toHaveAttribute("aria-selected", "true");
@@ -90,11 +99,11 @@ test("the setting list works with the keyboard", async ({ page }) => {
     await expect(page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
   }
   await page.keyboard.press("ArrowDown");
-  await expect(google).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Model" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowUp");
   await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Home");
-  await expect(google).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Model" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("End");
   await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
 });
@@ -161,7 +170,7 @@ test("agents tab toggles call agents_set", async ({ page }) => {
 });
 
 test.describe("window sizes", () => {
-  test("narrow: all six tabs fit and nothing scrolls sideways", async ({ page }) => {
+  test("narrow: all seven tabs fit and nothing scrolls sideways", async ({ page }) => {
     await page.setViewportSize({ width: 380, height: 600 });
     await page.goto("/?mock=1&g=builtin#settings");
     const tabs = page.locator(".tabs");
@@ -178,6 +187,7 @@ test.describe("window sizes", () => {
   test("wide: the list is on the left and the page on the right", async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 800 });
     await page.goto("/?mock=1&g=builtin#settings");
+    await page.getByRole("tab", { name: "Google" }).click();
     const list = (await page.getByRole("tablist").boundingBox())!;
     const panel = (await page.getByRole("tabpanel").boundingBox())!;
     expect(list.x).toBeLessThan(40);

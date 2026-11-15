@@ -202,6 +202,16 @@ button { font: inherit; color: inherit; }
 .own summary { cursor: pointer; font: 700 13px var(--sans); color: var(--ink-2); min-height: 32px; display: flex; align-items: center; }
 .own[open] summary { margin-bottom: 4px; }
 .set-err { margin: 6px 0 0; color: var(--rust); font-size: 13px; font-weight: 600; }
+.set-warn { color: var(--rust); font-weight: 600; }
+.hint { margin: -2px 0 4px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.hint .linkbtn { min-height: 26px; margin-top: 2px; }
+.choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.choice-opt { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--raised); cursor: pointer; }
+.choice-opt.on { border-color: var(--link); box-shadow: 0 0 0 1px var(--link) inset; }
+.choice-opt input { margin-top: 3px; }
+.choice-opt b { display: block; font-size: 14px; }
+.choice-opt small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.4; margin-top: 2px; }
+.model-set .acts { margin-top: 12px; }
 
 /* ---------- settings tabs, mail, activity ---------- */
 .tabs { display: flex; flex-direction: column; gap: 2px; }
