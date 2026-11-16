@@ -7,7 +7,9 @@ test("chat shows history, streams a tool step and a reply, and locks input while
 
   await expect(page.locator(".msg.me")).toHaveText(["hello"]);
   await expect(page.locator(".msg.bot")).toHaveText(["Hi! I am bleep."]);
-  await expect(page.locator(".badge")).toHaveText("Claude Code");
+  await expect(page.getByText("Claude Code")).toHaveCount(0);
+  await expect(page.getByLabel("Message bleep")).toHaveAttribute("placeholder", "Ask bleep anything about your day");
+  await expect(page.getByRole("button", { name: "Send" })).toBeDisabled();
 
   const box = page.getByLabel("Message bleep");
   await box.fill("what time is it in Tokyo");
@@ -43,4 +45,9 @@ test("a failed send is shown and the text is kept", async ({ page }) => {
   await expect(page.locator(".msg.sys.err")).toContainText("could not reach the model");
   await expect(box).toBeEnabled();
   await expect(box).toHaveValue("fail please");
+});
+
+test("a droid bubble shows in the chat after it is gone", async ({ page }) => {
+  await page.goto("/?mock=1&pinged=1#chat");
+  await expect(page.locator(".msg.ping")).toContainText("Design review in 1 hour");
 });

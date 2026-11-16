@@ -351,6 +351,7 @@ pub fn run() {
             bar::bar_join,
             bar::bar_dismiss,
             bar::bubble_click,
+            bar::bubble_dismiss,
             settings::settings_open,
             setup::setup_open,
             setup::setup_finish,

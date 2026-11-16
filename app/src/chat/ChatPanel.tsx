@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, healthOk, onApproval, onChatEvent, onCompacting, onNotice, type ChatContext, type Message, type RuntimeHealth } from "../ipc";
+import { api, healthOk, onApproval, onChatEvent, onCompacting, onNotice, onPing, type ChatContext, type Message, type RuntimeHealth } from "../ipc";
 import { meterLabel, meterLevel } from "../settings/memoryText";
 import { chatReducer, emptyChat, formatBackAt } from "./chatReducer";
 import { ToolSteps } from "./ToolSteps";
@@ -12,8 +12,15 @@ import { AgentsView, useAgents } from "../agents/AgentsView";
 const PAGE = 50;
 const SUGGESTIONS = ["What time is it in Tokyo?", "What day is it today?"];
 
+function pingTime(at: string): string {
+  const d = new Date(at);
+  if (!at || Number.isNaN(d.getTime())) return "bleep";
+  return `bleep, ${new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(d)}`;
+}
+
 function Bubble({ m }: { m: Message }) {
   if (m.kind === "divider") return <div className="divider" role="separator" aria-label={m.content}><span>{m.content}</span></div>;
+  if (m.kind === "ping") return <div className="msg ping"><span className="tag">{pingTime(m.created_at)}</span>{m.content}</div>;
   if (m.role === "system") return <div className="msg sys">{m.content}</div>;
   if (m.role === "user" && m.kind === "scheduled") return <div className="msg sched"><span className="tag">scheduled</span>{m.content}</div>;
   if (m.role === "user") return <div className="msg me">{m.content}</div>;
@@ -61,6 +68,7 @@ export function ChatPanel() {
     const un = onChatEvent(({ message_id, event }) => dispatch({ type: "event", messageId: message_id, event }));
     const unApproval = onApproval((approval) => dispatch({ type: "approval", approval }));
     const unNotice = onNotice(setNotice);
+    const unPing = onPing((message) => dispatch({ type: "ping", message }));
     api.chatContext().then(setCtx).catch(() => {});
     const unCompact = onCompacting((on) => {
       setCompacting(on);
@@ -82,6 +90,7 @@ export function ChatPanel() {
       void un.then((f) => f());
       void unApproval.then((f) => f());
       void unNotice.then((f) => f());
+      void unPing.then((f) => f());
       void unCompact.then((f) => f());
       void unFocus.then((f) => f());
       window.removeEventListener("keydown", onKey);
@@ -171,7 +180,6 @@ export function ChatPanel() {
           </button>
         </div>
         <span className="spacer" data-tauri-drag-region />
-        <span className="badge">Claude Code</span>
         <button className="iconbtn" aria-label="Close chat" title="Close (Esc)" onClick={() => void api.hideChat()}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
         </button>
@@ -227,13 +235,17 @@ export function ChatPanel() {
           ref={input}
           rows={1}
           value={draft}
-          placeholder={compacting ? "Compacting..." : ok ? "Ask bleep" : "Sign in to chat"}
+          placeholder={compacting ? "Compacting..." : ok ? "Ask bleep anything about your day" : "Sign in to chat"}
           disabled={!ok || busy}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           autoFocus
         />
-        <button type="submit" disabled={!canSend}>Send</button>
+        <button type="submit" className="send" aria-label="Send" title="Send (Enter)" disabled={!canSend}>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M10 16V4M4.5 9.5 10 4l5.5 5.5" />
+          </svg>
+        </button>
       </form>
     </div>
   );

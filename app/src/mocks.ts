@@ -68,6 +68,8 @@ export function installMocks(label: string) {
   let agentSet: AgentSettings = { claude_hooks: false, codex_notify: false, codex_running: true, auto_approve: false, screenshot_check: true, codex_watch: false, rules_path: "/Users/me/.bleep/agent-rules.toml" };
   // ?memory=1: facts, suggestions, a compaction divider and a nearly full chat.
   const memOn = q.has("memory");
+  // ?pinged=1: a droid bubble that was saved to the chat.
+  if (q.get("pinged")) history.push({ ...row(history.length + 1, "system", "Design review in 1 hour"), kind: "ping" });
   if (memOn) history.push({ ...row(3, "system", "Compacted 250K into a 3K summary. Facts saved to memory."), kind: "divider" });
   if (memOn) next = 4;
   let memView: MemoryView = {
@@ -266,6 +268,7 @@ export function installMocks(label: string) {
         case "bar_join":
         case "bar_dismiss":
         case "bubble_click":
+        case "bubble_dismiss":
           calls.push(cmd);
           return null;
         case "approval_decide": {

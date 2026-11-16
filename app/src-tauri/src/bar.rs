@@ -5,13 +5,12 @@ use crate::opener::{Opener, SystemOpener};
 use crate::proactive::cues::BarCue;
 use crate::proactive::scheduler::{BarUi, Scheduler};
 use crate::windows::{bar_pos, bubble_pos, open_chat, rect_of, screen_of, screens, Anchor, UiState, BAR, BUBBLE};
+use crate::store::{Kind, Message, MsgStatus, NewMessage, Role, Store};
 use crate::AppState;
 use serde_json::json;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, LogicalPosition, Manager};
 
-pub const BUBBLE_SECS: u64 = 12;
 pub const BUSY_NOTE: &str = "bleep is busy. Try Prep me again in a moment.";
 
 /// Only plain https links open from the bar. Anything else in an invite is ignored.
@@ -22,14 +21,19 @@ pub fn safe_join_url(url: &str) -> Option<&str> {
 
 pub struct TauriBarUi {
     app: AppHandle,
-    /// Bumped per bubble, so an old timer never hides a newer bubble.
-    bubble_gen: Arc<AtomicU64>,
 }
 
 impl TauriBarUi {
     pub fn new(app: AppHandle) -> Arc<TauriBarUi> {
-        Arc::new(TauriBarUi { app, bubble_gen: Default::default() })
+        Arc::new(TauriBarUi { app })
     }
+}
+
+/// Every bubble also goes into the chat, so a missed one can be read later. It is a system
+/// line: the model never sees it as a turn.
+pub fn save_ping(store: &Store, text: &str) -> anyhow::Result<Option<Message>> {
+    let id = store.insert_message(NewMessage { role: Role::System, kind: Kind::Ping, content: text.into(), status: MsgStatus::Done, session_id: None })?;
+    Ok(store.page_messages(Some(id + 1), 1)?.into_iter().find(|m| m.id == id))
 }
 
 impl BarUi for TauriBarUi {
@@ -61,8 +65,16 @@ impl BarUi for TauriBarUi {
 }
 
 impl TauriBarUi {
-    /// Skipped when the droid is hidden or tucked: the bar or the next check-in is enough then.
+    /// The bubble stays until clicked, dismissed, or replaced by a newer one. It is skipped
+    /// when the droid is hidden or tucked, but the chat still gets the line.
     fn show_bubble(&self, text: &str, ping_id: Option<i64>) {
+        match save_ping(&self.app.state::<AppState>().store, text) {
+            Ok(Some(m)) => {
+                let _ = self.app.emit("chat://ping", &m);
+            }
+            Ok(None) => {}
+            Err(e) => eprintln!("bleep: could not save ping to chat: {e}"),
+        }
         let Some(d) = self.app.get_webview_window("droid") else { return };
         let tucked = self.app.state::<UiState>().tucked.lock().unwrap().is_some();
         if tucked || !d.is_visible().unwrap_or(false) {
@@ -73,20 +85,10 @@ impl TauriBarUi {
         let _ = b.set_position(LogicalPosition::new(p.x, p.y));
         let _ = self.app.emit("bubble://text", json!({"text": text, "ping_id": ping_id}));
         let _ = b.show();
-        let ticket = self.bubble_gen.fetch_add(1, Ordering::SeqCst) + 1;
-        let (app, latest) = (self.app.clone(), self.bubble_gen.clone());
-        tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(BUBBLE_SECS)).await;
-            if latest.load(Ordering::SeqCst) == ticket {
-                if let Some(b) = app.get_webview_window("bubble") {
-                    let _ = b.hide();
-                }
-            }
-        });
     }
 }
 
-fn hide_bubble(app: &AppHandle) {
+pub fn hide_bubble(app: &AppHandle) {
     if let Some(b) = app.get_webview_window("bubble") {
         let _ = b.hide();
     }
@@ -152,6 +154,12 @@ pub fn bubble_not_useful(app: AppHandle, state: tauri::State<'_, AppState>, noti
     Ok(())
 }
 
+/// The close button on the bubble. The line stays in the chat.
+#[tauri::command]
+pub fn bubble_dismiss(app: AppHandle) {
+    hide_bubble(&app);
+}
+
 #[tauri::command]
 pub fn bubble_click(app: AppHandle) {
     hide_bubble(&app);
@@ -161,6 +169,15 @@ pub fn bubble_click(app: AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ping_is_saved_to_chat_as_a_system_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("b.db")).unwrap();
+        let m = save_ping(&store, "Standup in 10 min").unwrap().expect("saved");
+        assert_eq!((m.role, m.kind, m.content.as_str()), (Role::System, Kind::Ping, "Standup in 10 min"));
+        assert_eq!(store.page_messages(None, 10).unwrap().len(), 1);
+    }
 
     #[test]
     fn join_refuses_non_https_links() {

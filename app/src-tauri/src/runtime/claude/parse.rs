@@ -74,9 +74,10 @@ impl ClaudeParser {
                 .collect(),
             Some("rate_limit_event") => {
                 let info = &v["rate_limit_info"];
+                // Only "rejected" stops a turn. "allowed_warning" is a heads-up near the cap.
                 match info.get("status").and_then(Value::as_str) {
-                    Some("allowed") | None => vec![],
-                    Some(_) => vec![AgentEvent::RateLimited { until: info.get("resetsAt").and_then(Value::as_i64).unwrap_or(0) }],
+                    Some("rejected") => vec![AgentEvent::RateLimited { until: info.get("resetsAt").and_then(Value::as_i64).unwrap_or(0) }],
+                    _ => vec![],
                 }
             }
             Some("result") => {
@@ -157,6 +158,12 @@ mod tests {
     #[test]
     fn allowed_rate_limit_is_silent() {
         assert!(!fixture("text_turn.jsonl").iter().any(|e| matches!(e, AgentEvent::RateLimited { .. })));
+    }
+
+    #[test]
+    fn rate_limit_warning_is_silent() {
+        let line = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1794493800,"rateLimitType":"five_hour","utilization":0.9}}"#;
+        assert!(ClaudeParser::default().feed(line).is_empty());
     }
 
     #[test]

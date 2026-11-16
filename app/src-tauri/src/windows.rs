@@ -255,6 +255,10 @@ pub fn open_chat(app: &AppHandle, anchor: Anchor) {
     let _ = chat.set_size(LogicalSize::new(CHAT.w, CHAT.h));
     let _ = chat.show();
     let _ = chat.set_focus();
+    // The bubble's line is in the chat now, so the bubble can go.
+    if let Some(b) = app.get_webview_window("bubble") {
+        let _ = b.hide();
+    }
 }
 
 /// Debounced save of the droid's spot after a move. Skipped while tucked.

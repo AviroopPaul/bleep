@@ -67,3 +67,10 @@ test("a meeting bubble has no Not useful", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Design review/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Not useful" })).toHaveCount(0);
 });
+
+test("the bubble has a close button that keeps the line in the chat", async ({ page }) => {
+  await page.setViewportSize({ width: 240, height: 72 });
+  await page.goto("/?mock=1&bubble=Design%20review%20in%201%20hour#bubble");
+  await page.getByRole("button", { name: "Close" }).click();
+  expect(await calls(page)).toEqual(["bubble_dismiss"]);
+});

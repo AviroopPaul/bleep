@@ -69,6 +69,22 @@ describe("chatReducer", () => {
     expect(formatBackAt(1794493800, "Asia/Kolkata")).not.toMatch(/—/);
   });
 
+  it("a turn that finishes fine clears the limit note, an error keeps it", () => {
+    let s = chatReducer(sent(), { type: "event", messageId: 2, event: { type: "rate_limited", until: 1794493800 } });
+    s = chatReducer(s, { type: "event", messageId: 2, event: { type: "done", runtime_session_id: null } });
+    expect(s.rateLimitedUntil).toBeNull();
+    let e = chatReducer(sent(), { type: "event", messageId: 2, event: { type: "rate_limited", until: 1794493800 } });
+    e = chatReducer(e, { type: "event", messageId: 2, event: { type: "error", message: "limit", retryable: false } });
+    e = chatReducer(e, { type: "event", messageId: 2, event: { type: "done", runtime_session_id: null } });
+    expect(e.rateLimitedUntil).toBe(1794493800);
+  });
+
+  it("a ping lands in the log in id order", () => {
+    const ping: Message = { ...user(3, "Standup in 10 min"), role: "system", kind: "ping" };
+    const s = chatReducer(sent(), { type: "ping", message: ping });
+    expect(s.messages.map((m) => [m.id, m.kind])).toEqual([[1, "chat"], [2, "chat"], [3, "ping"]]);
+  });
+
   it("events that arrive before sent create the row, and sent does not duplicate it", () => {
     let s = chatReducer(emptyChat, { type: "event", messageId: 2, event: { type: "text_delta", text: "hi" } });
     s = chatReducer(s, { type: "sent", user: user(1, "hello"), assistantId: 2 });

@@ -26,7 +26,7 @@ macro_rules! str_enum {
 }
 
 str_enum!(Role { User = "user", Assistant = "assistant", System = "system" });
-str_enum!(Kind { Chat = "chat", Scheduled = "scheduled", System = "system", Approval = "approval", Divider = "divider" });
+str_enum!(Kind { Chat = "chat", Scheduled = "scheduled", System = "system", Approval = "approval", Divider = "divider", Ping = "ping" });
 str_enum!(MsgStatus { Streaming = "streaming", Done = "done", Error = "error", Interrupted = "interrupted" });
 str_enum!(Label { Ignore = "ignore", Fyi = "fyi", Important = "important", NeedsReply = "needs_reply", Bill = "bill" });
 str_enum!(ApprovalStatus { Pending = "pending", Approved = "approved", Declined = "declined", Expired = "expired", Done = "done", Failed = "failed" });

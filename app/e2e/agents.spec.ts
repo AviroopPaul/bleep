@@ -32,7 +32,7 @@ test("badge counts waiting sessions and the header still fits", async ({ page })
   await expect(page.getByRole("tab", { name: "Agents, 2 need you" })).toBeVisible();
   const fits = await page.locator(".panel-head").evaluate((el) => el.scrollWidth <= el.clientWidth);
   expect(fits).toBe(true);
-  await expect(page.locator(".panel-head .badge")).toBeVisible();
+  await expect(page.locator(".panel-head .badge")).toHaveCount(0);
 });
 
 test("no agents shows the empty state", async ({ page }) => {
