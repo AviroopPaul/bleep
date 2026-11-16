@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, healthOk, onApproval, onChatEvent, onCompacting, onNotice, onPing, type ChatContext, type Message, type RuntimeHealth } from "../ipc";
+import { api, healthOk, onApproval, onChatEvent, onChatExpanded, onCompacting, onNotice, onPing, type ChatContext, type Message, type RuntimeHealth } from "../ipc";
 import { meterLabel, meterLevel } from "../settings/memoryText";
 import { chatReducer, emptyChat, formatBackAt } from "./chatReducer";
 import { ToolSteps } from "./ToolSteps";
@@ -49,6 +49,7 @@ export function ChatPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [compacting, setCompacting] = useState(false);
   const [ctx, setCtx] = useState<ChatContext | null>(null);
+  const [big, setBig] = useState(false);
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -69,6 +70,7 @@ export function ChatPanel() {
     const unApproval = onApproval((approval) => dispatch({ type: "approval", approval }));
     const unNotice = onNotice(setNotice);
     const unPing = onPing((message) => dispatch({ type: "ping", message }));
+    const unBig = onChatExpanded(setBig);
     api.chatContext().then(setCtx).catch(() => {});
     const unCompact = onCompacting((on) => {
       setCompacting(on);
@@ -91,6 +93,7 @@ export function ChatPanel() {
       void unApproval.then((f) => f());
       void unNotice.then((f) => f());
       void unPing.then((f) => f());
+      void unBig.then((f) => f());
       void unCompact.then((f) => f());
       void unFocus.then((f) => f());
       window.removeEventListener("keydown", onKey);
@@ -180,6 +183,20 @@ export function ChatPanel() {
           </button>
         </div>
         <span className="spacer" data-tauri-drag-region />
+        <button
+          className="iconbtn"
+          aria-label={big ? "Shrink chat" : "Enlarge chat"}
+          aria-pressed={big}
+          title={big ? "Shrink" : "Enlarge"}
+          onClick={() => {
+            setBig(!big);
+            void api.setChatExpanded(!big);
+          }}
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {big ? <path d="M2.5 9.5h4v4M13.5 6.5h-4v-4M6.5 9.5 2 14M9.5 6.5 14 2" /> : <path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9" />}
+          </svg>
+        </button>
         <button className="iconbtn" aria-label="Close chat" title="Close (Esc)" onClick={() => void api.hideChat()}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
         </button>

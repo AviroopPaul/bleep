@@ -345,8 +345,10 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|w, ev| {
-            if let (tauri::WindowEvent::Moved(_), "droid") = (ev, w.label()) {
-                windows::on_droid_moved(w.app_handle());
+            match (ev, w.label()) {
+                (tauri::WindowEvent::Moved(_), "droid") => windows::on_droid_moved(w.app_handle()),
+                (tauri::WindowEvent::Focused(false), "chat") => windows::on_chat_blur(w.app_handle()),
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -379,6 +381,7 @@ pub fn run() {
             bar::bubble_not_useful,
             windows::chat_open,
             windows::chat_hide,
+            windows::chat_set_expanded,
             windows::droid_toggle_tuck,
             windows::droid_set_visible,
             agents::agents_list,

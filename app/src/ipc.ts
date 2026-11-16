@@ -305,6 +305,7 @@ export const api = {
   openLogin: () => invoke<void>("open_claude_login"),
   openChat: (anchor: "droid" | "center") => invoke<void>("chat_open", { anchor }),
   hideChat: () => invoke<void>("chat_hide"),
+  setChatExpanded: (expanded: boolean) => invoke<void>("chat_set_expanded", { expanded }),
   toggleTuck: () => invoke<void>("droid_toggle_tuck"),
   decide: (id: number, approve: boolean) => invoke<void>("approval_decide", { id, approve }),
   barCurrent: () => invoke<BarCue | null>("bar_current"),
@@ -419,6 +420,7 @@ export const onApproval = (cb: (a: Approval) => void): Promise<UnlistenFn> =>
   listen<Approval>("approval://changed", (e) => cb(e.payload));
 
 /** A droid bubble, saved to the chat so it can be read after the bubble is gone. */
+export const onChatExpanded = (cb: (on: boolean) => void): Promise<UnlistenFn> => listen<boolean>("chat://expanded", (e) => cb(e.payload));
 export const onPing = (cb: (m: Message) => void): Promise<UnlistenFn> => listen<Message>("chat://ping", (e) => cb(e.payload));
 
 export const onChatEvent = (cb: (e: ChatEmit) => void): Promise<UnlistenFn> =>

@@ -6,10 +6,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 pub const DROID: Size = Size { w: 132.0, h: 132.0 };
 pub const CHAT: Size = Size { w: 400.0, h: 600.0 };
+/// The enlarged chat. Shrunk to fit a small screen.
+pub const CHAT_BIG: Size = Size { w: 760.0, h: 860.0 };
 pub const BAR: Size = Size { w: 560.0, h: 64.0 };
 pub const BUBBLE: Size = Size { w: 240.0, h: 72.0 };
 /// Gap between the droid and the chat panel.
@@ -124,6 +126,8 @@ pub struct UiState {
     pub tucked: Mutex<Option<Point>>,
     /// Shared with the scheduler: on means no proactive output.
     pub paused: std::sync::Arc<AtomicBool>,
+    /// The chat is enlarged. Only the small chat closes when it loses focus.
+    pub chat_big: AtomicBool,
     save_gen: AtomicU64,
 }
 
@@ -244,13 +248,25 @@ pub fn create_windows(app: &AppHandle, cfg: &Config) -> tauri::Result<()> {
     Ok(())
 }
 
-pub fn open_chat(app: &AppHandle, anchor: Anchor) {
-    let Some(chat) = app.get_webview_window("chat") else { return };
+/// Where the small chat goes: next to the droid, or centered on the main screen.
+fn small_chat_pos(app: &AppHandle, anchor: Anchor) -> Point {
     let droid = app.get_webview_window("droid").filter(|d| d.is_visible().unwrap_or(false)).and_then(|d| rect_of(&d));
-    let p = match (anchor, droid) {
+    match (anchor, droid) {
         (Anchor::Droid, Some(d)) => chat_pos(d, screen_of(app, d), CHAT),
         _ => center_pos(screens(app)[0], CHAT),
-    };
+    }
+}
+
+fn set_chat_big(app: &AppHandle, on: bool) {
+    app.state::<UiState>().chat_big.store(on, Ordering::SeqCst);
+    let _ = app.emit("chat://expanded", on);
+}
+
+pub fn open_chat(app: &AppHandle, anchor: Anchor) {
+    let Some(chat) = app.get_webview_window("chat") else { return };
+    set_chat_big(app, false);
+    let _ = chat.set_resizable(false);
+    let p = small_chat_pos(app, anchor);
     let _ = chat.set_position(LogicalPosition::new(p.x, p.y));
     let _ = chat.set_size(LogicalSize::new(CHAT.w, CHAT.h));
     let _ = chat.show();
@@ -285,6 +301,33 @@ pub fn on_droid_moved(app: &AppHandle) {
 #[tauri::command]
 pub fn chat_open(app: AppHandle, anchor: Anchor) {
     open_chat(&app, anchor);
+}
+
+/// Enlarge the chat (centered on its screen) or shrink it back next to the droid.
+#[tauri::command]
+pub fn chat_set_expanded(app: AppHandle, expanded: bool) {
+    let Some(chat) = app.get_webview_window("chat") else { return };
+    let (p, s) = if expanded {
+        panel_place(rect_of(&chat), &screens(&app), CHAT_BIG)
+    } else {
+        (small_chat_pos(&app, Anchor::Droid), CHAT)
+    };
+    // Only the big chat can be resized, and never smaller than the small one.
+    let _ = chat.set_resizable(expanded);
+    let _ = chat.set_min_size(expanded.then(|| LogicalSize::new(CHAT.w, CHAT.h)));
+    let _ = chat.set_size(LogicalSize::new(s.w, s.h));
+    let _ = chat.set_position(LogicalPosition::new(p.x, p.y));
+    set_chat_big(&app, expanded);
+}
+
+/// The small chat closes when the user clicks away from it. The enlarged one stays.
+pub fn on_chat_blur(app: &AppHandle) {
+    if app.state::<UiState>().chat_big.load(Ordering::SeqCst) {
+        return;
+    }
+    if let Some(c) = app.get_webview_window("chat") {
+        let _ = c.hide();
+    }
 }
 
 #[tauri::command]
@@ -451,6 +494,20 @@ mod tests {
         let (p, s) = panel_place(None, &[small], Size { w: 860.0, h: 620.0 });
         assert_eq!((s.w, s.h), (800.0 - 2.0 * MARGIN, 560.0 - 2.0 * MARGIN));
         assert_eq!((p.x, p.y), (MARGIN, 25.0 + MARGIN));
+    }
+
+    #[test]
+    fn big_chat_centers_on_the_chats_screen() {
+        let laptop = Rect { x: 0.0, y: 25.0, w: 1440.0, h: 875.0 };
+        let monitor = Rect { x: 1440.0, y: 0.0, w: 2560.0, h: 1415.0 };
+        let chat = Rect { x: 3000.0, y: 700.0, w: 400.0, h: 600.0 };
+        let (p, s) = panel_place(Some(chat), &[laptop, monitor], CHAT_BIG);
+        assert_eq!((s.w, s.h), (CHAT_BIG.w, CHAT_BIG.h));
+        assert!(monitor.contains(p.x + s.w / 2.0, p.y + s.h / 2.0));
+        let chat = Rect { x: 600.0, y: 300.0, w: 400.0, h: 600.0 };
+        let (p, s) = panel_place(Some(chat), &[laptop, monitor], CHAT_BIG);
+        assert_eq!(s.h, 875.0 - 2.0 * MARGIN, "shrunk to the laptop screen");
+        assert_eq!(p.y, 25.0 + MARGIN);
     }
 
     #[test]
