@@ -94,18 +94,18 @@ test("the setting list works with the keyboard", async ({ page }) => {
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("tab", { name: "Mail" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tabpanel")).toContainText("VIPs");
-  for (const name of ["Memory", "Connectors", "Agents", "Activity"]) {
+  for (const name of ["Memory", "Connectors", "Agents", "Activity", "Updates"]) {
     await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
   }
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("tab", { name: "Model" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowUp");
-  await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Updates" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Home");
   await expect(page.getByRole("tab", { name: "Model" })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("End");
-  await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Updates" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("mail tab adds a VIP and accepts a mute suggestion", async ({ page }) => {

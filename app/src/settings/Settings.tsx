@@ -5,6 +5,7 @@ import { AgentSettingsTab } from "./AgentSettings";
 import { MemorySettingsTab } from "./MemorySettings";
 import { ConnectorsSettingsTab } from "./ConnectorsSettings";
 import { ModelSettingsTab } from "./ModelSettings";
+import { UpdatesSettingsTab } from "./UpdatesSettings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onGoogleStatus, type GoogleState, type LinkName } from "../ipc";
 
@@ -148,7 +149,7 @@ export function GoogleSettings() {
   );
 }
 
-const TABS = ["Model", "Google", "Mail", "Memory", "Connectors", "Agents", "Activity"] as const;
+const TABS = ["Model", "Google", "Mail", "Memory", "Connectors", "Agents", "Activity", "Updates"] as const;
 type Tab = (typeof TABS)[number];
 const BLURB: Record<Tab, string> = {
   Model: "Provider and models",
@@ -158,6 +159,7 @@ const BLURB: Record<Tab, string> = {
   Connectors: "MCP servers you add",
   Agents: "Coding sessions",
   Activity: "What bleep did",
+  Updates: "New versions",
 };
 
 export function Settings() {
@@ -208,6 +210,7 @@ export function Settings() {
           {tab === "Connectors" && <ConnectorsSettingsTab />}
           {tab === "Agents" && <AgentSettingsTab />}
           {tab === "Activity" && <Activity />}
+          {tab === "Updates" && <UpdatesSettingsTab />}
         </div>
       </div>
     </main>

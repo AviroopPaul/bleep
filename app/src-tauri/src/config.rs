@@ -67,6 +67,20 @@ impl Default for AgentsConfig {
     }
 }
 
+/// Self-update. On by default: new releases download and install in the background,
+/// then run after the next restart.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct UpdatesConfig {
+    pub auto_install: bool,
+}
+
+impl Default for UpdatesConfig {
+    fn default() -> Self {
+        Self { auto_install: true }
+    }
+}
+
 /// Memory and compaction (Phase 5).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -190,6 +204,7 @@ pub struct Config {
     pub memory: MemoryConfig,
     pub mcp: McpConfig,
     pub api: ApiConfig,
+    pub updates: UpdatesConfig,
 }
 
 impl Default for Config {
@@ -209,6 +224,7 @@ impl Default for Config {
             memory: MemoryConfig::default(),
             mcp: McpConfig::default(),
             api: ApiConfig::default(),
+            updates: UpdatesConfig::default(),
         }
     }
 }

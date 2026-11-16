@@ -364,7 +364,31 @@ export const api = {
   modelSave: (req: ModelSave) => invoke<void>("model_save", { req }),
   modelForgetKey: (provider: string) => invoke<void>("model_forget_key", { provider }),
   spendToday: () => invoke<SpendView>("spend_today"),
+  updateState: () => invoke<UpdateView>("update_state"),
+  updateCheck: () => invoke<UpdateView>("update_check"),
+  updateInstall: () => invoke<UpdateView>("update_install"),
+  updateSetAuto: (on: boolean) => invoke<UpdateView>("update_set_auto", { on }),
+  updateRestart: () => invoke<void>("update_restart"),
 };
+
+// updater::Phase and updater::UpdateView.
+export type UpdatePhase =
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "up_to_date" }
+  | { state: "available"; version: string; notes: string | null }
+  | { state: "downloading"; version: string; done: number; total: number | null }
+  | { state: "ready"; version: string }
+  | { state: "error"; message: string };
+
+export interface UpdateView {
+  current: string;
+  auto_install: boolean;
+  last_checked: string | null;
+  phase: UpdatePhase;
+}
+
+export const onUpdate = (cb: (v: UpdateView) => void): Promise<UnlistenFn> => listen<UpdateView>("update://changed", (e) => cb(e.payload));
 
 export const onCompacting = (cb: (on: boolean) => void): Promise<UnlistenFn> => listen<boolean>("chat://compacting", (e) => cb(e.payload));
 

@@ -46,6 +46,7 @@ bytes = "1"
 regex = "1"
 tokio-tungstenite = "0.30.0"
 toml_edit = "0.25.19"
+tauri-plugin-updater = "2"
 
 [dev-dependencies]
 tempfile = "3"

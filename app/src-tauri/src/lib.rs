@@ -23,6 +23,7 @@ pub mod settings;
 pub mod setup;
 pub mod startup;
 pub mod store;
+pub mod updater;
 pub mod windows;
 
 use chat::{ChatEmit, ChatService};
@@ -272,6 +273,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| windows::open_chat(app, windows::Anchor::Droid)))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -338,6 +340,7 @@ pub fn run() {
             if let Err(e) = hotkey::setup(app.handle()) {
                 eprintln!("bleep: summon shortcut not set: {e}");
             }
+            updater::start(app.handle());
             startup::first_run(app.handle());
             Ok(())
         })
@@ -411,7 +414,12 @@ pub fn run() {
             remote_cmds::remote_cancel_sign_in,
             remote_cmds::remote_set_tool,
             remote_cmds::remote_remove,
-            remote_cmds::remote_refresh
+            remote_cmds::remote_refresh,
+            updater::update_state,
+            updater::update_check,
+            updater::update_install,
+            updater::update_set_auto,
+            updater::update_restart
         ])
         .run(tauri::generate_context!())
         .expect("error while running bleep");
