@@ -68,7 +68,6 @@ button { font: inherit; color: inherit; }
 .panel-head { display: flex; align-items: center; gap: 9px; padding: 10px 10px 10px 14px; border-bottom: 1px solid var(--line); flex: none; cursor: default; }
 .panel-head .head-droid { width: 24px; flex: none; pointer-events: none; }
 .panel-head h1 { margin: 0; font: 600 18px/1 var(--display); letter-spacing: -0.01em; pointer-events: none; }
-.badge { font: 500 10.5px/1 var(--mono); color: var(--muted); padding: 4px 7px; border-radius: 99px; background: rgba(127, 127, 127, 0.12); pointer-events: none; }
 .panel-head .spacer { flex: 1; pointer-events: none; }
 .iconbtn { border: 0; background: transparent; cursor: pointer; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: var(--ink-2); }
 .iconbtn:hover { background: rgba(127, 127, 127, 0.14); }
@@ -106,6 +105,8 @@ button { font: inherit; color: inherit; }
 .msg.sys { align-self: center; font: 500 11.5px/1.45 var(--mono); color: var(--muted); border: 1px dashed var(--line); padding: 6px 10px; border-radius: 9px; max-width: 94%; text-align: center; white-space: normal; }
 .msg.sys.err { color: var(--rust); border-color: rgba(181, 83, 47, 0.4); }
 .msg.sched { align-self: flex-end; color: var(--ink-2); font-size: 13px; padding: 6px 10px; border-radius: 12px; border: 1px dashed var(--line); }
+.msg.ping { align-self: flex-start; color: var(--ink-2); font-size: 13px; padding: 6px 10px; border-radius: 12px; border: 1px dashed var(--line); max-width: 90%; }
+.msg.ping .tag { display: block; font: 500 10.5px/1.2 var(--mono); color: var(--muted); margin-bottom: 2px; }
 .msg.sched .tag { display: block; font: 500 10.5px/1.2 var(--mono); color: var(--muted); margin-bottom: 2px; }
 
 /* ---------- approval card ---------- */
@@ -147,6 +148,8 @@ button { font: inherit; color: inherit; }
 .composer textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47, 92, 147, 0.18); }
 .composer textarea:disabled { opacity: 0.6; }
 .composer button { border: 0; border-radius: 11px; padding: 0 14px; height: 42px; background: var(--blue); color: #fff; font: 700 14px var(--sans); cursor: pointer; }
+.composer button.send { width: 42px; padding: 0; display: grid; place-items: center; }
+.composer button.send svg { width: 18px; height: 18px; }
 .composer button:disabled { opacity: 0.4; cursor: default; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
@@ -170,6 +173,9 @@ button { font: inherit; color: inherit; }
 .bubble-wrap { position: fixed; inset: 0; display: grid; place-items: end center; padding: 4px; }
 .bubble { position: relative; max-width: 100%; font: 700 13px/1.35 var(--sans); color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; box-shadow: 0 6px 18px rgba(27, 31, 36, 0.18); cursor: pointer; text-align: center; animation: msgin 0.3s cubic-bezier(0.2, 1.2, 0.4, 1); }
 .bubble-box { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; max-width: 100%; }
+.bubble-x { position: absolute; top: -4px; right: -4px; width: 18px; height: 18px; display: grid; place-items: center; padding: 0; color: var(--ink-2); background: var(--raised); border: 1px solid var(--line); border-radius: 99px; cursor: pointer; }
+.bubble-x svg { width: 10px; height: 10px; }
+.bubble-x:hover { color: var(--ink); }
 .bubble-nope { font: 700 11px var(--sans); color: var(--ink-2); background: var(--raised); border: 1px solid var(--line); border-radius: 99px; padding: 2px 9px; cursor: pointer; }
 .bubble::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 10px; height: 10px; background: inherit; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: translateX(-50%) rotate(45deg); }
 

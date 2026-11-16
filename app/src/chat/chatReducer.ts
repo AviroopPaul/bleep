@@ -14,7 +14,8 @@ export type ChatAction =
   | { type: "history"; messages: Message[]; mode?: "replace" | "prepend" }
   | { type: "sent"; user: Message; assistantId: number }
   | { type: "event"; messageId: number; event: AgentEvent }
-  | { type: "approval"; approval: Approval };
+  | { type: "approval"; approval: Approval }
+  | { type: "ping"; message: Message };
 
 export const emptyChat: ChatState = { messages: [], streamingId: null, rateLimitedUntil: null, loose: [], context: null };
 
@@ -77,6 +78,9 @@ function applyEvent(m: Message, ev: AgentEvent): Message {
   }
 }
 
+/** A turn that ends without an error proves the limit is not in force. */
+const finishedOk = (list: Message[], id: number) => list.find((m) => m.id === id)?.status === "done";
+
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case "history": {
@@ -100,10 +104,12 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         messages,
         streamingId: event.type === "done" ? null : event.type === "rate_limited" ? state.streamingId : messageId,
-        rateLimitedUntil: event.type === "rate_limited" ? event.until : state.rateLimitedUntil,
+        rateLimitedUntil: event.type === "rate_limited" ? event.until : event.type === "done" && finishedOk(messages, messageId) ? null : state.rateLimitedUntil,
         context: event.type === "context" ? { used: event.used, window: event.window } : state.context,
       };
     }
+    case "ping":
+      return { ...state, messages: byId([...state.messages, action.message]) };
     case "approval": {
       const a = action.approval;
       const loose = state.loose.filter((x) => x.id !== a.id);

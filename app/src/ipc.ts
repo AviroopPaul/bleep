@@ -303,6 +303,7 @@ export const api = {
   barJoin: () => invoke<void>("bar_join"),
   barDismiss: () => invoke<void>("bar_dismiss"),
   bubbleClick: () => invoke<void>("bubble_click"),
+  bubbleDismiss: () => invoke<void>("bubble_dismiss"),
   bubbleNotUseful: (pingId: number) => invoke<void>("bubble_not_useful", { pingId }),
   googleState: () => invoke<GoogleState>("google_state"),
   googleSaveClient: (clientId: string, clientSecret: string) => invoke<GoogleState>("google_save_client", { clientId, clientSecret }),
@@ -379,6 +380,9 @@ export const onNotice = (cb: (text: string) => void): Promise<UnlistenFn> =>
 
 export const onApproval = (cb: (a: Approval) => void): Promise<UnlistenFn> =>
   listen<Approval>("approval://changed", (e) => cb(e.payload));
+
+/** A droid bubble, saved to the chat so it can be read after the bubble is gone. */
+export const onPing = (cb: (m: Message) => void): Promise<UnlistenFn> => listen<Message>("chat://ping", (e) => cb(e.payload));
 
 export const onChatEvent = (cb: (e: ChatEmit) => void): Promise<UnlistenFn> =>
   listen<ChatEmit>("chat://event", (e) => cb(e.payload));
