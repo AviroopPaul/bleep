@@ -288,6 +288,7 @@ pub fn run() {
             app.manage(ui);
             app.manage(google.clone());
             windows::create_windows(app.handle(), &cfg)?;
+            windows::follow_active_screen(app.handle());
             let bar_ui = bar::TauriBarUi::new(app.handle().clone());
             let sched = proactive::scheduler::Scheduler::new(proactive::scheduler::SchedulerDeps {
                 store: store.clone(),

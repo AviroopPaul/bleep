@@ -112,6 +112,20 @@ pub fn default_droid_pos(screen: Rect, droid: Size) -> Point {
     Point { x: screen.x + screen.w - droid.w - 24.0, y: screen.y + screen.h - droid.h - 24.0 }
 }
 
+/// One screen: the whole monitor (menu bar and Dock included) and its work area.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Display {
+    pub full: Rect,
+    pub work: Rect,
+}
+
+/// The work area the droid should move to: the screen under the cursor, when the droid
+/// sits on another screen. None when the droid is already there or the cursor is off screen.
+pub fn follow_target(droid: Rect, cursor: Point, displays: &[Display]) -> Option<Rect> {
+    let active = displays.iter().find(|d| d.full.contains(cursor.x, cursor.y))?;
+    (!active.full.contains(droid.x + droid.w / 2.0, droid.y + droid.h / 2.0)).then_some(active.work)
+}
+
 /// The saved spot if it is on some screen, else bottom right of the first screen.
 pub fn restore_pos(saved: Option<(f64, f64)>, screens: &[Rect], droid: Size) -> Point {
     match saved {
@@ -129,6 +143,8 @@ pub struct UiState {
     /// The chat is enlarged. Only the small chat closes when it loses focus.
     pub chat_big: AtomicBool,
     save_gen: AtomicU64,
+    /// When the droid last moved. A recent move means a drag may be under way.
+    moved_at: Mutex<Option<std::time::Instant>>,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug)]
@@ -138,27 +154,104 @@ pub enum Anchor {
     Center,
 }
 
-/// Logical work areas of all screens, primary first.
-pub(crate) fn screens(app: &AppHandle) -> Vec<Rect> {
-    let to_rect = |m: &tauri::Monitor| {
+/// All screens in logical points, primary first.
+pub(crate) fn displays(app: &AppHandle) -> Vec<Display> {
+    let to_display = |m: &tauri::Monitor| {
         let s = m.scale_factor();
         let wa = m.work_area();
-        Rect { x: wa.position.x as f64 / s, y: wa.position.y as f64 / s, w: wa.size.width as f64 / s, h: wa.size.height as f64 / s }
+        let (p, z) = (m.position(), m.size());
+        Display {
+            full: Rect { x: p.x as f64 / s, y: p.y as f64 / s, w: z.width as f64 / s, h: z.height as f64 / s },
+            work: Rect { x: wa.position.x as f64 / s, y: wa.position.y as f64 / s, w: wa.size.width as f64 / s, h: wa.size.height as f64 / s },
+        }
     };
     let mut out = vec![];
     if let Ok(Some(p)) = app.primary_monitor() {
-        out.push(to_rect(&p));
+        out.push(to_display(&p));
     }
     for m in app.available_monitors().unwrap_or_default() {
-        let r = to_rect(&m);
-        if !out.contains(&r) {
-            out.push(r);
+        let d = to_display(&m);
+        if !out.contains(&d) {
+            out.push(d);
         }
     }
+    out
+}
+
+/// Logical work areas of all screens, primary first.
+pub(crate) fn screens(app: &AppHandle) -> Vec<Rect> {
+    let out: Vec<Rect> = displays(app).iter().map(|d| d.work).collect();
     if out.is_empty() {
-        out.push(Rect { x: 0.0, y: 25.0, w: 1440.0, h: 875.0 });
+        return vec![Rect { x: 0.0, y: 25.0, w: 1440.0, h: 875.0 }];
     }
     out
+}
+
+/// The cursor in logical points. macOS reports it scaled by the main screen's factor.
+fn cursor_point(app: &AppHandle) -> Option<Point> {
+    let c = app.cursor_position().ok()?;
+    let s = app.primary_monitor().ok()??.scale_factor();
+    Some(Point { x: c.x / s, y: c.y / s })
+}
+
+/// Moves the droid to the bottom right of the screen the user works on (the one under the
+/// cursor). The cursor must stay on that screen for two checks, so a quick pass does not
+/// count. Nothing moves while the chat is open, the droid is hidden, or it is being dragged.
+pub fn follow_active_screen(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let mut pending: Option<Rect> = None;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            let target = active_screen_target(&app);
+            match (target, pending) {
+                (Some(t), Some(p)) if t == p => {
+                    move_droid_to(&app, t);
+                    pending = None;
+                }
+                _ => pending = target,
+            }
+        }
+    });
+}
+
+fn active_screen_target(app: &AppHandle) -> Option<Rect> {
+    let droid = app.get_webview_window("droid")?;
+    if !droid.is_visible().unwrap_or(false) || app.get_webview_window("chat").is_some_and(|c| c.is_visible().unwrap_or(false)) {
+        return None;
+    }
+    let ui = app.state::<UiState>();
+    if ui.moved_at.lock().unwrap().is_some_and(|t| t.elapsed() < std::time::Duration::from_millis(1500)) {
+        return None;
+    }
+    let r = rect_of(&droid)?;
+    // A tucked droid is judged by the spot it came from, since it hangs off the screen edge.
+    let home = match *ui.tucked.lock().unwrap() {
+        Some(back) => Rect { x: back.x, y: back.y, w: r.w, h: r.h },
+        None => r,
+    };
+    follow_target(home, cursor_point(app)?, &displays(app))
+}
+
+fn move_droid_to(app: &AppHandle, work: Rect) {
+    let Some(d) = app.get_webview_window("droid") else { return };
+    let home = default_droid_pos(work, DROID);
+    let ui = app.state::<UiState>();
+    let to = {
+        let mut tucked = ui.tucked.lock().unwrap();
+        match tucked.as_mut() {
+            Some(back) => {
+                *back = home;
+                tuck_pos(Rect { x: home.x, y: home.y, w: DROID.w, h: DROID.h }, work)
+            }
+            None => home,
+        }
+    };
+    let _ = d.set_position(LogicalPosition::new(to.x, to.y));
+    if let Some(b) = app.get_webview_window("bubble").filter(|b| b.is_visible().unwrap_or(false)) {
+        let p = bubble_pos(Rect { x: to.x, y: to.y, w: DROID.w, h: DROID.h }, work, BUBBLE);
+        let _ = b.set_position(LogicalPosition::new(p.x, p.y));
+    }
 }
 
 pub(crate) fn rect_of(w: &WebviewWindow) -> Option<Rect> {
@@ -280,6 +373,7 @@ pub fn open_chat(app: &AppHandle, anchor: Anchor) {
 /// Debounced save of the droid's spot after a move. Skipped while tucked.
 pub fn on_droid_moved(app: &AppHandle) {
     let ui = app.state::<UiState>();
+    *ui.moved_at.lock().unwrap() = Some(std::time::Instant::now());
     let ticket = ui.save_gen.fetch_add(1, Ordering::SeqCst) + 1;
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -512,6 +606,24 @@ mod tests {
         let (p, s) = panel_place(Some(chat), &[laptop, monitor], CHAT_BIG);
         assert_eq!(s.h, 875.0 - 2.0 * MARGIN, "shrunk to the laptop screen");
         assert_eq!(p.y, 25.0 + MARGIN);
+    }
+
+    #[test]
+    fn droid_follows_the_screen_under_the_cursor() {
+        let laptop = Display { full: Rect { x: 0.0, y: 0.0, w: 1440.0, h: 900.0 }, work: Rect { x: 0.0, y: 25.0, w: 1440.0, h: 875.0 } };
+        let monitor = Display { full: Rect { x: 1440.0, y: 0.0, w: 2560.0, h: 1440.0 }, work: Rect { x: 1440.0, y: 25.0, w: 2560.0, h: 1415.0 } };
+        let all = [laptop, monitor];
+        let on_laptop = droid(1284.0, 744.0);
+        // Cursor on the other screen: go there.
+        assert_eq!(follow_target(on_laptop, Point { x: 2000.0, y: 500.0 }, &all), Some(monitor.work));
+        // Cursor on the droid's own screen, menu bar included: stay.
+        assert_eq!(follow_target(on_laptop, Point { x: 300.0, y: 10.0 }, &all), None);
+        // Cursor off every screen: stay.
+        assert_eq!(follow_target(on_laptop, Point { x: -50.0, y: -50.0 }, &all), None);
+        // The new spot is the bottom right of the monitor's work area.
+        let p = default_droid_pos(monitor.work, Size { w: 132.0, h: 132.0 });
+        assert_eq!((p.x, p.y), (1440.0 + 2560.0 - 132.0 - 24.0, 25.0 + 1415.0 - 132.0 - 24.0));
+        assert_eq!(follow_target(droid(p.x, p.y), Point { x: 2000.0, y: 500.0 }, &all), None);
     }
 
     #[test]

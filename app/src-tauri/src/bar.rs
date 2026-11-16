@@ -39,7 +39,9 @@ pub fn save_ping(store: &Store, text: &str) -> anyhow::Result<Option<Message>> {
 impl BarUi for TauriBarUi {
     fn show(&self, cue: &BarCue) {
         if let Some(w) = self.app.get_webview_window("bar") {
-            let p = bar_pos(screens(&self.app)[0], BAR);
+            // The bar opens on the droid's screen, which follows the screen in use.
+            let screen = self.app.get_webview_window("droid").and_then(|d| rect_of(&d)).map(|r| screen_of(&self.app, r)).unwrap_or_else(|| screens(&self.app)[0]);
+            let p = bar_pos(screen, BAR);
             let _ = w.set_position(LogicalPosition::new(p.x, p.y));
             let _ = w.show();
         }
