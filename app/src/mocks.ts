@@ -2,7 +2,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type { ModelSettings as ModelSettingsT, ModelSave, Preset } from "./ipc";
-import type { ActivityItem, AgentAsk, AgentChatLine, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode } from "./ipc";
+import type { ActivityItem, AgentAsk, AgentChatLine, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode, UpdateView } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
   id, role, kind: "chat", content, tool_steps: [], tokens: null, status: "done", session_id: 1, created_at: "",
@@ -111,6 +111,13 @@ export function installMocks(label: string) {
   let agentSet: AgentSettings = { claude_hooks: false, codex_notify: false, codex_running: true, auto_approve: false, screenshot_check: true, codex_watch: false, rules_path: "/Users/me/.bleep/agent-rules.toml" };
   // ?memory=1: facts, suggestions, a compaction divider and a nearly full chat.
   const memOn = q.has("memory");
+  // ?update=new: a newer release is out. Otherwise bleep is up to date.
+  let upd: UpdateView = { current: "0.2.0", auto_install: q.get("update_auto") !== "0", last_checked: null, phase: { state: "idle" } };
+  const setUpd = (phase: UpdateView["phase"]) => {
+    upd = { ...upd, phase };
+    void emit("update://changed", upd);
+    return upd;
+  };
   // ?pinged=1: a droid bubble that was saved to the chat.
   if (q.get("pinged")) history.push({ ...row(history.length + 1, "system", "Design review in 1 hour"), kind: "ping" });
   if (memOn) history.push({ ...row(3, "system", "Compacted 250K into a 3K summary. Facts saved to memory."), kind: "divider" });
@@ -475,6 +482,26 @@ export function installMocks(label: string) {
           return null;
         case "chat_context":
           return { used: memOn ? 120_000 : null, threshold: memSet.threshold, window: memSet.window };
+        case "update_state":
+          return upd;
+        case "update_check": {
+          calls.push(cmd);
+          upd = { ...upd, last_checked: new Date().toISOString() };
+          if (q.get("update") !== "new") return setUpd({ state: "up_to_date" });
+          if (!upd.auto_install) return setUpd({ state: "available", version: "0.3.0", notes: "- Auto-update from Settings" });
+          setUpd({ state: "downloading", version: "0.3.0", done: 50, total: 100 });
+          return setUpd({ state: "ready", version: "0.3.0" });
+        }
+        case "update_install":
+          calls.push(cmd);
+          return upd.phase.state === "available" ? setUpd({ state: "ready", version: upd.phase.version }) : upd;
+        case "update_set_auto":
+          calls.push(`update_set_auto:${a.on}`);
+          upd = { ...upd, auto_install: !!a.on };
+          return upd;
+        case "update_restart":
+          calls.push(cmd);
+          return null;
         default:
           return null;
       }
