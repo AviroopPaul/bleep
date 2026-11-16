@@ -1,6 +1,6 @@
 [package]
 name = "bleep"
-version = "0.3.0"
+version = "0.3.1"
 description = "A little droid that lives on your Mac"
 authors = ["Aviroop Paul"]
 edition = "2024"
