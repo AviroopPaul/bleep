@@ -374,10 +374,12 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let setup = MenuItem::with_id(app, "setup", "Set up bleep…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit bleep", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&toggle, &open, &pause, &login, &settings, &setup, &PredefinedMenuItem::separator(app)?, &quit])?;
-    let mut tray = TrayIconBuilder::with_id("bleep").tooltip("bleep").menu(&menu).show_menu_on_left_click(true);
-    if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(icon.clone());
-    }
+    // The menu bar shows only bleep's eye, as on the landing page. Source: icons/tray.svg.
+    let tray = TrayIconBuilder::with_id("bleep")
+        .tooltip("bleep")
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .icon(tauri::include_image!("icons/tray.png"));
     tray.on_menu_event(move |app, ev| match ev.id().as_ref() {
         "toggle_droid" => {
             if let Some(d) = app.get_webview_window("droid") {

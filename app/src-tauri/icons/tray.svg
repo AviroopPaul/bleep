@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="43 23 34 34">
+  <!-- bleep's eye, as on the landing page droid. The light rim keeps it visible on a dark menu bar. -->
+  <circle cx="60" cy="40" r="16.5" fill="#F7F6F2"/>
+  <circle cx="60" cy="40" r="15" fill="#1B1F24"/>
+  <circle cx="60" cy="40" r="9.5" fill="#2F5C93"/>
+  <circle cx="56" cy="36" r="3" fill="#fff"/>
+</svg>
