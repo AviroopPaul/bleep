@@ -51,3 +51,14 @@ test("a droid bubble shows in the chat after it is gone", async ({ page }) => {
   await page.goto("/?mock=1&pinged=1#chat");
   await expect(page.locator(".msg.ping")).toContainText("Design review in 1 hour");
 });
+
+test("the enlarge button toggles to shrink", async ({ page }) => {
+  await page.goto("/?mock=1#chat");
+  const grow = page.getByRole("button", { name: "Enlarge chat" });
+  await expect(grow).toHaveAttribute("aria-pressed", "false");
+  await grow.click();
+  const shrink = page.getByRole("button", { name: "Shrink chat" });
+  await expect(shrink).toHaveAttribute("aria-pressed", "true");
+  await shrink.click();
+  await expect(page.getByRole("button", { name: "Enlarge chat" })).toBeVisible();
+});
