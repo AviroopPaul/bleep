@@ -1,7 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="43 23 34 34">
-  <!-- bleep's eye, as on the landing page droid. The light rim keeps it visible on a dark menu bar. -->
-  <circle cx="60" cy="40" r="16.5" fill="#F7F6F2"/>
-  <circle cx="60" cy="40" r="15" fill="#1B1F24"/>
-  <circle cx="60" cy="40" r="9.5" fill="#2F5C93"/>
-  <circle cx="56" cy="36" r="3" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="16 -3 88 66">
+  <!-- bleep's droid head as an outline, from the landing page droid. macOS uses it as a
+       template image: only the alpha counts, and the menu bar tints it black or white. -->
+  <g fill="none" stroke="#000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="60" y1="21" x2="60" y2="13"/>
+    <circle cx="60" cy="7" r="5"/>
+    <path d="M22 58 A38 37 0 0 1 98 58 Z"/>
+    <circle cx="60" cy="39" r="10"/>
+  </g>
+  <circle cx="60" cy="39" r="3.5" fill="#000"/>
 </svg>

@@ -374,12 +374,14 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let setup = MenuItem::with_id(app, "setup", "Set up bleep…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit bleep", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&toggle, &open, &pause, &login, &settings, &setup, &PredefinedMenuItem::separator(app)?, &quit])?;
-    // The menu bar shows only bleep's eye, as on the landing page. Source: icons/tray.svg.
+    // The menu bar shows bleep's droid head as an outline. Source: icons/tray.svg.
+    // As a template image, macOS tints it to match a light or dark menu bar.
     let tray = TrayIconBuilder::with_id("bleep")
         .tooltip("bleep")
         .menu(&menu)
         .show_menu_on_left_click(true)
-        .icon(tauri::include_image!("icons/tray.png"));
+        .icon(tauri::include_image!("icons/tray.png"))
+        .icon_as_template(true);
     tray.on_menu_event(move |app, ev| match ev.id().as_ref() {
         "toggle_droid" => {
             if let Some(d) = app.get_webview_window("droid") {
