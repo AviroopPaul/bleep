@@ -265,6 +265,7 @@ fn set_chat_big(app: &AppHandle, on: bool) {
 pub fn open_chat(app: &AppHandle, anchor: Anchor) {
     let Some(chat) = app.get_webview_window("chat") else { return };
     set_chat_big(app, false);
+    let _ = chat.set_resizable(false);
     let p = small_chat_pos(app, anchor);
     let _ = chat.set_position(LogicalPosition::new(p.x, p.y));
     let _ = chat.set_size(LogicalSize::new(CHAT.w, CHAT.h));
@@ -311,6 +312,9 @@ pub fn chat_set_expanded(app: AppHandle, expanded: bool) {
     } else {
         (small_chat_pos(&app, Anchor::Droid), CHAT)
     };
+    // Only the big chat can be resized, and never smaller than the small one.
+    let _ = chat.set_resizable(expanded);
+    let _ = chat.set_min_size(expanded.then(|| LogicalSize::new(CHAT.w, CHAT.h)));
     let _ = chat.set_size(LogicalSize::new(s.w, s.h));
     let _ = chat.set_position(LogicalPosition::new(p.x, p.y));
     set_chat_big(&app, expanded);
