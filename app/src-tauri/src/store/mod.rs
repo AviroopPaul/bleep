@@ -63,7 +63,7 @@ pub struct MailRow {
 str_enum!(AgentTool { Claude = "claude", Codex = "codex" });
 str_enum!(AgentState { Running = "running", Waiting = "waiting", Done = "done" });
 str_enum!(AskKind { Permission = "permission", Question = "question" });
-str_enum!(AskDecision { Auto = "auto", Approved = "approved", Denied = "denied", Queued = "queued", Expired = "expired" });
+str_enum!(AskDecision { Auto = "auto", Approved = "approved", Denied = "denied", Answered = "answered", Queued = "queued", Expired = "expired" });
 
 /// One of my coding sessions. `id` is "claude:<session id>" or "codex:<thread id>".
 #[derive(Clone, Debug, Serialize, PartialEq)]

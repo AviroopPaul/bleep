@@ -1,5 +1,7 @@
 //! Tauri commands for the Agents view (chat panel) and the Agents settings tab.
 use crate::agentwatch::codex::{daemon_running, CodexWatch};
+use crate::agentwatch::hub::AgentWatch;
+use crate::agentwatch::transcript::{read_chat, ChatLine, CHAT_BYTES, CHAT_LINES};
 use crate::agentwatch::install::{self, HookFiles};
 use crate::config::AgentsConfig;
 use crate::store::{AgentAsk, AgentSession};
@@ -12,6 +14,10 @@ use std::sync::Arc;
 pub struct AgentsView {
     pub sessions: Vec<AgentSession>,
     pub asks: Vec<AgentAsk>,
+    /// Claude Code asks whose hook waits for my answer in bleep.
+    pub held: Vec<i64>,
+    /// Claude Code sessions that take a reply from bleep.
+    pub replyable: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -47,16 +53,40 @@ fn now_settings(state: &AppState) -> AgentSettings {
 }
 
 #[tauri::command]
-pub fn agents_list(state: tauri::State<'_, AppState>) -> Result<AgentsView, String> {
+pub fn agents_list(state: tauri::State<'_, AppState>, watch: tauri::State<'_, Arc<AgentWatch>>) -> Result<AgentsView, String> {
     let sessions = state.store.agent_sessions(chrono::Utc::now()).map_err(|e| e.to_string())?;
     let asks = state.store.agent_asks_recent(50).map_err(|e| e.to_string())?;
-    Ok(AgentsView { sessions, asks })
+    let live = watch.live();
+    Ok(AgentsView { sessions, asks, held: live.held, replyable: live.replyable })
 }
 
-/// My tap on a queued ask. Only Codex asks can be answered from bleep.
+/// My tap on a queued ask: a held Claude Code permission, or a Codex ask.
 #[tauri::command]
-pub async fn agents_decide(codex: tauri::State<'_, Arc<CodexWatch>>, ask_id: i64, approve: bool) -> Result<(), String> {
+pub async fn agents_decide(codex: tauri::State<'_, Arc<CodexWatch>>, watch: tauri::State<'_, Arc<AgentWatch>>, ask_id: i64, approve: bool) -> Result<(), String> {
+    if watch.live().held.contains(&ask_id) {
+        return watch.decide_held(ask_id, approve);
+    }
     codex.answer(ask_id, approve).await
+}
+
+/// My picks for a Claude Code AskUserQuestion: question text to option label.
+#[tauri::command]
+pub fn agents_choose(watch: tauri::State<'_, Arc<AgentWatch>>, ask_id: i64, answers: serde_json::Map<String, serde_json::Value>) -> Result<(), String> {
+    watch.choose(ask_id, answers)
+}
+
+/// My reply to a Claude Code session that stopped. It wakes the session with my words.
+#[tauri::command]
+pub fn agents_reply(watch: tauri::State<'_, Arc<AgentWatch>>, session_id: String, text: String) -> Result<(), String> {
+    watch.reply(&session_id, &text)
+}
+
+/// The newest lines of a session's chat, read from its Claude Code transcript.
+#[tauri::command]
+pub async fn agents_chat(state: tauri::State<'_, AppState>, session_id: String) -> Result<Vec<ChatLine>, String> {
+    let s = state.store.agent_session(&session_id).map_err(|e| e.to_string())?.ok_or("No such session.")?;
+    let Some(path) = s.transcript_path.filter(|p| p.ends_with(".jsonl")) else { return Ok(vec![]) };
+    tauri::async_runtime::spawn_blocking(move || read_chat(Path::new(&path), CHAT_BYTES, CHAT_LINES)).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

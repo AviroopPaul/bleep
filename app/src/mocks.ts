@@ -2,7 +2,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type { ModelSettings as ModelSettingsT, ModelSave, Preset } from "./ipc";
-import type { ActivityItem, AgentAsk, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode } from "./ipc";
+import type { ActivityItem, AgentAsk, AgentChatLine, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
   id, role, kind: "chat", content, tool_steps: [], tokens: null, status: "done", session_id: 1, created_at: "",
@@ -65,6 +65,49 @@ export function installMocks(label: string) {
         askRow(19, "claude:c", "wants to run npm test", "auto", "npm test", null),
       ]
     : [];
+  // ?answers=1: Claude Code asks bleep can answer: a permission, a choice, and a reply.
+  let held: number[] = [];
+  let replyable: string[] = [];
+  const chats: Record<string, AgentChatLine[]> = {};
+  if (q.has("answers")) {
+    sessions = [
+      { ...sess("claude:e", "claude", "/Users/me/code/landing", "waiting", "Which database should the waitlist use?", 1), title: "Add a waitlist form" },
+      { ...sess("claude:f", "claude", "/Users/me/code/bleep", "waiting", "Should I also update the README?", 3), title: "Rename the hook flag" },
+      ...sessions,
+    ];
+    asks = [
+      { ...askRow(23, "claude:f", "Should I also update the README?", "queued", null, null), kind: "question", payload: { question: "Renamed the flag in all 4 files and the tests pass. Should I also update the README?" } },
+      { ...askRow(22, "claude:e", "Which database should the waitlist use?", "queued", null, null), kind: "question", payload: { tool_name: "AskUserQuestion", cwd: "/Users/me/code/landing", questions: [
+        { question: "Which database should the waitlist use?", header: "Database", multiSelect: false, options: [{ label: "Neon Postgres", description: "Free tier, works with Vercel" }, { label: "Upstash Redis", description: "Simple list, no schema" }] },
+        { question: "What should the form collect?", header: "Fields", multiSelect: true, options: [{ label: "Email", description: "" }, { label: "Name", description: "" }, { label: "Company", description: "" }] },
+      ] } },
+      ...asks.map((a) => (a.id === 20 ? { ...a, payload: { tool_name: "Bash", command: "git push --force origin main", paths: [], cwd: "/Users/me/code/shop" }, checks: ['matches "git push"'] } : a)),
+    ];
+    held = [20, 22];
+    replyable = ["claude:f"];
+    chats["claude:e"] = [
+      { role: "user", text: "Add a waitlist form to the landing page. Store the emails somewhere free." },
+      { role: "assistant", text: "I'll add the form under the hero. First I'll look at how the page is built." },
+      { role: "tool", text: "Read: page.tsx" },
+      { role: "tool", text: "Bash: ls components" },
+      { role: "assistant", text: "The page is a **Next.js** app on Vercel. The form is easy:\n\n- one `<input type=email>`\n- a server action that saves it\n\nFor storage there are two good free options. <b>raw html stays text</b>" },
+      { role: "tool", text: "AskUserQuestion: Which database should the waitlist use?" },
+    ];
+    chats["claude:f"] = [
+      { role: "user", text: "Rename --wait to --hold in bleep-hook and everywhere it is used." },
+      { role: "tool", text: "Grep: --wait" },
+      { role: "tool", text: "Edit: main.rs" },
+      { role: "tool", text: "Edit: install.rs" },
+      { role: "tool", text: "Bash: cargo test" },
+      { role: "assistant", text: "Renamed the flag in all 4 files and the tests pass. Should I also update the README?" },
+    ];
+    chats["claude:a"] = [
+      { role: "user", text: "Rebase my branch on main and push it." },
+      { role: "tool", text: "Bash: git rebase origin/main" },
+      { role: "assistant", text: "Rebased cleanly. The branch was pushed before, so this needs a force push." },
+      { role: "tool", text: "Bash: git push --force origin main" },
+    ];
+  }
   let agentSet: AgentSettings = { claude_hooks: false, codex_notify: false, codex_running: true, auto_approve: false, screenshot_check: true, codex_watch: false, rules_path: "/Users/me/.bleep/agent-rules.toml" };
   // ?memory=1: facts, suggestions, a compaction divider and a nearly full chat.
   const memOn = q.has("memory");
@@ -229,12 +272,34 @@ export function installMocks(label: string) {
         case "activity_list":
           return activity;
         case "agents_list":
-          return { sessions, asks };
+          return { sessions, asks, held, replyable };
+        case "agents_chat":
+          return chats[a.sessionId as string] ?? [];
+        case "agents_choose": {
+          calls.push(`agents_choose:${a.askId}:${JSON.stringify(a.answers)}`);
+          if (!held.includes(a.askId as number)) throw "This ask is no longer waiting. It was answered somewhere else.";
+          const ask = asks.find((x) => x.id === a.askId)!;
+          held = held.filter((x) => x !== a.askId);
+          asks = asks.map((x) => (x.id === ask.id ? { ...x, decision: "answered", decided_at: new Date().toISOString() } : x));
+          sessions = sessions.map((x) => (x.id === ask.session_id ? { ...x, state: "running", last_ask: null } : x));
+          later(20, () => void emit("agents://changed", {}));
+          return null;
+        }
+        case "agents_reply": {
+          calls.push(`agents_reply:${a.sessionId}:${a.text}`);
+          if (!replyable.includes(a.sessionId as string)) throw "This session does not take a reply now. Answer in the terminal.";
+          replyable = replyable.filter((x) => x !== a.sessionId);
+          asks = asks.map((x) => (x.session_id === a.sessionId && x.decision === "queued" ? { ...x, decision: "answered", decided_at: new Date().toISOString() } : x));
+          sessions = sessions.map((x) => (x.id === a.sessionId ? { ...x, state: "running", last_ask: null } : x));
+          later(20, () => void emit("agents://changed", {}));
+          return null;
+        }
         case "agents_decide": {
           calls.push(`agents_decide:${a.askId}:${a.approve}`);
           const ask = asks.find((x) => x.id === a.askId);
           if (!ask || ask.decision !== "queued") throw "This ask is no longer waiting.";
-          if (!ask.rpc_id) throw "Answer this one in the terminal.";
+          if (!ask.rpc_id && !held.includes(ask.id)) throw "Answer this one in the terminal.";
+          held = held.filter((x) => x !== ask.id);
           asks = asks.map((x) => (x.id === ask.id ? { ...x, decision: a.approve ? "approved" : "denied", decided_at: new Date().toISOString() } : x));
           sessions = sessions.map((x) => (x.id === ask.session_id ? { ...x, state: "running", last_ask: null } : x));
           later(20, () => void emit("agents://changed", {}));

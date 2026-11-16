@@ -120,7 +120,7 @@ export interface AgentAsk {
   summary: string;
   payload: Record<string, unknown>;
   checks: string[];
-  decision: "auto" | "approved" | "denied" | "queued" | "expired";
+  decision: "auto" | "approved" | "denied" | "answered" | "queued" | "expired";
   rule: string | null;
   rpc_id: string | null;
   created_at: string;
@@ -130,6 +130,16 @@ export interface AgentAsk {
 export interface AgentsView {
   sessions: AgentSession[];
   asks: AgentAsk[];
+  /** Claude Code asks whose hook waits for my answer in bleep. */
+  held: number[];
+  /** Claude Code sessions that take a reply from bleep. */
+  replyable: string[];
+}
+
+/** One line of a coding session's chat. Agent text: show as plain text only. */
+export interface AgentChatLine {
+  role: "user" | "assistant" | "tool";
+  text: string;
 }
 
 export interface AgentSettings {
@@ -321,6 +331,9 @@ export const api = {
   activityList: (limit: number) => invoke<ActivityItem[]>("activity_list", { limit }),
   agentsList: () => invoke<AgentsView>("agents_list"),
   agentsDecide: (askId: number, approve: boolean) => invoke<void>("agents_decide", { askId, approve }),
+  agentsChoose: (askId: number, answers: Record<string, string>) => invoke<void>("agents_choose", { askId, answers }),
+  agentsReply: (sessionId: string, text: string) => invoke<void>("agents_reply", { sessionId, text }),
+  agentsChat: (sessionId: string) => invoke<AgentChatLine[]>("agents_chat", { sessionId }),
   agentsSettings: () => invoke<AgentSettings>("agents_settings"),
   agentsInstallClaude: () => invoke<AgentSettings>("agents_install_claude"),
   agentsRemoveClaude: () => invoke<AgentSettings>("agents_remove_claude"),

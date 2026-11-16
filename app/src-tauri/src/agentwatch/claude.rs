@@ -73,6 +73,30 @@ pub fn allow_output() -> Value {
     json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow"}}})
 }
 
+/// My "no" from bleep. The agent goes on without the tool.
+pub fn deny_output() -> Value {
+    json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "deny", "message": "The user said no in bleep."}}})
+}
+
+/// Claude Code's tool for questions with options. Never approved by a rule.
+pub const ASK_USER_QUESTION: &str = "AskUserQuestion";
+
+/// My answers to an AskUserQuestion call: question text to option label (several labels
+/// joined with ", "). Claude Code takes them as the tool's `answers` input.
+pub fn answers_output(questions: &Value, answers: &serde_json::Map<String, Value>) -> Value {
+    json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow", "updatedInput": {"questions": questions, "answers": answers}}}})
+}
+
+/// What `bleep-hook claude-reply` prints to wake the session. Only my own words go in.
+pub fn reply_output(text: &str) -> Value {
+    json!({"rewake": format!("The user replied from bleep:\n\n{}", text.trim())})
+}
+
+/// The question texts of an AskUserQuestion input.
+pub fn question_texts(questions: &Value) -> Vec<String> {
+    questions.as_array().into_iter().flatten().filter_map(|q| q.get("question").and_then(Value::as_str)).map(str::to_string).collect()
+}
+
 /// A fixed line: the small model read agent-made pixels, so its words never reach the agent.
 pub fn go_on_output() -> Value {
     json!({"decision": "block", "reason": "bleep checked the screenshot against your ask and it matches. Go on."})
@@ -138,6 +162,17 @@ mod tests {
         for s in [summary(&e), question_summary("A. B?")] {
             assert!(!s.contains('\u{2014}'));
         }
+    }
+
+    #[test]
+    fn answers_and_replies_match_claude_code() {
+        let qs = json!([{"question": "Which DB?", "header": "DB", "options": [{"label": "Neon"}, {"label": "SQLite"}], "multiSelect": false}]);
+        let mut a = serde_json::Map::new();
+        a.insert("Which DB?".into(), json!("Neon"));
+        assert_eq!(answers_output(&qs, &a)["hookSpecificOutput"]["decision"], json!({"behavior": "allow", "updatedInput": {"questions": qs, "answers": {"Which DB?": "Neon"}}}));
+        assert_eq!(question_texts(&qs), vec!["Which DB?".to_string()]);
+        assert_eq!(deny_output()["hookSpecificOutput"]["decision"]["behavior"], "deny");
+        assert_eq!(reply_output("  Yes, go.\n"), json!({"rewake": "The user replied from bleep:\n\nYes, go."}));
     }
 
     #[test]

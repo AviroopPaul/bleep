@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, folder, groupSessions, handledLine } from "./agentsText";
+import { ago, answersFor, askDetail, choicesOf, folder, groupSessions, handledLine } from "./agentsText";
 import type { AgentAsk, AgentSession } from "../ipc";
 
 const s = (id: string, state: AgentSession["state"]): AgentSession => ({
@@ -37,5 +37,35 @@ describe("agents text", () => {
 
   it("uses no em dashes", () => {
     for (const d of ["auto", "approved", "denied", "expired", "queued"] as const) expect(handledLine(ask(d, "x"))).not.toContain("\u2014");
+  });
+});
+
+describe("answering from bleep", () => {
+  const q = { payload: { tool_name: "AskUserQuestion", questions: [
+    { question: "Which DB?", header: "DB", options: [{ label: "Neon", description: "Postgres" }, { label: "SQLite" }], multiSelect: false },
+    { question: "Which parts?", header: "Parts", options: [{ label: "API" }, { label: "UI" }], multiSelect: true },
+    { header: "broken" },
+  ] } };
+
+  it("reads AskUserQuestion choices and ignores other asks", () => {
+    const c = choicesOf(q)!;
+    expect(c.map((x) => x.question)).toEqual(["Which DB?", "Which parts?"]);
+    expect(c[0].options).toEqual([{ label: "Neon", description: "Postgres" }, { label: "SQLite", description: "" }]);
+    expect(c[1].multiSelect).toBe(true);
+    expect(choicesOf({ payload: { tool_name: "Bash" } })).toBeNull();
+  });
+
+  it("joins several picks and prefers my own words", () => {
+    const c = choicesOf(q)!;
+    expect(answersFor(c, { "Which parts?": ["API", "UI"] }, {})).toEqual({ "Which parts?": "API, UI" });
+    expect(answersFor(c, { "Which DB?": ["Neon"] }, { "Which DB?": "  Turso  " })).toEqual({ "Which DB?": "Turso" });
+    expect(answersFor(c, {}, { "Which DB?": "  " })).toEqual({});
+  });
+
+  it("shows the command or paths of a permission ask", () => {
+    expect(askDetail({ payload: { command: "git push --force" } })).toBe("git push --force");
+    expect(askDetail({ payload: { paths: ["/a", "/b"] } })).toBe("/a\n/b");
+    expect(askDetail({ payload: {} })).toBeNull();
+    expect(handledLine({ decision: "answered", rule: null })).toBe("Answered by you");
   });
 });
