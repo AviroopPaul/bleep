@@ -159,3 +159,37 @@ fn unknown_mode_exits_zero() {
     assert_eq!(out.status.code(), Some(0));
     assert!(out.stdout.is_empty());
 }
+
+#[test]
+fn reply_wakes_claude_with_exit_two_and_text_on_stderr() {
+    let (d, sock) = home();
+    let srv = serve_once(&sock, Some(r#"{"rewake":"Yes, ship it.\nAlso \"tag\" it é 🚀"}"#), Duration::ZERO);
+    let (out, _) = run(d.path(), &["claude-reply", "Stop"], r#"{"session_id":"s1"}"#, None);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(out.stdout.is_empty());
+    assert_eq!(String::from_utf8(out.stderr).unwrap(), "Yes, ship it.\nAlso \"tag\" it \u{e9} \u{1f680}");
+    assert_eq!(srv.join().unwrap().trim_end(), r#"{"v":1,"source":"claude-reply","event":"Stop","wait":true,"payload":{"session_id":"s1"}}"#);
+}
+
+#[test]
+fn reply_without_answer_exits_zero_quietly() {
+    let (d, sock) = home();
+    let _srv = serve_once(&sock, Some(""), Duration::ZERO);
+    let (out, _) = run(d.path(), &["claude-reply", "Stop"], "{}", None);
+    assert_eq!(out.status.code(), Some(0));
+    assert!(out.stdout.is_empty() && out.stderr.is_empty());
+    for bad in [r#"{"rewake":"unterminated}"#, r#"{"other":"x"}"#, r#"{"rewake":"   "}"#] {
+        let (d, sock) = home();
+        let _srv = serve_once(&sock, Some(bad), Duration::ZERO);
+        let (out, _) = run(d.path(), &["claude-reply", "Stop"], "{}", None);
+        assert_eq!(out.status.code(), Some(0), "{bad}");
+        assert!(out.stderr.is_empty(), "{bad}");
+    }
+}
+
+#[test]
+fn reply_with_no_bleep_exits_zero() {
+    let (d, _) = home();
+    let (out, _) = run(d.path(), &["claude-reply", "Stop"], "{}", None);
+    assert_eq!(out.status.code(), Some(0));
+}

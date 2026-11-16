@@ -11,8 +11,10 @@ use crate::proactive::scheduler::Clock;
 use crate::store::Store;
 use async_trait::async_trait;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use tokio::sync::oneshot;
 
 pub const SCREENSHOT_RULE: &str = "screenshot check";
 
@@ -35,11 +37,139 @@ pub struct WatchDeps {
 
 pub struct AgentWatch {
     d: WatchDeps,
+    /// Claude Code permission hooks held open until I answer in bleep, by ask id. The
+    /// terminal shows its own prompt meanwhile; the first answer wins.
+    held: Mutex<HashMap<i64, oneshot::Sender<Option<Value>>>>,
+    /// Background Stop hooks (`claude-reply`) waiting for my reply, by session id.
+    replies: Mutex<HashMap<String, oneshot::Sender<Option<String>>>>,
+}
+
+/// What I can answer from bleep right now.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
+pub struct Live {
+    /// Ask ids whose hook waits for my answer.
+    pub held: Vec<i64>,
+    /// Session ids that take a reply.
+    pub replyable: Vec<String>,
 }
 
 impl AgentWatch {
     pub fn new(d: WatchDeps) -> Arc<AgentWatch> {
-        Arc::new(AgentWatch { d })
+        Arc::new(AgentWatch { d, held: Mutex::default(), replies: Mutex::default() })
+    }
+
+    /// A hook that gave up (its own time ran out) leaves a closed slot: not live.
+    pub fn live(&self) -> Live {
+        let mut held: Vec<i64> = {
+            let mut h = self.held.lock().unwrap();
+            h.retain(|_, t| !t.is_closed());
+            h.keys().copied().collect()
+        };
+        held.sort_unstable();
+        let mut replyable: Vec<String> = {
+            let mut r = self.replies.lock().unwrap();
+            r.retain(|_, t| !t.is_closed());
+            r.keys().cloned().collect()
+        };
+        replyable.sort();
+        Live { held, replyable }
+    }
+
+    /// Holds a Claude Code hook until I answer in bleep. `None`: answered elsewhere.
+    async fn hold(&self, ask_id: i64) -> Option<Value> {
+        let (tx, rx) = oneshot::channel();
+        self.held.lock().unwrap().insert(ask_id, tx);
+        (self.d.emit)();
+        let out = rx.await.ok().flatten();
+        self.held.lock().unwrap().remove(&ask_id);
+        out
+    }
+
+    /// Sends my answer to a held hook and records it.
+    fn release(&self, ask_id: i64, out: Value, decision: AskDecision) -> Result<(), String> {
+        let gone = || "This ask is no longer waiting. It was answered somewhere else.".to_string();
+        let tx = self.held.lock().unwrap().remove(&ask_id).ok_or_else(gone)?;
+        tx.send(Some(out)).map_err(|_| gone())?;
+        let _ = self.d.store.set_ask_decision(ask_id, decision, None);
+        if let Some(a) = self.d.store.agent_ask(ask_id).ok().flatten() {
+            self.mark_running(&a.session_id);
+        }
+        Ok(())
+    }
+
+    fn mark_running(&self, session_id: &str) {
+        if let Some(mut s) = self.d.store.agent_session(session_id).ok().flatten() {
+            s.state = AgentState::Running;
+            s.last_ask = None;
+            s.updated = (self.d.now)();
+            self.save(&s);
+        }
+    }
+
+    /// My Approve or Deny on a held Claude Code permission ask.
+    pub fn decide_held(&self, ask_id: i64, approve: bool) -> Result<(), String> {
+        let out = if approve { claude::allow_output() } else { claude::deny_output() };
+        self.release(ask_id, out, if approve { AskDecision::Approved } else { AskDecision::Denied })
+    }
+
+    /// My picks for an AskUserQuestion call: question text to label(s).
+    pub fn choose(&self, ask_id: i64, answers: serde_json::Map<String, Value>) -> Result<(), String> {
+        let ask = self.d.store.agent_ask(ask_id).map_err(|e| e.to_string())?.ok_or("No such ask.")?;
+        let questions = ask.payload.get("questions").cloned().unwrap_or(Value::Null);
+        let known = claude::question_texts(&questions);
+        let mut clean = serde_json::Map::new();
+        for (q, a) in answers {
+            let Some(a) = a.as_str().map(str::trim).filter(|a| !a.is_empty()) else { continue };
+            if !known.contains(&q) {
+                return Err("That answer is for a question this ask does not have.".into());
+            }
+            clean.insert(q, json!(a));
+        }
+        if clean.is_empty() {
+            return Err("Pick an answer first.".into());
+        }
+        self.release(ask_id, claude::answers_output(&questions, &clean), AskDecision::Answered)
+    }
+
+    /// My reply to a session that stopped, sent through its waiting `claude-reply` hook.
+    pub fn reply(&self, session_id: &str, text: &str) -> Result<(), String> {
+        let text = text.trim();
+        if text.is_empty() {
+            return Err("Type a reply first.".into());
+        }
+        let tx = self.replies.lock().unwrap().remove(session_id).ok_or("This session does not take a reply now. Answer in the terminal.")?;
+        tx.send(Some(text.to_string())).map_err(|_| "This session does not take a reply now. Answer in the terminal.".to_string())?;
+        for a in self.d.store.queued_asks(session_id).unwrap_or_default() {
+            let _ = self.d.store.set_ask_decision(a.id, AskDecision::Answered, None);
+        }
+        self.mark_running(session_id);
+        Ok(())
+    }
+
+    /// A `claude-reply` hook: waits until I reply, or until the session moves on.
+    async fn wait_reply(&self, p: &Value) -> Option<Value> {
+        let sid = format!("claude:{}", p.get("session_id")?.as_str()?);
+        let (tx, rx) = oneshot::channel();
+        if let Some(old) = self.replies.lock().unwrap().insert(sid.clone(), tx) {
+            let _ = old.send(None);
+        }
+        (self.d.emit)();
+        let text = rx.await.ok().flatten();
+        if text.is_none() {
+            // Dropped or replaced: clear only our own (closed) slot.
+            let mut r = self.replies.lock().unwrap();
+            if r.get(&sid).is_some_and(|t| t.is_closed()) {
+                r.remove(&sid);
+            }
+        }
+        Some(claude::reply_output(&text?))
+    }
+
+    /// The session moved on without bleep: its reply hook gives up.
+    fn drop_reply(&self, session_id: &str) {
+        if let Some(tx) = self.replies.lock().unwrap().remove(session_id) {
+            let _ = tx.send(None);
+        }
     }
 
     fn save(&self, s: &AgentSession) {
@@ -92,6 +222,9 @@ impl AgentWatch {
     pub fn expire_queued(&self, session_id: &str) {
         for a in self.d.store.queued_asks(session_id).unwrap_or_default() {
             let _ = self.d.store.set_ask_decision(a.id, AskDecision::Expired, None);
+            if let Some(tx) = self.held.lock().unwrap().remove(&a.id) {
+                let _ = tx.send(None);
+            }
         }
     }
 
@@ -127,6 +260,7 @@ impl AgentWatch {
         match claude::classify(event, p)? {
             ClaudeEvent::Start | ClaudeEvent::ToolDone | ClaudeEvent::Prompt => {
                 self.expire_queued(&s.id);
+                self.drop_reply(&s.id);
                 if event == "UserPromptSubmit" && s.title.is_none() {
                     s.title = p.get("prompt").and_then(Value::as_str).map(|t| claude::cut(t, 60));
                 }
@@ -135,9 +269,14 @@ impl AgentWatch {
                 self.save(&s);
                 None
             }
+            ClaudeEvent::Permission(ask) if ask.tool_name == claude::ASK_USER_QUESTION => self.ask_user(s, p).await,
             ClaudeEvent::Permission(ask) => {
-                let (_, d) = self.decide(&s, ask, None).await;
-                (d == AskDecision::Auto).then(claude::allow_output)
+                let (id, d) = self.decide(&s, ask, None).await;
+                if d == AskDecision::Auto {
+                    return Some(claude::allow_output());
+                }
+                // The terminal asks too. Whichever of us answers first wins.
+                self.hold(id).await
             }
             ClaudeEvent::Notify { idle } => {
                 if self.d.store.queued_asks(&s.id).unwrap_or_default().is_empty() {
@@ -152,12 +291,28 @@ impl AgentWatch {
             ClaudeEvent::Stop { active } => self.stop(s, p, active).await,
             ClaudeEvent::End => {
                 self.expire_queued(&s.id);
+                self.drop_reply(&s.id);
                 self.save(&s);
                 let _ = self.d.store.end_agent_session(&s.id);
                 (self.d.emit)();
                 None
             }
         }
+    }
+
+    /// Claude Code asks me questions with options. Rules never answer these: only I do.
+    async fn ask_user(&self, mut s: AgentSession, p: &Value) -> Option<Value> {
+        let questions = p.pointer("/tool_input/questions").cloned().unwrap_or(json!([]));
+        let first = claude::question_texts(&questions).into_iter().next().unwrap_or_else(|| "has a question for you".into());
+        let summary = claude::cut(&first, 80);
+        let cwd = p.get("cwd").and_then(Value::as_str).unwrap_or("");
+        let new = NewAsk { session_id: s.id.clone(), kind: AskKind::Question, summary: summary.clone(), payload: json!({"tool_name": claude::ASK_USER_QUESTION, "questions": questions, "cwd": cwd}), checks: vec![], decision: AskDecision::Queued, rule: None, rpc_id: None };
+        let id = self.d.store.insert_agent_ask(&new).unwrap_or(0);
+        s.state = AgentState::Waiting;
+        s.last_ask = Some(summary.clone());
+        self.save(&s);
+        self.d.ping.waiting(&s.project, &summary, id, self.waiting_now());
+        self.hold(id).await
     }
 
     async fn stop(&self, mut s: AgentSession, p: &Value, active: bool) -> Option<Value> {
@@ -227,6 +382,7 @@ impl HookHandler for AgentWatch {
     async fn handle(&self, msg: HookMsg) -> Option<Value> {
         match msg.source.as_str() {
             "claude" => self.claude(&msg.event, &msg.payload).await,
+            "claude-reply" => self.wait_reply(&msg.payload).await,
             "codex-notify" => {
                 self.codex_notify(&msg.payload);
                 None
@@ -349,10 +505,46 @@ mod tests {
 
     const SID: &str = "claude:60adba83-07cb-42b3-8c37-d834b9fbe879";
 
+    /// Sends a hook message that waits for me; returns once `n` hooks are held.
+    async fn held(r: &Rig, m: HookMsg, n: usize) -> tokio::task::JoinHandle<Option<Value>> {
+        let w = r.w.clone();
+        let h = tokio::spawn(async move { w.handle(m).await });
+        for _ in 0..500 {
+            if r.w.live().held.len() >= n {
+                return h;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+        }
+        panic!("hook was never held");
+    }
+
+    async fn reply_waiting(r: &Rig, m: HookMsg) -> tokio::task::JoinHandle<Option<Value>> {
+        let w = r.w.clone();
+        let h = tokio::spawn(async move { w.handle(m).await });
+        for _ in 0..500 {
+            if !r.w.live().replyable.is_empty() {
+                return h;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+        }
+        panic!("reply hook never waited");
+    }
+
+    fn reply_msg() -> HookMsg {
+        HookMsg { source: "claude-reply".into(), event: "Stop".into(), wait: true, payload: fx("stop.json") }
+    }
+
+    fn ask_user_msg() -> HookMsg {
+        let mut p = fx("permission_request_bash.json");
+        p["tool_name"] = json!("AskUserQuestion");
+        p["tool_input"] = json!({"questions": [{"question": "Which DB?", "header": "DB", "options": [{"label": "Neon", "description": ""}, {"label": "SQLite", "description": ""}], "multiSelect": false}]});
+        msg("PermissionRequest", p)
+    }
+
     #[tokio::test]
     async fn auto_off_queues_even_safe_asks() {
         let r = rig(false, None);
-        assert_eq!(r.w.handle(bash("npm test")).await, None);
+        let _h = held(&r, bash("npm test"), 1).await;
         let q = r.store.queued_asks(SID).unwrap();
         assert_eq!(q.len(), 1);
         assert_eq!(q[0].checks, vec!["auto-approve is off".to_string()]);
@@ -376,17 +568,102 @@ mod tests {
     async fn paused_allows_nothing() {
         let r = rig(true, None);
         r.paused.store(true, Ordering::SeqCst);
-        assert_eq!(r.w.handle(bash("npm test")).await, None);
+        let _h = held(&r, bash("npm test"), 1).await;
         assert_eq!(r.store.queued_asks(SID).unwrap()[0].checks, vec!["bleep is paused".to_string()]);
     }
 
     #[tokio::test]
-    async fn unsure_ask_queues_pings_and_returns_none() {
+    async fn unsure_ask_queues_pings_and_waits_for_me() {
         let r = rig(true, None);
-        assert_eq!(r.w.handle(bash("git push --force origin main")).await, None);
+        let h = held(&r, bash("git push --force origin main"), 1).await;
         let q = r.store.queued_asks(SID).unwrap();
         assert_eq!(q[0].checks, vec!["matches \"git push\"".to_string()]);
         assert_eq!(r.pings.0.lock().unwrap()[0], ("/Users/me/code/shop".to_string(), "wants to run git push --force origin main".to_string(), 1));
+        assert_eq!(r.w.live().held, vec![q[0].id]);
+        assert!(!h.is_finished(), "the hook waits for my answer");
+        h.abort();
+    }
+
+    #[tokio::test]
+    async fn approve_in_bleep_releases_the_hook() {
+        let r = rig(true, None);
+        let h = held(&r, bash("git push --force"), 1).await;
+        let id = r.store.queued_asks(SID).unwrap()[0].id;
+        r.w.decide_held(id, true).unwrap();
+        assert_eq!(h.await.unwrap(), Some(claude::allow_output()));
+        assert_eq!(r.store.agent_ask(id).unwrap().unwrap().decision, AskDecision::Approved);
+        assert_eq!(r.store.agent_session(SID).unwrap().unwrap().state, AgentState::Running);
+        assert!(r.w.live().held.is_empty());
+        assert!(r.w.decide_held(id, false).is_err(), "only once");
+    }
+
+    #[tokio::test]
+    async fn deny_in_bleep_says_no() {
+        let r = rig(true, None);
+        let h = held(&r, bash("git push --force"), 1).await;
+        let id = r.store.queued_asks(SID).unwrap()[0].id;
+        r.w.decide_held(id, false).unwrap();
+        assert_eq!(h.await.unwrap(), Some(claude::deny_output()));
+        assert_eq!(r.store.agent_ask(id).unwrap().unwrap().decision, AskDecision::Denied);
+    }
+
+    #[tokio::test]
+    async fn ask_user_question_is_never_auto_and_takes_my_pick() {
+        let r = rig(true, None);
+        let h = held(&r, ask_user_msg(), 1).await;
+        let a = r.store.queued_asks(SID).unwrap().remove(0);
+        assert_eq!((a.kind, a.summary.as_str()), (AskKind::Question, "Which DB?"));
+        assert_eq!(a.payload["questions"][0]["options"][1]["label"], "SQLite");
+        let mut wrong = serde_json::Map::new();
+        wrong.insert("Something else?".into(), json!("Neon"));
+        assert!(r.w.choose(a.id, wrong).is_err());
+        assert!(r.w.choose(a.id, serde_json::Map::new()).is_err());
+        let mut pick = serde_json::Map::new();
+        pick.insert("Which DB?".into(), json!("SQLite"));
+        r.w.choose(a.id, pick.clone()).unwrap();
+        assert_eq!(h.await.unwrap(), Some(claude::answers_output(&a.payload["questions"], &pick)));
+        assert_eq!(r.store.agent_ask(a.id).unwrap().unwrap().decision, AskDecision::Answered);
+    }
+
+    #[tokio::test]
+    async fn reply_wakes_the_session_with_my_words() {
+        let r = rig(true, None);
+        r.w.handle(stop_with("transcript_plain.jsonl", "Should I also update the README?")).await;
+        let q = r.store.queued_asks(SID).unwrap();
+        assert_eq!(q.len(), 1);
+        let h = reply_waiting(&r, reply_msg()).await;
+        assert_eq!(r.w.live().replyable, vec![SID.to_string()]);
+        assert!(r.w.reply(SID, "   ").is_err());
+        r.w.reply(SID, "Yes, and the changelog.").unwrap();
+        assert_eq!(h.await.unwrap(), Some(claude::reply_output("Yes, and the changelog.")));
+        assert_eq!(r.store.agent_ask(q[0].id).unwrap().unwrap().decision, AskDecision::Answered);
+        assert_eq!(r.store.agent_session(SID).unwrap().unwrap().state, AgentState::Running);
+        assert!(r.w.reply(SID, "again").is_err(), "the hook is used up");
+    }
+
+    #[tokio::test]
+    async fn typing_in_the_terminal_lets_the_reply_hook_go() {
+        let r = rig(true, None);
+        let h = reply_waiting(&r, reply_msg()).await;
+        r.w.handle(msg("UserPromptSubmit", fx("user_prompt_submit.json"))).await;
+        assert_eq!(h.await.unwrap(), None);
+        assert!(r.w.live().replyable.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_new_reply_hook_replaces_the_old_one() {
+        let r = rig(true, None);
+        let first = reply_waiting(&r, reply_msg()).await;
+        let w = r.w.clone();
+        let second = tokio::spawn(async move { w.handle(reply_msg()).await });
+        assert_eq!(first.await.unwrap(), None);
+        for _ in 0..500 {
+            if r.w.reply(SID, "ok").is_ok() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+        }
+        assert_eq!(second.await.unwrap(), Some(claude::reply_output("ok")));
     }
 
     fn stop_with(transcript_name: &str, last: &str) -> HookMsg {
@@ -443,20 +720,22 @@ mod tests {
     #[tokio::test]
     async fn next_event_expires_queued_asks() {
         let r = rig(true, None);
-        r.w.handle(bash("git push --force")).await;
+        let h = held(&r, bash("git push --force"), 1).await;
         let id = r.store.queued_asks(SID).unwrap()[0].id;
         r.w.handle(msg("PostToolUse", fx("post_tool_use.json"))).await;
         assert_eq!(r.store.agent_ask(id).unwrap().unwrap().decision, AskDecision::Expired);
+        assert_eq!(h.await.unwrap(), None, "answered in the terminal: the hook lets go");
+        assert!(r.w.decide_held(id, true).is_err());
         assert_eq!(r.store.agent_session(SID).unwrap().unwrap().state, AgentState::Running);
     }
 
     #[tokio::test]
     async fn two_waiting_say_n_agents() {
         let r = rig(true, None);
-        r.w.handle(bash("git push --force")).await;
+        let _a = held(&r, bash("git push --force"), 1).await;
         let mut other = bash("rm -rf dist");
         other.payload["session_id"] = json!("other");
-        r.w.handle(other).await;
+        let _b = held(&r, other, 2).await;
         assert_eq!(r.pings.0.lock().unwrap()[1].2, 2);
     }
 

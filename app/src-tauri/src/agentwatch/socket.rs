@@ -9,6 +9,13 @@ use std::time::Duration;
 
 /// Under `bleep-hook`'s own 20 s, so the reply always arrives in time.
 pub const HANDLER_BUDGET: Duration = Duration::from_secs(18);
+/// A permission ask or a reply waits for me. Under `bleep-hook`'s own 3590 s.
+pub const WAIT_FOR_ME: Duration = Duration::from_secs(3580);
+
+/// The messages whose answer is mine to give, so they may wait long.
+pub fn waits_for_me(msg: &HookMsg) -> bool {
+    matches!((msg.source.as_str(), msg.event.as_str()), ("claude", "PermissionRequest") | ("claude-reply", _))
+}
 
 #[async_trait]
 pub trait HookHandler: Send + Sync {
@@ -64,6 +71,7 @@ async fn one(stream: tokio::net::UnixStream, handler: Arc<dyn HookHandler>, budg
     let reply = match parse_hook(&line) {
         Ok(msg) => {
             let wait = msg.wait;
+            let budget = if waits_for_me(&msg) { budget.max(WAIT_FOR_ME) } else { budget };
             let answer = tokio::time::timeout(budget, handler.handle(msg)).await.ok().flatten();
             if !wait {
                 return;
@@ -146,6 +154,15 @@ mod tests {
         let t0 = std::time::Instant::now();
         assert_eq!(ask(&p, STOP).await, "\n");
         assert!(t0.elapsed() < Duration::from_millis(400));
+    }
+
+    #[test]
+    fn only_my_answers_wait_long() {
+        let m = |source: &str, event: &str| HookMsg { source: source.into(), event: event.into(), wait: true, payload: json!({}) };
+        assert!(waits_for_me(&m("claude", "PermissionRequest")));
+        assert!(waits_for_me(&m("claude-reply", "Stop")));
+        assert!(!waits_for_me(&m("claude", "Stop")));
+        assert!(!waits_for_me(&m("codex-notify", "PermissionRequest")));
     }
 
     #[tokio::test]

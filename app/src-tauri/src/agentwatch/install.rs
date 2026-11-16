@@ -28,10 +28,30 @@ pub const CLAUDE_EVENTS: &[(&str, bool, bool)] = &[
     ("SessionEnd", false, false),
 ];
 
+/// A permission ask waits this long for my answer in bleep. The terminal asks at the same
+/// time, so a long wait never blocks me there.
+pub const LONG_WAIT_SECS: u64 = 3600;
+
 fn hook_command(f: &HookFiles, event: &str) -> String {
+    format!("{} claude {event}", quoted_bin(f))
+}
+
+fn quoted_bin(f: &HookFiles) -> String {
     let bin = f.hook_bin.display().to_string();
-    let bin = if bin.contains(' ') { format!("'{bin}'") } else { bin };
-    format!("{bin} claude {event}")
+    if bin.contains(' ') { format!("'{bin}'") } else { bin }
+}
+
+/// The background Stop hook that waits for my reply from bleep and wakes the session.
+fn reply_command(f: &HookFiles) -> String {
+    format!("{} claude-reply Stop", quoted_bin(f))
+}
+
+fn reply_hook(f: &HookFiles) -> Value {
+    json!({"type": "command", "command": reply_command(f), "asyncRewake": true, "timeout": LONG_WAIT_SECS})
+}
+
+fn has_command(s: &Map<String, Value>, event: &str, pred: impl Fn(&Value) -> bool) -> bool {
+    s.get("hooks").and_then(|h| h.get(event)).and_then(Value::as_array).is_some_and(|entries| entries.iter().any(|e| e.get("hooks").and_then(Value::as_array).is_some_and(|hs| hs.iter().any(&pred))))
 }
 
 fn is_ours(f: &HookFiles, entry_hook: &Value) -> bool {
@@ -103,11 +123,24 @@ fn strip_ours(f: &HookFiles, settings: &mut Map<String, Value>) {
 
 pub fn claude_status(f: &HookFiles) -> bool {
     let Ok(Some(s)) = read_settings(&target(&f.claude_settings)) else { return false };
-    CLAUDE_EVENTS.iter().all(|(event, _, _)| {
-        s.get("hooks").and_then(|h| h.get(*event)).and_then(Value::as_array).is_some_and(|entries| {
-            entries.iter().any(|e| e.get("hooks").and_then(Value::as_array).is_some_and(|hs| hs.iter().any(|h| h.get("command").and_then(Value::as_str) == Some(&hook_command(f, event)))))
-        })
-    })
+    let permission_waits = has_command(&s, "PermissionRequest", |h| {
+        h.get("command").and_then(Value::as_str) == Some(&hook_command(f, "PermissionRequest")) && h.get("timeout").and_then(Value::as_u64) == Some(LONG_WAIT_SECS)
+    });
+    permission_waits
+        && has_command(&s, "Stop", |h| *h == reply_hook(f))
+        && CLAUDE_EVENTS.iter().all(|(event, _, _)| has_command(&s, event, |h| h.get("command").and_then(Value::as_str) == Some(&hook_command(f, event))))
+}
+
+/// Brings an older bleep install up to date (new hooks, longer waits). Leaves the file
+/// alone when bleep's hooks are not installed at all. True when it wrote the file.
+pub fn upgrade_claude(f: &HookFiles) -> Result<bool, String> {
+    let Some(s) = read_settings(&target(&f.claude_settings))? else { return Ok(false) };
+    let ours = s.get("hooks").and_then(Value::as_object).is_some_and(|hooks| hooks.keys().any(|event| has_command(&s, event, |h| is_ours(f, h))));
+    if !ours || claude_status(f) {
+        return Ok(false);
+    }
+    install_claude(f)?;
+    Ok(true)
 }
 
 pub fn install_claude(f: &HookFiles) -> Result<(), String> {
@@ -120,13 +153,14 @@ pub fn install_claude(f: &HookFiles) -> Result<(), String> {
     for (event, waits, matcher) in CLAUDE_EVENTS {
         let mut h = json!({"type": "command", "command": hook_command(f, event)});
         if *waits {
-            h["timeout"] = json!(30);
+            h["timeout"] = json!(if *event == "PermissionRequest" { LONG_WAIT_SECS } else { 30 });
         }
         let mut entry = Map::new();
         if *matcher {
             entry.insert("matcher".into(), json!("*"));
         }
-        entry.insert("hooks".into(), json!([h]));
+        let hs = if *event == "Stop" { json!([h, reply_hook(f)]) } else { json!([h]) };
+        entry.insert("hooks".into(), hs);
         let list = hooks.entry(event.to_string()).or_insert_with(|| json!([]));
         let Value::Array(list) = list else { return Err(format!("hooks.{event} in {} is not a list, so bleep did not change it.", file.display())) };
         list.push(Value::Object(entry));
@@ -305,9 +339,10 @@ mod tests {
         install_claude(&f).unwrap();
         assert!(claude_status(&f));
         let v = read(&f.claude_settings);
-        assert_eq!(v["hooks"]["PermissionRequest"][0], json!({"matcher": "*", "hooks": [{"type": "command", "command": "/Users/me/.bleep/bin/bleep-hook claude PermissionRequest", "timeout": 30}]}));
+        assert_eq!(v["hooks"]["PermissionRequest"][0], json!({"matcher": "*", "hooks": [{"type": "command", "command": "/Users/me/.bleep/bin/bleep-hook claude PermissionRequest", "timeout": 3600}]}));
         assert_eq!(v["hooks"]["SessionStart"][0], json!({"hooks": [{"type": "command", "command": "/Users/me/.bleep/bin/bleep-hook claude SessionStart"}]}));
         assert_eq!(v["hooks"]["Stop"][0]["hooks"][0]["timeout"], 30);
+        assert_eq!(v["hooks"]["Stop"][0]["hooks"][1], json!({"type": "command", "command": "/Users/me/.bleep/bin/bleep-hook claude-reply Stop", "asyncRewake": true, "timeout": 3600}));
         assert_eq!(v["hooks"].as_object().unwrap().len(), 7);
         assert!(!f.claude_settings.with_file_name("settings.json.bleep-backup").exists(), "nothing to back up");
     }
@@ -325,6 +360,28 @@ mod tests {
         assert_eq!(stop.len(), 2);
         assert_eq!(stop[0]["hooks"][0]["command"], "say done");
         assert_eq!(v["permissions"]["allow"][0], "Bash(npm test)");
+    }
+
+    #[test]
+    fn upgrade_brings_an_old_install_up_to_date_only() {
+        let d = tempfile::tempdir().unwrap();
+        let f = files(d.path());
+        assert!(!upgrade_claude(&f).unwrap(), "no file: nothing to do");
+        std::fs::create_dir_all(f.claude_settings.parent().unwrap()).unwrap();
+        std::fs::write(&f.claude_settings, MINE).unwrap();
+        assert!(!upgrade_claude(&f).unwrap(), "bleep not installed: left alone");
+        assert_eq!(std::fs::read_to_string(&f.claude_settings).unwrap(), MINE);
+        // An install from before replies: short permission wait and no reply hook.
+        install_claude(&f).unwrap();
+        let mut v = read(&f.claude_settings);
+        v["hooks"]["PermissionRequest"][0]["hooks"][0]["timeout"] = json!(30);
+        v["hooks"]["Stop"][1]["hooks"].as_array_mut().unwrap().pop();
+        std::fs::write(&f.claude_settings, v.to_string()).unwrap();
+        assert!(!claude_status(&f));
+        assert!(upgrade_claude(&f).unwrap());
+        assert!(claude_status(&f));
+        assert!(!upgrade_claude(&f).unwrap(), "up to date");
+        assert_eq!(read(&f.claude_settings)["hooks"]["Stop"][0]["hooks"][0]["command"], "say done");
     }
 
     #[test]

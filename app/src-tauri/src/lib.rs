@@ -249,6 +249,13 @@ fn start_agent_watch(app: &tauri::App, store: Arc<Store>, runtime: Arc<dyn runti
     });
     let codex = agentwatch::codex::CodexWatch::new(watch.clone(), store);
     app.manage(codex.clone());
+    app.manage(watch.clone());
+    // An older install lacks the reply hook and the long permission wait.
+    match agentwatch::install::upgrade_claude(&agentwatch::install::HookFiles::real(&paths)) {
+        Ok(true) => eprintln!("bleep: updated the Claude Code hooks"),
+        Ok(false) => {}
+        Err(e) => eprintln!("bleep: could not update the Claude Code hooks: {e}"),
+    }
     let sock = paths.sock.clone();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = agentwatch::socket::serve(&sock, watch).await {
@@ -373,6 +380,9 @@ pub fn run() {
             windows::droid_set_visible,
             agents::agents_list,
             agents::agents_decide,
+            agents::agents_choose,
+            agents::agents_reply,
+            agents::agents_chat,
             agents::agents_settings,
             agents::agents_install_claude,
             agents::agents_remove_claude,

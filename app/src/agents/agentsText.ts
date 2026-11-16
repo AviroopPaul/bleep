@@ -17,6 +17,8 @@ export function handledLine(a: Pick<AgentAsk, "decision" | "rule">): string {
       return "Approved by you";
     case "denied":
       return "Denied by you";
+    case "answered":
+      return "Answered by you";
     case "expired":
       return "Answered elsewhere";
     default:
@@ -35,4 +37,47 @@ export function ago(at: string, now = Date.now()): string {
 
 export function folder(project: string): string {
   return project.replace(/\/+$/, "").split("/").pop() || "unknown folder";
+}
+
+/** One question of a Claude Code AskUserQuestion call. */
+export interface Choice {
+  question: string;
+  header: string;
+  options: { label: string; description: string }[];
+  multiSelect: boolean;
+}
+
+/** The questions of an AskUserQuestion ask, or null for any other ask. */
+export function choicesOf(a: Pick<AgentAsk, "payload">): Choice[] | null {
+  if (a.payload.tool_name !== "AskUserQuestion" || !Array.isArray(a.payload.questions)) return null;
+  return (a.payload.questions as Record<string, unknown>[])
+    .filter((q) => typeof q.question === "string")
+    .map((q) => ({
+      question: q.question as string,
+      header: typeof q.header === "string" ? q.header : "",
+      options: (Array.isArray(q.options) ? q.options : [])
+        .filter((o): o is Record<string, unknown> => !!o && typeof (o as Record<string, unknown>).label === "string")
+        .map((o) => ({ label: o.label as string, description: typeof o.description === "string" ? o.description : "" })),
+      multiSelect: q.multiSelect === true,
+    }));
+}
+
+/** My picks as Claude Code wants them: several labels joined with ", ", or my own words. */
+export function answersFor(choices: Choice[], picked: Record<string, string[]>, other: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const c of choices) {
+    const own = other[c.question]?.trim();
+    const labels = picked[c.question] ?? [];
+    const a = own || labels.join(", ");
+    if (a) out[c.question] = a;
+  }
+  return out;
+}
+
+/** What a permission ask wants to run or touch, for the answer card. */
+export function askDetail(a: Pick<AgentAsk, "payload">): string | null {
+  const p = a.payload;
+  if (typeof p.command === "string" && p.command) return p.command;
+  if (Array.isArray(p.paths) && p.paths.length) return (p.paths as string[]).join("\n");
+  return null;
 }
