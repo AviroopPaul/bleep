@@ -24,6 +24,7 @@ pub mod setup;
 pub mod startup;
 pub mod store;
 pub mod updater;
+pub mod voice;
 pub mod windows;
 
 use chat::{ChatEmit, ChatService};
@@ -287,6 +288,7 @@ pub fn run() {
             let paused = ui.paused.clone();
             app.manage(ui);
             app.manage(google.clone());
+            app.manage(Arc::new(voice::Voice::new(app.state::<AppState>().paths.root.join("models"))));
             windows::create_windows(app.handle(), &cfg)?;
             windows::follow_active_screen(app.handle());
             let bar_ui = bar::TauriBarUi::new(app.handle().clone());
@@ -341,6 +343,7 @@ pub fn run() {
             if let Err(e) = hotkey::setup(app.handle()) {
                 eprintln!("bleep: summon shortcut not set: {e}");
             }
+            voice::start(app.handle());
             updater::start(app.handle());
             startup::first_run(app.handle());
             Ok(())
@@ -423,7 +426,13 @@ pub fn run() {
             updater::update_check,
             updater::update_install,
             updater::update_set_auto,
-            updater::update_restart
+            updater::update_restart,
+            voice::voice_settings,
+            voice::voice_status,
+            voice::voice_set,
+            voice::voice_speak,
+            voice::voice_stop_speaking,
+            voice::voice_test_speaker
         ])
         .run(tauri::generate_context!())
         .expect("error while running bleep");

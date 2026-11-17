@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, healthOk, onApproval, onChatEvent, onChatExpanded, onCompacting, onNotice, onPing, type ChatContext, type Message, type RuntimeHealth } from "../ipc";
+import { api, healthOk, onApproval, onChatEvent, onChatExpanded, onCompacting, onNotice, onPing, onVoice, type ChatContext, type Message, type RuntimeHealth } from "../ipc";
 import { meterLabel, meterLevel } from "../settings/memoryText";
 import { chatReducer, emptyChat, formatBackAt } from "./chatReducer";
 import { ToolSteps } from "./ToolSteps";
@@ -55,6 +55,11 @@ export function ChatPanel() {
   const stick = useRef(true);
   const keepFrom = useRef<number | null>(null);
   const [view, setView] = useState<"chat" | "agents">("chat");
+  // After the wake phrase: listening for the request.
+  const [listening, setListening] = useState(false);
+  // Replies to spoken requests are read aloud when they finish.
+  const spoken = useRef(new Set<number>());
+  const sendRef = useRef<(text: string, byVoice?: boolean) => Promise<void>>(async () => {});
   const agents = useAgents();
   const waiting = agents.view.sessions.filter((x) => x.state === "waiting").length;
 
@@ -100,6 +105,30 @@ export function ChatPanel() {
     };
   }, [checkHealth]);
 
+  useEffect(() => {
+    const un = onVoice((e) => {
+      if (e.kind === "wake") {
+        setView("chat");
+        setListening(true);
+        void api.voiceStopSpeaking();
+      } else {
+        setListening(false);
+        if (e.kind === "heard") void sendRef.current(e.text, true);
+      }
+    });
+    return () => void un.then((f) => f());
+  }, []);
+
+  // A spoken request's reply is read aloud once it is done.
+  useEffect(() => {
+    for (const id of spoken.current) {
+      const m = state.messages.find((x) => x.id === id);
+      if (!m || m.status === "streaming") continue;
+      spoken.current.delete(id);
+      if (m.status === "done" && m.content.trim()) void api.voiceSpeak(m.content);
+    }
+  }, [state.messages]);
+
   // After each reply the window may be known for the first time, which can move the threshold.
   useEffect(() => {
     if (state.streamingId === null) api.chatContext().then(setCtx).catch(() => {});
@@ -137,13 +166,20 @@ export function ChatPanel() {
   const meter = ctx ? meterLabel(used, ctx.threshold) : "";
   const canSend = ok && !busy && draft.trim().length > 0;
 
-  const send = async (text: string) => {
+  const send = async (text: string, byVoice = false) => {
     const t = text.trim();
-    if (!t || !ok || busy) return;
+    if (!t) return;
+    if (!ok || busy) {
+      // A spoken request that cannot go now waits in the box, not lost.
+      if (byVoice) setDraft(t);
+      return;
+    }
     setSending(true);
     stick.current = true;
+    void api.voiceStopSpeaking();
     try {
       const assistantId = await api.send(t);
+      if (byVoice) spoken.current.add(assistantId);
       const user: Message = { id: assistantId - 1, role: "user", kind: "chat", content: t, tool_steps: [], tokens: null, status: "done", session_id: null, created_at: "" };
       dispatch({ type: "sent", user, assistantId });
       setDraft("");
@@ -161,6 +197,8 @@ export function ChatPanel() {
       input.current?.focus();
     }
   };
+
+  sendRef.current = send;
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -245,16 +283,19 @@ export function ChatPanel() {
         </div>
       )}
 
-      <form className="composer" hidden={view !== "chat"} onSubmit={(e) => { e.preventDefault(); void send(draft); }}>
+      <form className={`composer ${listening ? "listening" : ""}`} hidden={view !== "chat"} onSubmit={(e) => { e.preventDefault(); void send(draft); }}>
         <label htmlFor="msg" className="sr-only">Message bleep</label>
         <textarea
           id="msg"
           ref={input}
           rows={1}
           value={draft}
-          placeholder={compacting ? "Compacting..." : ok ? "Ask bleep anything about your day" : "Sign in to chat"}
+          placeholder={listening ? "Listening..." : compacting ? "Compacting..." : ok ? "Ask bleep anything about your day" : "Sign in to chat"}
           disabled={!ok || busy}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setListening(false);
+          }}
           onKeyDown={onKeyDown}
           autoFocus
         />

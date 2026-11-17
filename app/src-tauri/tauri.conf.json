@@ -29,6 +29,7 @@
     ],
     "macOS": {
       "minimumSystemVersion": "15.0",
+      "entitlements": "./Entitlements.plist",
       "signingIdentity": "ScreenRecz Local Signing"
     }
   },

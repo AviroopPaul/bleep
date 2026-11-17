@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { DROID_FULL } from "./droidSvg";
-import { api, onChatEvent, onDroidMood } from "../ipc";
+import { api, onChatEvent, onDroidMood, onVoice } from "../ipc";
 
-type Mood = "idle" | "thinking" | "alert" | "happy";
+type Mood = "idle" | "thinking" | "alert" | "happy" | "listening";
 const DRAG_PX = 4;
 const DOUBLE_MS = 260;
 
@@ -31,9 +31,16 @@ export function Droid() {
       window.clearTimeout(timer.current);
       setMood(m === "alert" ? "alert" : "idle");
     });
+    // The wake phrase lights the antenna green until the request is heard.
+    const unVoice = onVoice((e) => {
+      window.clearTimeout(timer.current);
+      if (e.kind === "wake") setMood("listening");
+      else setMood((m) => (m === "listening" ? (e.kind === "heard" ? "thinking" : "idle") : m));
+    });
     return () => {
       void un.then((f) => f());
       void unMood.then((f) => f());
+      void unVoice.then((f) => f());
     };
   }, []);
 

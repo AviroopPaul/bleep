@@ -6,6 +6,7 @@ import { MemorySettingsTab } from "./MemorySettings";
 import { ConnectorsSettingsTab } from "./ConnectorsSettings";
 import { ModelSettingsTab } from "./ModelSettings";
 import { UpdatesSettingsTab } from "./UpdatesSettings";
+import { VoiceSettingsTab } from "./VoiceSettings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onGoogleStatus, type GoogleState, type LinkName } from "../ipc";
 
@@ -149,10 +150,11 @@ export function GoogleSettings() {
   );
 }
 
-const TABS = ["Model", "Google", "Mail", "Memory", "Connectors", "Agents", "Activity", "Updates"] as const;
+const TABS = ["Model", "Voice", "Google", "Mail", "Memory", "Connectors", "Agents", "Activity", "Updates"] as const;
 type Tab = (typeof TABS)[number];
 const BLURB: Record<Tab, string> = {
   Model: "Provider and models",
+  Voice: "Wake word and speech",
   Google: "Account and calendar",
   Mail: "VIPs, mutes and lists",
   Memory: "Facts and compaction",
@@ -204,6 +206,7 @@ export function Settings() {
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-panel">
         <div className="set-page">
           {tab === "Model" && <ModelSettingsTab />}
+          {tab === "Voice" && <VoiceSettingsTab />}
           {tab === "Google" && <GoogleSettings />}
           {tab === "Mail" && <MailSettings />}
           {tab === "Memory" && <MemorySettingsTab />}

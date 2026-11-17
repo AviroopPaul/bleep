@@ -47,10 +47,17 @@ regex = "1"
 tokio-tungstenite = "0.30.0"
 toml_edit = "0.25.19"
 tauri-plugin-updater = "2"
+# Wake word: mic capture, resampling, on-device speech to text (Moonshine via ONNX Runtime).
+cpal = "0.16"
+rubato = "0.16"
+transcribe-rs = { version = "0.3", features = ["onnx"] }
+# transcribe-rs 0.3.12 does not build against ort rc.15; keep the version it was written for.
+ort = { version = "=2.0.0-rc.12", default-features = false }
+sha2 = "0.10"
+ndarray = "0.17"
 
 [dev-dependencies]
 tempfile = "3"
-sha2 = "0.10"
 
 [profile.release]
 codegen-units = 1
