@@ -81,6 +81,32 @@ impl Default for UpdatesConfig {
     }
 }
 
+/// Voice: the wake word, the mic, and spoken replies. Empty device names mean
+/// the system default, which follows whatever macOS picks (AirPods in, AirPods used).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct VoiceConfig {
+    /// Listen for the wake phrase. Off until the user turns it on: it keeps the mic open.
+    pub wake: bool,
+    pub phrase: String,
+    /// "strict", "normal" or "loose": how sure bleep must be that it heard the phrase.
+    pub sensitivity: String,
+    /// Input device name.
+    pub mic: String,
+    /// Read replies to spoken requests aloud.
+    pub speak: bool,
+    /// Output device name for spoken replies.
+    pub speaker: String,
+    /// A macOS voice name. Empty is the system voice.
+    pub voice: String,
+}
+
+impl Default for VoiceConfig {
+    fn default() -> Self {
+        Self { wake: false, phrase: crate::voice::wake::DEFAULT_PHRASE.into(), sensitivity: "normal".into(), mic: String::new(), speak: true, speaker: String::new(), voice: String::new() }
+    }
+}
+
 /// Memory and compaction (Phase 5).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -205,6 +231,7 @@ pub struct Config {
     pub mcp: McpConfig,
     pub api: ApiConfig,
     pub updates: UpdatesConfig,
+    pub voice: VoiceConfig,
 }
 
 impl Default for Config {
@@ -225,6 +252,7 @@ impl Default for Config {
             mcp: McpConfig::default(),
             api: ApiConfig::default(),
             updates: UpdatesConfig::default(),
+            voice: VoiceConfig::default(),
         }
     }
 }
@@ -373,6 +401,15 @@ mod tests {
         assert_eq!(c.checkin.brief, "08:30");
         assert_eq!(c.checkin.checkins, vec!["13:00".to_string(), "18:00".to_string()], "unset keys keep defaults");
         assert_eq!(c.mail.vips, vec!["priya@example.com".to_string()]);
+    }
+
+    #[test]
+    fn voice_defaults_off_with_system_devices() {
+        let c: Config = toml::from_str("").unwrap();
+        assert_eq!(c.voice, VoiceConfig { wake: false, phrase: "hey bleep".into(), sensitivity: "normal".into(), mic: String::new(), speak: true, speaker: String::new(), voice: String::new() });
+        let c: Config = toml::from_str("[voice]\nwake = true\nphrase = \"jarvis\"\nmic = \"AirPods\"").unwrap();
+        assert!(c.voice.wake && c.voice.speak);
+        assert_eq!((c.voice.phrase.as_str(), c.voice.mic.as_str(), c.voice.speaker.as_str()), ("jarvis", "AirPods", ""));
     }
 
     #[test]

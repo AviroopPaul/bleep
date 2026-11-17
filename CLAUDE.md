@@ -7,6 +7,7 @@ Floating macOS assistant. Plan and decisions: `docs/build-plan.md`. App: `app/` 
 - **Locally, run only the tests for what you changed.** Rust: `cd app/src-tauri && cargo test --lib <module>`. Web: `cd app && npx vitest run <file>`, `npx playwright test <spec>`.
 - **Do not run the full suites locally.** CI runs them on every pull request (`.github/workflows/ci.yml`). If a PR check fails, fix it on the branch.
 - Tests never call Google or open a browser. Google APIs are mocked (`src-tauri/src/google/mock.rs`, fixtures in `src-tauri/tests/fixtures/google/`). Playwright runs headless with mocked IPC (`?mock=1`).
+- Voice tests that need the speech model on disk are `#[ignore]`: `cargo test --lib voice -- --ignored --nocapture`. They speak with macOS `say`, so run them on a Mac. `cargo run --example voice_live` checks the real mic (it plays the phrase through the speakers).
 
 ## Build
 

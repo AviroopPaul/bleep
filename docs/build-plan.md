@@ -35,7 +35,7 @@ Prior work: `~/Documents/code/valet/docs/architecture.html` (9 Nov). It has the 
 - **Other platforms:** no Windows, no Linux, no phone app.
 - **Browser or screen automation:** no clicking around websites, no reading the screen.
 - **Payments:** it reminds me about bills. It never pays them.
-- **Voice:** no speech in or out.
+- **Cloud voice:** no audio leaves the Mac. Since 0.4.0 bleep has an opt-in wake word ("hey bleep") with on-device speech to text (Moonshine) and spoken replies through the macOS voices.
 - **Plugin marketplace:** connectors are first-party code only.
 
 ## 4. Anti-goals (fail even if it works)

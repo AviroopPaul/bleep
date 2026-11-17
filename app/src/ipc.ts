@@ -370,7 +370,51 @@ export const api = {
   updateInstall: () => invoke<UpdateView>("update_install"),
   updateSetAuto: (on: boolean) => invoke<UpdateView>("update_set_auto", { on }),
   updateRestart: () => invoke<void>("update_restart"),
+  voiceSettings: () => invoke<VoiceView>("voice_settings"),
+  voiceStatus: () => invoke<VoiceStatus>("voice_status"),
+  voiceSet: (config: VoiceConfig) => invoke<VoiceView>("voice_set", { config }),
+  voiceSpeak: (text: string) => invoke<void>("voice_speak", { text }),
+  voiceStopSpeaking: () => invoke<void>("voice_stop_speaking"),
+  voiceTestSpeaker: (voice: string, speaker: string) => invoke<void>("voice_test_speaker", { voice, speaker }),
 };
+
+// config::VoiceConfig. Empty device names mean the system default.
+export interface VoiceConfig {
+  wake: boolean;
+  phrase: string;
+  sensitivity: "strict" | "normal" | "loose";
+  mic: string;
+  speak: boolean;
+  speaker: string;
+  voice: string;
+}
+
+// voice::Status.
+export type VoicePhase = "off" | "downloading" | "loading" | "listening" | "awake" | "error";
+export interface VoiceStatus {
+  phase: VoicePhase;
+  detail: string;
+  mic: string | null;
+  level: number;
+  last_heard: string | null;
+  progress: number | null;
+}
+
+// voice::VoiceView.
+export interface VoiceView {
+  config: VoiceConfig;
+  status: VoiceStatus;
+  model_ready: boolean;
+  model_mb: number;
+  mics: string[];
+  default_mic: string | null;
+  speakers: { id: string; name: string }[];
+  voices: { name: string; locale: string }[];
+}
+
+// voice::VoiceEvent: the wake phrase was heard, then the request (or nothing).
+export type VoiceEvent = { kind: "wake" } | { kind: "heard"; text: string } | { kind: "idle" };
+export const onVoice = (cb: (e: VoiceEvent) => void): Promise<UnlistenFn> => listen<VoiceEvent>("voice://event", (e) => cb(e.payload));
 
 // updater::Phase and updater::UpdateView.
 export type UpdatePhase =

@@ -396,3 +396,14 @@ button { font: inherit; color: inherit; }
 .pill.error { background: rgba(176, 84, 52, 0.14); color: var(--rust); max-width: 60%; }
 .ag-choices > .btn { position: sticky; bottom: -12px; box-shadow: 0 -8px 10px var(--raised); }
 .upd-notes { white-space: pre-wrap; }
+
+/* Voice settings */
+.row-input { display: flex; gap: 8px; }
+.row-input input { flex: 1; min-width: 0; }
+.voice-live { margin-top: 12px; }
+.level { height: 6px; border-radius: 99px; background: rgba(127, 127, 127, 0.16); overflow: hidden; margin-top: 12px; }
+.level i { display: block; height: 100%; background: var(--sage); border-radius: 99px; transition: width 0.15s; }
+/* The droid listens after its wake phrase. */
+.droid.listening .ant { animation: listenAnt 0.9s ease-in-out infinite; }
+@keyframes listenAnt { 0%, 100% { fill: var(--sage); } 50% { fill: #cfe8c8; } }
+.composer.listening textarea::placeholder { color: var(--sage); font-weight: 700; }

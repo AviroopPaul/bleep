@@ -2,7 +2,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type { ModelSettings as ModelSettingsT, ModelSave, Preset } from "./ipc";
-import type { ActivityItem, AgentAsk, AgentChatLine, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode, UpdateView } from "./ipc";
+import type { ActivityItem, AgentAsk, AgentChatLine, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode, UpdateView, VoiceConfig, VoiceStatus, VoiceView } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
   id, role, kind: "chat", content, tool_steps: [], tokens: null, status: "done", session_id: 1, created_at: "",
@@ -178,6 +178,16 @@ export function installMocks(label: string) {
   if (bubble) setTimeout(() => emit("bubble://text", { text: bubble, ping_id: ping ? Number(ping) : null }), 200);
   const later = (ms: number, f: () => void) => setTimeout(f, ms);
   const chatEv = (id: number, event: ChatEmit["event"]) => emit("chat://event", { message_id: id, event });
+  // Voice: ?voice=on starts with the wake word on and listening. Tests drive events with __voice.
+  let voiceCfg: VoiceConfig = { wake: q.get("voice") === "on", phrase: "hey bleep", sensitivity: "normal", mic: "", speak: true, speaker: "", voice: "" };
+  let voiceSt: VoiceStatus = { phase: voiceCfg.wake ? "listening" : "off", detail: "", mic: voiceCfg.wake ? "MacBook Air Microphone" : null, level: 0.05, last_heard: null, progress: null };
+  const voiceView = (): VoiceView => ({
+    config: voiceCfg, status: voiceSt, model_ready: true, model_mb: 66,
+    mics: ["MacBook Air Microphone", "AirPods Pro"], default_mic: "MacBook Air Microphone",
+    speakers: [{ id: "81", name: "MacBook Air Speakers" }, { id: "73", name: "AirPods Pro" }],
+    voices: [{ name: "Daniel (English (UK))", locale: "en_GB" }, { name: "Samantha", locale: "en_US" }],
+  });
+  (window as unknown as { __voice: (e: unknown) => void }).__voice = (e) => void emit("voice://event", e);
   mockIPC(
     (cmd, args) => {
       const a = (args ?? {}) as Record<string, unknown>;
@@ -482,6 +492,27 @@ export function installMocks(label: string) {
           return null;
         case "chat_context":
           return { used: memOn ? 120_000 : null, threshold: memSet.threshold, window: memSet.window };
+        case "voice_settings":
+          return voiceView();
+        case "voice_status":
+          return voiceSt;
+        case "voice_set": {
+          const c = a.config as VoiceConfig;
+          const phrase = c.phrase.trim().toLowerCase().replace(/[^a-z0-9' ]/g, "").replace(/\s+/g, " ");
+          if (phrase.replace(/[^a-z]/g, "").length < 4) throw "Use a phrase with at least 4 letters.";
+          calls.push(`voice_set:${c.wake}:${phrase}:${c.mic}:${c.sensitivity}:${c.speak}:${c.speaker}:${c.voice}`);
+          voiceCfg = { ...c, phrase };
+          voiceSt = c.wake ? { ...voiceSt, phase: "listening", mic: c.mic || "MacBook Air Microphone" } : { ...voiceSt, phase: "off", mic: null };
+          return voiceView();
+        }
+        case "voice_speak":
+          calls.push(`voice_speak:${a.text}`);
+          return null;
+        case "voice_stop_speaking":
+          return null;
+        case "voice_test_speaker":
+          calls.push(`voice_test_speaker:${a.voice}:${a.speaker}`);
+          return null;
         case "update_state":
           return upd;
         case "update_check": {
