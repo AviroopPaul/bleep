@@ -10,8 +10,8 @@ describe("avatars", () => {
   });
 
   it("switching buddy swaps a default color but keeps a picked one", () => {
-    expect(switchKind(DEFAULT_AVATAR, "puff").color).toBe("#38BDF8");
-    expect(switchKind({ ...DEFAULT_AVATAR, color: "#FF4FA3" }, "puff").color).toBe("#FF4FA3");
+    expect(switchKind(DEFAULT_AVATAR, "blip").color).toBe("#3D6BFF");
+    expect(switchKind({ ...DEFAULT_AVATAR, color: "#FF4FA3" }, "blip").color).toBe("#FF4FA3");
   });
 
   it("draws every buddy in every finish", () => {

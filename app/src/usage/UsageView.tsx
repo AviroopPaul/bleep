@@ -5,8 +5,7 @@ import { busiest, costNote, count, dayLabel, heatLevel, hourLabel, money, purpos
 
 const BAR_H = 96;
 
-/** The Usage tab: what bleep spent and when, from the local database. Replaces the old
- * context bar under the chat header. */
+/** Settings > Usage: what bleep spent and when, from the local database. */
 export function UsageView({ ctx }: { ctx: ChatContext | null }) {
   const [days, setDays] = useState(7);
   const [v, setV] = useState<Usage | null>(null);
@@ -21,7 +20,7 @@ export function UsageView({ ctx }: { ctx: ChatContext | null }) {
   const ctxPct = ctx && used != null ? Math.min(100, (used / ctx.threshold) * 100) : 0;
 
   return (
-    <div className="usage" role="tabpanel" aria-label="Usage">
+    <div className="usage">
       <div className="us-range" role="radiogroup" aria-label="Range">
         {RANGES.map((r) => (
           <button key={r.days} role="radio" aria-checked={days === r.days} className="us-pill" onClick={() => setDays(r.days)}>{r.label}</button>

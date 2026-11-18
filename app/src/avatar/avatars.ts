@@ -12,7 +12,7 @@ export interface AvatarConfig {
   finish: Finish;
 }
 
-export const DEFAULT_AVATAR: AvatarConfig = { kind: "blip", color: "#3D6BFF", finish: "glossy" };
+export const DEFAULT_AVATAR: AvatarConfig = { kind: "puff", color: "#38BDF8", finish: "glossy" };
 export const FINISHES: { id: Finish; name: string }[] = [
   { id: "flat", name: "Flat" },
   { id: "glossy", name: "Glossy" },

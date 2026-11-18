@@ -37,20 +37,24 @@ test("compaction slider, note and Compact now", async ({ page }) => {
   await expect(page.getByText("Compacted. The chat goes on from the summary.")).toBeVisible();
 });
 
-test("chat has no context bar; the Usage tab shows context and warns near compaction", async ({ page }) => {
+test("chat has no context bar; near compaction the gear warns and opens Settings > Usage", async ({ page }) => {
   await page.goto("/?mock=1&memory=1&agents=1#chat");
   await expect(page.getByRole("separator", { name: "Compacted 250K into a 3K summary. Facts saved to memory." })).toBeVisible();
   await expect(page.locator(".panel-head [role=meter]")).toHaveCount(0);
   const fits = await page.locator(".panel-head").evaluate((el) => el.scrollWidth <= el.clientWidth);
   expect(fits).toBe(true);
-  await expect(page.getByRole("tab", { name: "Usage", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
   await page.getByLabel("Message bleep").fill("time in Tokyo?");
   await page.getByRole("button", { name: "Send" }).click();
-  const usage = page.getByRole("tab", { name: "Usage, chat context is near compaction" });
-  await expect(usage).toBeVisible();
-  await usage.click();
-  const meter = page.getByRole("meter", { name: "Chat context" });
-  await expect(meter).toHaveAttribute("aria-valuetext", "215K of 250K");
+  const gear = page.getByRole("button", { name: "Settings, chat context is near compaction" });
+  await expect(gear).toBeVisible();
+  await gear.click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __calls: string[] }).__calls)).toContain("settings_open:usage");
+});
+
+test("Settings > Usage shows the chat context", async ({ page }) => {
+  await page.goto("/?mock=1&memory=1#settings/usage");
+  await expect(page.getByRole("meter", { name: "Chat context" })).toHaveAttribute("aria-valuetext", /of 250K$/);
 });
 
 test("compacting disables send and reloads the chat", async ({ page }) => {

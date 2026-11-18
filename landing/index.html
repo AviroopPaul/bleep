@@ -3,24 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>bleep: a little droid for your Mac</title>
+<title>bleep: a little buddy for your Mac</title>
 <meta name="description" content="bleep floats on your Mac. It watches your Claude Code and Codex sessions, your mail and your calendar. It handles the small asks and tells you what needs you.">
 <link rel="canonical" href="https://bleep-omega.vercel.app/">
 <!-- Share preview (Open Graph + Twitter/X). Image source: scripts/og/og.html -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="bleep">
 <meta property="og:url" content="https://bleep-omega.vercel.app/">
-<meta property="og:title" content="bleep: a little droid for your Mac">
+<meta property="og:title" content="bleep: a little buddy for your Mac">
 <meta property="og:description" content="It floats on your Mac and watches your coding agents, mail and calendar. It handles the small asks and tells you what needs you.">
 <meta property="og:image" content="https://bleep-omega.vercel.app/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="bleep, a small droid, with cards for an approved test run, a meeting in 60 minutes and a bill due today.">
+<meta property="og:image:alt" content="bleep, a small buddy, with cards for an approved test run, a meeting in 60 minutes and a bill due today.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="bleep: a little droid for your Mac">
+<meta name="twitter:title" content="bleep: a little buddy for your Mac">
 <meta name="twitter:description" content="It floats on your Mac and watches your coding agents, mail and calendar. It handles the small asks and tells you what needs you.">
 <meta name="twitter:image" content="https://bleep-omega.vercel.app/og.png">
-<meta name="twitter:image:alt" content="bleep, a small droid, with cards for an approved test run, a meeting in 60 minutes and a bill due today.">
+<meta name="twitter:image:alt" content="bleep, a small buddy, with cards for an approved test run, a meeting in 60 minutes and a bill due today.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -56,15 +56,19 @@ a{color:inherit}
 /* ---------- nav ---------- */
 nav.top{position:sticky; top:0; z-index:40; background:rgba(253,253,253,.86); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-bottom:1px solid transparent; transition:border-color .25s}
 nav.top.mini{border-bottom-color:var(--line)}
-nav.top .bar{max-width:1180px; margin:0 auto; padding:12px 24px; display:flex; align-items:center; gap:26px}
-.brand{display:flex; align-items:center; gap:9px; font:600 19px/1 var(--sans); letter-spacing:-.03em; text-decoration:none; color:var(--ink)}
-.brand > span{display:block; width:27px; flex:none; transition:transform .3s} .brand:hover > span{transform:rotate(-8deg)}
+nav.top .bar{max-width:1180px; margin:0 auto; padding:14px 24px; display:flex; align-items:center; gap:8px}
+.brand{display:flex; align-items:center; gap:10px; font:600 18px/1 var(--sans); letter-spacing:-.03em; text-decoration:none; color:var(--ink); margin-right:auto}
+.btile{display:grid; place-items:center; width:34px; height:34px; flex:none; border-radius:10px; background:linear-gradient(160deg,#F4F7FF,#E3EAFB); box-shadow:inset 0 0 0 1px rgba(0,0,0,.04); transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.btile > span{display:block; width:24px}
+.brand:hover .btile{transform:rotate(-8deg) scale(1.05)}
 .brand .wm{font-style:normal}
-nav.top .links{display:flex; gap:2px; align-items:center}
-nav.top .links a{font-size:14.5px; text-decoration:none; color:var(--ink-2); padding:6px 10px; border-radius:8px; transition:color .15s, background .15s}
-nav.top .links a:hover{color:var(--ink); background:#F2F2F2}
-nav.top .right{margin-left:auto; display:flex; gap:8px; align-items:center}
-@media (max-width:700px){ nav.top .links, nav.top .right .ghost{display:none} }
+nav.top .links{display:flex; gap:4px; align-items:center}
+nav.top .links a{font:450 15px/1 var(--sans); text-decoration:none; color:var(--ink); padding:9px 12px; border-radius:10px; transition:background .15s}
+nav.top .links a:hover{background:#F2F2F2}
+.npill{display:inline-flex; align-items:center; gap:7px; margin-left:10px; height:40px; padding:0 18px; border-radius:999px; background:#161616; color:#fff; font:500 15px/1 var(--sans); text-decoration:none; transition:background .15s, transform .15s}
+.npill:hover{background:#2A2A2A} .npill:active{transform:translateY(1px)}
+.npill svg{width:16px; height:16px; flex:none}
+@media (max-width:700px){ nav.top .links{display:none} nav.top .bar{padding:12px 16px} .npill{height:36px; padding:0 15px; font-size:14px} }
 .btn{display:inline-flex; align-items:center; justify-content:center; gap:8px; height:46px; padding:0 20px; font:500 15px/1 var(--sans); border-radius:14px; border:1px solid transparent; cursor:pointer; text-decoration:none; white-space:nowrap; transition:transform .15s, box-shadow .15s, background .15s, filter .15s}
 .btn:active{transform:translateY(1px)}
 .btn.primary{color:#fff; background:linear-gradient(#2965EC,#5C89F8); box-shadow:0 2px 10px rgba(75,131,253,.24), inset 0 1px 0 rgba(255,255,255,.2)}
@@ -88,11 +92,6 @@ nav.top .right{margin-left:auto; display:flex; gap:8px; align-items:center}
 .icopy{flex:none; border:0; cursor:pointer; font:500 12.5px/1 var(--sans); padding:9px 12px; border-radius:9px; background:#F2F2F2; color:var(--ink)}
 .icopy:hover{background:#E9E9E9} .icopy.ok{background:#E6F2E4; color:#2F6B39}
 /* hero: the command as one quiet line under the buttons */
-.inst.line{display:inline-flex; width:auto; max-width:100%; padding:0; border:0; background:transparent; box-shadow:none}
-.inst.line .icmd{padding:0; gap:8px; min-width:0}
-.inst.line code{font-size:13.5px; color:var(--ink-2)}
-.inst.line .iprompt{font-size:13.5px}
-.inst.line .icopy{padding:6px 9px; font-size:12px}
 @media (max-width:560px){ .icmd code{font-size:12.5px} }
 .faq code{font:500 .9em var(--mono); background:#F2F2F2; padding:1px 5px; border-radius:5px}
 .btn.dl .apl{width:19px; height:19px; margin-top:-3px; flex:none}
@@ -104,8 +103,44 @@ kbd{display:inline-grid; place-items:center; min-width:28px; height:28px; paddin
 .htop{display:flex; flex-direction:column; align-items:center; text-align:center; padding:88px 0 0}
 .hero h1{font:500 clamp(40px,5.4vw,66px)/1.04 var(--display); letter-spacing:-.04em; color:var(--ink); margin:0 0 20px}
 .hero h1 span{color:#A3A3A3}
-.hcta{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:22px}
-.hinst{display:flex; flex-direction:column; align-items:center; gap:8px; max-width:100%}
+.avail{display:inline-flex; align-items:center; gap:8px; margin:0 0 26px; padding:7px 15px; border-radius:999px; background:#F2F2F2; font:500 14px/1 var(--sans); color:var(--muted)}
+.avail span{display:inline-flex; align-items:center; gap:5px; color:var(--ink)} .avail .apl{width:14px; height:14px; margin-top:-2px}
+.avail i{font-style:normal; color:#BDBDBD}
+.hero h1.meet{display:flex; align-items:center; justify-content:center; gap:.16em; font-size:clamp(54px,9.4vw,116px); line-height:1; letter-spacing:-.055em; margin:0 0 26px; white-space:nowrap}
+.hero h1.meet .mbud{display:block; width:.92em; flex:none; color:inherit; margin-top:.04em; cursor:pointer}
+.hero h1.meet .mbud svg{display:block; width:100%; overflow:visible}
+.hchip{display:inline-flex; align-items:center; gap:6px; padding:1px 8px 1px 6px; margin:0 1px; border-radius:8px; background:#F2F2F2; font-size:.9em; font-weight:500; color:var(--ink); white-space:nowrap; vertical-align:1px; line-height:1.45}
+.nw{white-space:nowrap}
+.hchip i{display:block; width:15px; height:15px; flex:none} .hchip i svg{display:block; width:100%; height:100%}
+.hcta{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:0 0 18px}
+.hcta .btn{height:54px; padding:0 26px; border-radius:16px; font-size:16px}
+.btn.soft{background:#F2F2F2; color:var(--ink)} .btn.soft:hover{background:#EAEAEA}
+.btn.gh .ghm{width:18px; height:18px; flex:none}
+.btn.gh .ghn{display:inline-flex; align-items:center; gap:4px; margin-left:4px; padding:4px 8px; border-radius:8px; background:#fff; font:600 13px/1 var(--sans); color:var(--ink-2); font-variant-numeric:tabular-nums}
+.btn.gh .ghn[hidden]{display:none}
+.btn.gh .ghn svg{width:12px; height:12px; color:#E3A008}
+.split{position:relative; display:flex; height:54px; border-radius:16px; background:#1B1B1B; color:#fff; box-shadow:0 6px 18px rgba(0,0,0,.14)}
+.split > button{border:0; background:transparent; color:inherit; cursor:pointer; font:500 16px/1 var(--sans)}
+.sp-main{display:flex; align-items:center; gap:9px; padding:0 20px 0 24px; border-radius:16px 0 0 16px}
+.sp-main .apl{width:18px; height:18px; margin-top:-3px; flex:none}
+.sp-more{display:grid; place-items:center; width:48px; border-left:1px solid rgba(255,255,255,.16) !important; border-radius:0 16px 16px 0}
+.sp-more svg{width:14px; height:14px; transition:transform .2s} .sp-more[aria-expanded="true"] svg{transform:rotate(180deg)}
+.split > button:hover{background:rgba(255,255,255,.08)} .split > button:focus-visible{outline:2px solid var(--blue-2); outline-offset:2px}
+.sp-menu{position:absolute; z-index:30; top:calc(100% + 8px); left:0; width:min(400px,calc(100vw - 32px)); padding:8px; border-radius:16px; background:#fff; color:var(--ink); border:1px solid var(--line); box-shadow:0 18px 48px rgba(0,0,0,.14); text-align:left}
+.sp-menu p{margin:4px 8px 6px; font:500 12px var(--sans); color:var(--muted)}
+.sp-row{display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:10px; width:100%; padding:10px; border:0; border-radius:10px; background:transparent; color:inherit; text-decoration:none; cursor:pointer; text-align:left; font:600 13.5px/1.2 var(--sans)}
+.sp-row:hover, .sp-row:focus-visible{background:#F5F5F5; outline:none}
+.sp-row code{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:500 12px var(--mono); color:var(--ink-2)}
+.sp-row em{font:500 12px var(--sans); font-style:normal; color:var(--blue)} .sp-row.ok em{color:#2F6B39}
+.sp-row.link{grid-template-columns:1fr auto}
+.hfoot{margin:0 0 6px; font-size:14px; color:var(--muted)} .hfoot.ok{color:#2F6B39}
+@media (max-width:560px){
+  .avail{font-size:12.5px; padding:6px 12px; margin-bottom:20px}
+  .hero h1.meet{font-size:clamp(46px,15vw,64px)}
+  .hcta{flex-direction:column; align-items:stretch; width:100%; max-width:340px}
+  .split{width:100%} .sp-main{flex:1; justify-content:center}
+  .sp-menu{left:auto; right:0}
+}
 .req{margin:2px 0 0; font:500 12.5px var(--mono); color:var(--muted); letter-spacing:.02em}
 .sec-head .stencil, .wwith .stencil{display:block}
 .sec-head > div:only-child{grid-column:1 / -1}
@@ -121,7 +156,7 @@ kbd{display:inline-grid; place-items:center; min-width:28px; height:28px; paddin
 .hphone{display:none}
 .phone .hfit{display:none}
 .phone .hphone{display:flex; flex-direction:column; align-items:center; margin-top:26px}
-.hphone .droid{width:104px; margin-bottom:-6px; position:relative; z-index:1}
+.hphone .bud{width:104px; margin-bottom:-6px; position:relative; z-index:1}
 .hpn{width:100%; max-width:380px; border-radius:20px; padding:6px; background:var(--soft)}
 .hpr{display:flex; gap:11px; align-items:center; padding:11px 12px; margin:5px 0; border-radius:14px; background:#fff; text-align:left; box-shadow:0 8px 18px -14px rgba(27,31,36,.5); animation:hpin .55s cubic-bezier(.2,1.3,.4,1) both}
 .hpr:nth-child(2){animation-delay:.45s} .hpr:nth-child(3){animation-delay:.9s}
@@ -131,7 +166,7 @@ kbd{display:inline-grid; place-items:center; min-width:28px; height:28px; paddin
 .hpr em{margin-left:auto; font:600 10.5px/1 var(--mono); font-style:normal; padding:5px 7px; border-radius:7px; background:rgba(95,122,90,.16); color:var(--sage); white-space:nowrap}
 .hpr em.c{background:rgba(236,111,85,.14); color:var(--db-coral)} .hpr em.b{background:rgba(232,169,59,.2); color:#8A5A12}
 @media (max-width:560px){ .icmd code{-webkit-mask-image:linear-gradient(90deg,#000 78%,transparent); mask-image:linear-gradient(90deg,#000 78%,transparent)} }
-.hero p.lede{font-size:19px; line-height:1.5; color:var(--ink-2); max-width:600px; margin:0 0 30px; text-wrap:balance}
+.hero p.lede{font-size:19px; line-height:1.6; color:var(--ink-2); max-width:680px; margin:0 0 30px; text-wrap:balance}
 .hfit{position:relative; margin-top:60px; background:var(--soft); border:1px solid var(--line); border-radius:28px; overflow:hidden}
 .hstage{position:absolute; left:0; top:0; width:1132px; height:600px; transform:scale(var(--fs,1)); transform-origin:0 0}
 .arcs{position:absolute; inset:0; overflow:hidden; pointer-events:none; -webkit-mask-image:linear-gradient(#000 70%, transparent); mask-image:linear-gradient(#000 70%, transparent)}
@@ -218,14 +253,13 @@ kbd{display:inline-grid; place-items:center; min-width:28px; height:28px; paddin
 
 /* the flying droid */
 .hfly{position:absolute; left:0; top:0; z-index:5; width:88px; transform-origin:50% 50%; will-change:transform}
-.hfly .droid{cursor:pointer}
+.hfly .bud{cursor:pointer}
 .hero-bubble{position:absolute; left:50%; bottom:100%; translate:-50% -2px; background:var(--ink); color:#fff; font:600 11px/1.25 var(--sans); padding:7px 10px; border-radius:10px; white-space:nowrap; opacity:0; transform:translateY(6px) scale(.8); transform-origin:50% 100%; transition:.28s cubic-bezier(.3,1.5,.5,1); pointer-events:none; text-align:center}
 .hero-bubble small{display:block; font:500 9px var(--mono); color:rgba(255,255,255,.65); margin-top:3px}
 .hero-bubble.show{opacity:1; transform:none}
 
 .phone .htop{padding:48px 0 0}
 .phone section{padding:76px 0 0}
-.phone .closer{padding:64px 0 56px}
 .phone .hero p.lede{font-size:16.5px}
 .phone .hfit{margin:8px -12px 0; background:none; border:0; border-radius:0}
 /* laptop-shaped scenes on phones: same layout as desktop, scaled to fit */
@@ -255,6 +289,60 @@ kbd{display:inline-grid; place-items:center; min-width:28px; height:28px; paddin
 @keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-6deg) translateY(-4px)}75%{transform:rotate(6deg) translateY(-4px)}}
 .droid.happy .bob{animation:hop .6s ease-out}
 @keyframes hop{0%{transform:translateY(0)}40%{transform:translateY(-16px)}100%{transform:translateY(0)}}
+
+/* ---------- buddies (copied from app/src/theme.css, "avatar") ---------- */
+/* ---------- avatar (the buddies, src/avatar/avatars.ts) ---------- */
+/* Moods are data-mood on .av. Keyframes have an av- prefix so the droid's keep working. */
+.av { --fx: var(--ink); }
+.av svg { width: 100%; height: auto; display: block; overflow: visible; }
+.av .shadow { fill: rgba(0, 0, 0, 0.18); transform-box: fill-box; transform-origin: center; animation: av-shadow 3.2s ease-in-out infinite; }
+.av .bob { transform-box: view-box; transform-origin: 60px 108px; animation: av-bob 3.2s ease-in-out infinite; }
+.av .eyes-open { transform-box: fill-box; transform-origin: center; animation: av-blink 5.2s infinite; }
+.av .wide, .av .look { transform-box: fill-box; transform-origin: center; transition: transform 0.25s ease; }
+.av .leaf { transform-box: view-box; transform-origin: 60px 36px; animation: av-sway 3.2s ease-in-out infinite; }
+.av .eyes-happy, .av .mouth > *, .av .fx > g { display: none; }
+.av[data-mood="idle"] .m-idle, .av[data-mood="happy"] .m-happy, .av[data-mood="alert"] .m-alert,
+.av[data-mood="thinking"] .m-think, .av[data-mood="listening"] .m-listen { display: inline; }
+.av[data-mood="happy"] .eyes-open { display: none; }
+.av[data-mood="happy"] .eyes-happy, .av[data-mood="happy"] .fx-happy { display: inline; }
+.av[data-mood="happy"] .bob { animation: av-hop 0.9s ease-out 2; }
+.av[data-mood="happy"] .leaf { animation: av-wave 0.45s ease-in-out infinite alternate; }
+/* Alert can last a whole meeting bar: shake twice, then keep only the badge pulsing. */
+.av[data-mood="alert"] .bob { animation: av-shake 0.45s ease-in-out 2; }
+.av[data-mood="alert"] .wide { transform: scale(1.18, 1.28); }
+.av[data-mood="alert"] .fx-alert { display: inline; }
+.av[data-mood="alert"] .leaf { animation: av-perk 0.2s ease-in-out 4 alternate; }
+.av[data-mood="thinking"] .look { transform: translate(3px, -3px); }
+.av[data-mood="thinking"] .bob { animation: av-bob 4.6s ease-in-out infinite; }
+.av[data-mood="thinking"] .fx-think { display: inline; }
+.av[data-mood="listening"] .wide { transform: scale(1.1, 1.12); }
+.av[data-mood="listening"] .bob { animation: av-lean 2s ease-in-out infinite; }
+.av[data-mood="listening"] .fx-listen { display: inline; }
+.av[data-mood="listening"] .leaf { animation: none; transform: scaleY(1.12); }
+.av .fx-think circle { fill: var(--fx); transform-box: fill-box; animation: av-dot 1.1s ease-in-out infinite; }
+.av .fx-think circle:nth-child(2) { animation-delay: 0.18s; }
+.av .fx-think circle:nth-child(3) { animation-delay: 0.36s; }
+.av .fx-alert g { transform-box: fill-box; transform-origin: center; animation: av-pulse 0.6s ease-in-out infinite; }
+.av .fx-listen path { fill: none; stroke: #22c55e; stroke-width: 3.2; stroke-linecap: round; animation: av-wavefx 1.2s ease-out infinite; }
+.av .fx-listen path:nth-child(2n) { animation-delay: 0.3s; }
+.av .fx-happy path { transform-box: fill-box; transform-origin: center; animation: av-pop 1.2s ease-out infinite; }
+.av .fx-happy path:nth-child(2) { animation-delay: 0.35s; }
+.av .fx-happy path:nth-child(3) { animation-delay: 0.7s; }
+.av.still .bob, .av.still .eyes-open, .av.still .leaf { animation: none; }
+@keyframes av-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes av-shadow { 0%, 100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(0.86); opacity: 0.7; } }
+@keyframes av-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@keyframes av-hop { 0%, 100% { transform: translateY(0) scale(1, 1); } 15% { transform: translateY(0) scale(1.07, 0.9); } 45% { transform: translateY(-15px) scale(0.95, 1.06); } 75% { transform: translateY(0) scale(1.05, 0.95); } }
+@keyframes av-shake { 0%, 100% { transform: translateX(0) rotate(0); } 25% { transform: translateX(-3px) rotate(-5deg); } 75% { transform: translateX(3px) rotate(5deg); } }
+@keyframes av-lean { 0%, 100% { transform: rotate(-6deg) translateY(0); } 50% { transform: rotate(-6deg) translateY(-3px); } }
+@keyframes av-sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes av-wave { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@keyframes av-perk { from { transform: scaleY(1.15) rotate(-3deg); } to { transform: scaleY(1.15) rotate(3deg); } }
+@keyframes av-dot { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+@keyframes av-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+@keyframes av-wavefx { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes av-pop { 0% { opacity: 0; transform: scale(0.2) rotate(0); } 30% { opacity: 1; transform: scale(1.1) rotate(25deg); } 100% { opacity: 0; transform: scale(0.5) rotate(70deg); } }
+
 
 /* ---------- sections ---------- */
 section{padding:120px 0 0}
@@ -604,6 +692,85 @@ section{padding:120px 0 0}
 .art .note.y{background:#FFE58A} .art .note.p{background:#FFC9D6} .art .note.b{background:#CFE6FA}
 .a5 .dr{width:28.6cqmin; right:6%; bottom:4%}
 
+/* ---------- buddies: pick your own ---------- */
+.pick{border-radius:24px; padding:10px; display:grid; grid-template-columns:1.05fr 1fr; gap:10px}
+.pk-stage{position:relative; border-radius:18px; background:radial-gradient(120% 90% at 50% 100%, #E9F0FE, #F7F9FF 60%, #fff); min-height:430px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:58px 20px 24px; overflow:hidden; box-shadow:inset 0 0 0 1px rgba(0,0,0,.03)}
+.pk-bar{position:absolute; left:0; right:0; top:0; height:30px; display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 14px; background:rgba(255,255,255,.75); border-bottom:1px solid var(--line); font:500 12px var(--sans); color:var(--ink)}
+.pk-bar .pk-tray{width:17px; height:17px; display:block; padding:1px; border-radius:4px; background:rgba(0,0,0,.07)}
+.pk-tray svg{width:100%; height:100%; display:block}
+.pk-big{width:min(220px,56%)}
+.pk-moods{display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin-top:24px}
+.chip{height:34px; padding:0 13px; border-radius:99px; border:1px solid #E6E6E6; background:#fff; font:500 13.5px var(--sans); color:var(--ink-2); cursor:pointer; transition:background .15s, color .15s}
+.chip:hover{border-color:#D4D4D4}
+.chip[aria-pressed="true"], .chip[aria-checked="true"]{background:var(--ink); color:#fff; border-color:var(--ink)}
+.chip:disabled{opacity:.4; cursor:default}
+.pk-side{padding:18px 16px 14px; display:flex; flex-direction:column; gap:10px; min-width:0}
+.pk-side h3{margin:4px 0 0; font:600 13px var(--sans); color:var(--muted); display:flex; justify-content:space-between; gap:8px}
+.pk-side h3 small{font:500 12.5px var(--sans); color:var(--muted)}
+.pk-kinds{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px}
+.pk-kind{display:flex; flex-direction:column; align-items:center; gap:5px; padding:10px 4px 8px; border-radius:14px; border:1px solid var(--line); background:#fff; cursor:pointer; font:500 13px var(--sans); color:var(--ink-2); transition:border-color .15s, box-shadow .15s}
+.pk-kind > span{width:46px; height:46px; display:grid; place-items:center}
+.pk-kind > span svg{width:100%; height:auto; display:block}
+.pk-kind:hover{border-color:#DCDCDC}
+.pk-kind[aria-checked="true"]{border-color:var(--blue); box-shadow:0 0 0 3px var(--blue-soft); color:var(--ink)}
+.pk-colors{display:flex; flex-wrap:wrap; gap:10px}
+.pk-sw{width:32px; height:32px; border-radius:50%; border:0; padding:0; cursor:pointer; background:var(--c); box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.pk-sw[aria-checked="true"]{box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--ink)}
+.pk-fins{display:flex; flex-wrap:wrap; gap:6px}
+.pk-note{margin:2px 0 0; font-size:14.5px; color:var(--ink-2); min-height:22px}
+.pk-side [hidden]{display:none}
+@media (max-width:860px){ .pick{grid-template-columns:1fr} .pk-stage{min-height:360px} }
+@media (max-width:420px){ .pk-kind{font-size:12px; padding:8px 2px 6px} .pk-kind > span{width:38px; height:38px} .pick{padding:6px} .pk-side{padding:14px 8px 10px} }
+
+/* 6 files on this Mac */
+.a6{background:linear-gradient(180deg,#EEF4FB,#DCE7F5)}
+.art .tm{left:5%; top:9%; width:min(58%,112cqmin); background:#1E2227; color:#D6D6D6; border-radius:4cqmin; padding:4.4cqmin 4.8cqmin; font:500 4.1cqmin/1.6 var(--mono); transform:rotate(-2deg); box-shadow:0 3.3cqmin 8cqmin -3.3cqmin rgba(27,31,36,.55)}
+.art .tm b{color:#7EE2A8; font-weight:600}
+.art .tm div{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.art .tm .hit{color:#9DB7F5}
+.art .tm .hit em{font-style:normal; color:#F2F2F2}
+.art .pdf{right:6%; top:10%; width:52cqmin; padding:5cqmin 4.6cqmin 5.5cqmin; background:#fff; border-radius:2.6cqmin; transform:rotate(4deg); box-shadow:0 3.3cqmin 8cqmin -3.3cqmin rgba(27,31,36,.45); font:500 3.6cqmin/1.45 var(--mono); color:var(--muted)}
+.art .pdf .tag{position:absolute; right:4cqmin; top:-2.6cqmin; background:var(--red); color:#fff; font:700 3.4cqmin/1 var(--sans); padding:1.6cqmin 2.4cqmin; border-radius:1.6cqmin; letter-spacing:.06em}
+.art .pdf b{display:block; font:700 5cqmin/1.15 var(--display); color:var(--ink); margin-bottom:2.6cqmin}
+.art .pdf i{display:block; height:1.8cqmin; border-radius:1cqmin; background:#ECECEC; margin:1.8cqmin 0}
+.art .pdf mark{display:inline-block; background:#FFF0B3; color:var(--ink); font-weight:600; padding:.6cqmin 1.2cqmin; border-radius:1cqmin; margin-top:1.4cqmin}
+.art .ask{left:30%; bottom:8%; width:min(60%,104cqmin); background:#fff; border-radius:4cqmin; padding:4cqmin 4.4cqmin; box-shadow:0 3.3cqmin 8cqmin -3.3cqmin rgba(27,31,36,.5); transform:rotate(1.5deg); font:600 4.4cqmin/1.3 var(--sans)}
+.art .ask code{display:block; margin:2.2cqmin 0 3cqmin; font:500 4cqmin var(--mono); background:var(--soft); padding:2cqmin 2.6cqmin; border-radius:2cqmin; color:var(--ink)}
+.art .ask .bt{display:flex; gap:2.2cqmin}
+.art .ask .bt span{font:600 3.8cqmin/1 var(--sans); padding:2.2cqmin 3.6cqmin; border-radius:2.4cqmin; background:var(--ink); color:#fff}
+.art .ask .bt span + span{background:#fff; color:var(--ink); box-shadow:inset 0 0 0 1px #E2E2E2}
+/* 7 reminders */
+.a7{background:linear-gradient(180deg,#EEFAF6,#D5F1E7)}
+.art .ntf{left:7%; right:7%; top:8%; display:flex; align-items:center; gap:3.6cqmin; padding:3.6cqmin 4cqmin; background:rgba(255,255,255,.92); border-radius:4.4cqmin; box-shadow:0 3.3cqmin 8cqmin -3.3cqmin rgba(27,31,36,.4); font:500 4cqmin/1.3 var(--sans); color:var(--ink-2)}
+.art .ntf .ic{width:10cqmin; height:10cqmin; flex:none; border-radius:2.6cqmin; background:linear-gradient(#EAF1F8,#C9D8EA); padding:1.4cqmin}
+.art .ntf .ic svg{width:100%; height:100%; display:block}
+.art .ntf b{display:block; font:600 4.6cqmin/1.25 var(--sans); color:var(--ink)}
+.art .ntf small{margin-left:auto; align-self:flex-start; font:500 3.4cqmin var(--sans); color:var(--muted)}
+.art .rb{left:7%; bottom:12%; max-width:56%; background:#fff; border-radius:4.4cqmin 4.4cqmin 4.4cqmin 1.4cqmin; padding:3.6cqmin 4cqmin; box-shadow:0 3.3cqmin 8cqmin -3.3cqmin rgba(27,31,36,.45); font:600 4.4cqmin/1.3 var(--sans)}
+.art .rb .bt{display:flex; flex-wrap:wrap; gap:1.8cqmin; margin-top:2.6cqmin}
+.art .rb .bt span{font:600 3.5cqmin/1 var(--sans); padding:2cqmin 2.8cqmin; border-radius:99px; background:var(--soft); box-shadow:inset 0 0 0 1px #E6E6E6}
+.art .rb .bt span:first-child{background:var(--ink); color:#fff; box-shadow:none}
+.a7 .dr{width:30cqmin; right:6%; bottom:5%}
+/* 8 usage */
+.a8{background:linear-gradient(180deg,#F3F5FA,#E2E7F2)}
+.art .ut{top:8%; width:40%; background:#fff; border-radius:3.6cqmin; padding:3.4cqmin 3.8cqmin; box-shadow:0 2.6cqmin 6cqmin -3cqmin rgba(27,31,36,.35)}
+.art .ut small{display:block; font:600 3.1cqmin/1.2 var(--sans); color:var(--muted); text-transform:uppercase; letter-spacing:.04em}
+.art .ut b{display:block; font:600 8cqmin/1.15 var(--display); color:var(--ink); margin-top:1cqmin}
+.art .hm{left:7%; right:7%; bottom:8%; background:#fff; border-radius:3.6cqmin; padding:3.4cqmin 3.8cqmin; box-shadow:0 2.6cqmin 6cqmin -3cqmin rgba(27,31,36,.35)}
+.art .hm small{display:block; font:600 3.1cqmin/1.2 var(--sans); color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:2cqmin}
+.art .hm .g{display:grid; grid-template-columns:repeat(18,1fr); gap:.9cqmin}
+.art .hm .g i{display:block; aspect-ratio:1; border-radius:.8cqmin; background:var(--blue); opacity:var(--o,.08)}
+/* 9 offer a connector */
+.a9{background:linear-gradient(180deg,#F2F4FF,#E0E6FF)}
+.art .ofc{right:6%; bottom:9%; width:min(56%,108cqmin); display:flex; align-items:center; gap:3.6cqmin; background:#fff; border-radius:4cqmin; padding:3.8cqmin 4.2cqmin; box-shadow:0 3.3cqmin 8cqmin -3.3cqmin rgba(27,31,36,.5); transform:rotate(-1.5deg)}
+.art .ofc svg{width:9cqmin; height:9cqmin; flex:none; display:block}
+.art .ofc div{flex:1; min-width:0; font:500 3.6cqmin/1.35 var(--sans); color:var(--muted)}
+.art .ofc b{display:block; font:600 4.8cqmin/1.2 var(--sans); color:var(--ink)}
+.art .ofc .sw{position:relative; width:11cqmin; height:6.4cqmin; flex:none; border-radius:99px; background:#D6D6D6; animation:lpSw 7s infinite}
+.art .ofc .sw::after{content:""; position:absolute; left:.8cqmin; top:.8cqmin; width:4.8cqmin; height:4.8cqmin; border-radius:50%; background:#fff; box-shadow:0 .4cqmin 1cqmin rgba(0,0,0,.25); animation:lpKnob 7s infinite}
+@keyframes lpSw{0%,52%{background:#D6D6D6} 56%,100%{background:#34C759}}
+@keyframes lpKnob{0%,52%{translate:0 0} 56%,100%{translate:4.6cqmin 0}}
+
 /* ---------- works with: orbit ---------- */
 .wwith{display:grid; grid-template-columns:1fr 1.05fr; gap:48px; align-items:center}
 .wwith h2{font:500 clamp(32px,3.6vw,44px)/1.08 var(--display); letter-spacing:-.035em; margin:10px 0 14px; color:var(--ink)}
@@ -683,7 +850,7 @@ section{padding:120px 0 0}
 .founder .sig{font:600 34px/1 "Caveat", var(--display); color:var(--ink); margin-top:10px; rotate:-2deg; width:max-content}
 @media (max-width:560px){ .founder{grid-template-columns:1fr; padding:22px; gap:14px} }
 
-/* ---------- faq + closer + footer ---------- */
+/* ---------- faq + buddy wall ---------- */
 .faq{max-width:820px; border-top:1px solid var(--line)}
 .faq details{border-bottom:1px solid var(--line); padding:20px 0}
 .faq summary{cursor:pointer; list-style:none; font:500 17px/1.35 var(--sans); color:var(--ink); display:flex; justify-content:space-between; gap:16px}
@@ -691,17 +858,33 @@ section{padding:120px 0 0}
 .faq summary::after{content:"+"; font:300 22px/1 var(--sans); color:var(--muted); transition:transform .2s}
 .faq details[open] summary::after{transform:rotate(45deg)}
 .faq details p{margin:10px 0 0; color:#6B6B6B; max-width:680px}
-.closer{margin-top:130px; padding:96px 0 88px; background:var(--soft); border-top:1px solid var(--line); text-align:center}
-.closer h2{font:500 clamp(36px,4.6vw,56px)/1.05 var(--display); letter-spacing:-.04em; margin:18px 0 30px; color:var(--ink)}
-.closer h2 span{color:#A3A3A3}
-.cdroid{position:relative; width:130px; margin:0 auto; cursor:pointer}
-.cdroid .bub{position:absolute; bottom:100%; left:50%; transform:translate(-50%,6px) scale(.9); opacity:0; transition:.25s cubic-bezier(.3,1.5,.5,1); background:var(--ink); color:#fff; font:600 12.5px var(--sans); padding:7px 11px; border-radius:11px; white-space:nowrap; pointer-events:none}
-.cdroid .bub.show{opacity:1; transform:translate(-50%,-4px)}
-footer{border-top:1px solid var(--line); background:var(--soft); padding:24px 0 36px; font-size:13.5px; color:var(--muted)}
-footer .wrap{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px}
-footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--ink)}
-.flinks{display:flex; gap:18px; align-items:center; flex-wrap:wrap}
-@media (max-width:900px){ footer{padding:22px 0 calc(30px + env(safe-area-inset-bottom))} footer .wrap{flex-direction:column; text-align:center; gap:10px; padding:0 20px} .flinks{justify-content:center} footer .mono{display:none} }
+/* The buddy wall: every buddy, every color, every mood. Tap one and it hops; its neighbors catch the joy. */
+.bwall{position:relative; margin:130px 16px calc(16px + env(safe-area-inset-bottom)); height:clamp(540px,66vh,660px); border-radius:28px; overflow:hidden; background:#101114; isolation:isolate; text-align:center; color:#fff}
+.bwall::before{content:""; position:absolute; inset:0; z-index:0; background:radial-gradient(60% 70% at 15% 20%, rgba(61,107,255,.22), transparent 70%), radial-gradient(50% 60% at 85% 80%, rgba(255,79,163,.16), transparent 70%), radial-gradient(40% 50% at 70% 10%, rgba(31,196,142,.12), transparent 70%)}
+.bwall::after{content:""; position:absolute; inset:0; z-index:3; pointer-events:none; border-radius:inherit; box-shadow:inset 0 0 90px 30px rgba(10,11,13,.85)}
+.wall-grid{position:absolute; inset:0; z-index:1}
+.wb{position:absolute; cursor:pointer; transform:rotate(var(--r)) scale(var(--s)); transition:transform .25s cubic-bezier(.3,1.6,.5,1), filter .25s; -webkit-tap-highlight-color:transparent; touch-action:manipulation}
+.wb .av{display:block; --fx:#E8EAED}
+.wb.hov{transform:rotate(0deg) scale(calc(var(--s) * 1.12)); z-index:2; filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}
+.wb.jump{animation:wb-jump .7s cubic-bezier(.3,1.4,.5,1)}
+.wb.dizzy{animation:wb-spin .8s cubic-bezier(.4,1.6,.5,1)}
+.wb .av[data-mood="idle"] .bob{animation-delay:var(--d); animation-duration:var(--bd)}
+.wb .av .eyes-open{animation-delay:var(--e)}
+.wb .av .shadow{display:none}
+@keyframes wb-jump{0%{transform:rotate(var(--r)) scale(var(--s))} 18%{transform:rotate(var(--r)) scale(calc(var(--s)*1.12), calc(var(--s)*.86))} 50%{transform:rotate(0deg) translateY(-26%) scale(calc(var(--s)*1.08))} 78%{transform:rotate(var(--r)) translateY(0) scale(calc(var(--s)*1.04), calc(var(--s)*.95))} 100%{transform:rotate(var(--r)) scale(var(--s))}}
+@keyframes wb-spin{0%{transform:rotate(var(--r)) scale(var(--s))} 60%{transform:rotate(calc(var(--r) + 380deg)) scale(calc(var(--s)*1.1))} 100%{transform:rotate(calc(var(--r) + 360deg)) scale(var(--s))}}
+.wpop{position:absolute; z-index:4; pointer-events:none; translate:-50% -100%; background:#fff; color:var(--ink); font:600 12px/1 var(--sans); padding:7px 10px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,.3); white-space:nowrap; animation:wpop 1.3s cubic-bezier(.3,1.5,.5,1) forwards}
+@keyframes wpop{0%{opacity:0; transform:translateY(8px) scale(.6)} 18%{opacity:1; transform:translateY(0) scale(1)} 75%{opacity:1; transform:translateY(-10px)} 100%{opacity:0; transform:translateY(-18px)}}
+.wall-veil{position:absolute; inset:0; z-index:2; pointer-events:none; background:radial-gradient(closest-side, rgba(16,17,20,.95) 0%, rgba(16,17,20,.86) 58%, rgba(16,17,20,0) 100%) center/min(1000px,110%) 100% no-repeat; -webkit-backdrop-filter:blur(9px); backdrop-filter:blur(9px); -webkit-mask-image:radial-gradient(closest-side, #000 58%, transparent 100%); mask-image:radial-gradient(closest-side, #000 58%, transparent 100%); -webkit-mask-size:min(1000px,110%) 100%; mask-size:min(1000px,110%) 100%; -webkit-mask-position:center; mask-position:center; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat}
+.wall-in{position:relative; z-index:4; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 20px; pointer-events:none}
+.wall-in > *, .bwall .dlwrap > *{pointer-events:none} .bwall .inst{pointer-events:auto}
+.bwall h2{font:500 clamp(34px,4.6vw,56px)/1.05 var(--display); letter-spacing:-.04em; margin:0 0 28px; color:#fff; text-shadow:0 2px 24px rgba(0,0,0,.5)}
+.bwall h2 span{color:rgba(255,255,255,.55)}
+.bwall .dlwrap{max-width:560px}
+.bwall .inst{background:rgba(255,255,255,.97); box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.bwall .req{color:rgba(255,255,255,.7); text-shadow:0 1px 8px rgba(0,0,0,.8)}
+@media (max-width:600px){ .bwall{margin:90px 10px 10px; height:600px; border-radius:22px} .wall-veil{background-size:130% 92%; -webkit-mask-size:130% 92%; mask-size:130% 92%} }
+@media (prefers-reduced-motion:reduce){ .wb, .wb .av *{animation:none !important; transition:none !important} }
 
 .belt{overflow:hidden}
 @media (max-width:700px){ .cchip{font-size:11px; padding:6px 9px 6px 6px} }
@@ -721,14 +904,11 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
 <!-- ============ NAV ============ -->
 <nav class="top">
   <div class="bar">
-    <a class="brand" href="#top" aria-label="bleep, back to top"><span data-droid="head"></span><em class="wm">bleep</em></a>
+    <a class="brand" href="#top" aria-label="bleep, back to top"><span class="btile"><span data-bud="head"></span></span><em class="wm">bleep</em></a>
     <div class="links">
-      <a href="#demo">Demo</a><a href="#cases">Features</a><a href="#private">Privacy</a><a href="#faq">FAQ</a>
+      <a href="#demo">demo</a><a href="#cases">features</a><a href="#private">privacy</a><a href="#faq">faq</a>
     </div>
-    <div class="right">
-      <a class="btn sm ghost" href="https://github.com/AviroopPaul/bleep-releases/releases" target="_blank" rel="noopener">Releases</a>
-      <a class="btn sm primary" href="#download">Install</a>
-    </div>
+    <a class="npill" href="https://github.com/AviroopPaul/bleep" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>github</span></a>
   </div>
 </nav>
 
@@ -737,20 +917,23 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
 <div class="wrap">
   <header class="hero">
     <div class="htop">
-      <h1 class="rv">Your agents, unblocked.<br><span>Your inbox, handled.</span></h1>
-      <p class="lede rv">A little droid on your Mac. It clears the small asks from your coding agents, mail and calendar, and taps you only when it matters.</p>
-      <div class="hcta rv">
-        <a class="btn primary" href="#demo">Watch the demo</a>
-        <a class="btn ghost" href="#cases">See what it does</a>
-      </div>
-      <div class="hinst rv" id="install">
-        <div class="inst line" data-inst>
-          <div class="icmd">
-            <span class="iprompt" aria-hidden="true">$</span><code data-cmd="brew">brew install --cask AviroopPaul/tap/bleep</code><code data-cmd="curl" hidden>curl -fsSL https://bleep-omega.vercel.app/install.sh | sh</code>
-            <button class="icopy" type="button">Copy</button>
+      <p class="avail rv">available on <span><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>macOS</span><i aria-hidden="true">·</i><span>Apple silicon</span></p>
+      <h1 class="meet rv">Meet <span class="bud mbud" data-bud="face" title="Your buddy. Pick another one below."></span> bleep</h1>
+      <p class="lede rv">A little buddy for the <span class="nw"><span class="hchip"><i data-icon="cc"></i>Claude Code</span>,</span> <span class="nw"><span class="hchip"><i data-icon="gm"></i>Gmail</span> and</span> <span class="hchip"><i data-icon="ca"></i>Calendar</span> you already use. It clears the small asks and taps you only when it matters.</p>
+      <div class="hcta rv" id="install">
+        <div class="split" id="hsplit">
+          <button class="sp-main" type="button" id="hCopy" data-cmd="brew install --cask AviroopPaul/tap/bleep"><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg><span>Install for free</span></button>
+          <button class="sp-more" type="button" id="hMore" aria-haspopup="true" aria-expanded="false" aria-controls="hMenu" aria-label="More ways to install"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="sp-menu" id="hMenu" hidden>
+            <p>Paste one in Terminal</p>
+            <button type="button" class="sp-row" data-cmd="brew install --cask AviroopPaul/tap/bleep"><b>Homebrew</b><code>brew install --cask AviroopPaul/tap/bleep</code><em>Copy</em></button>
+            <button type="button" class="sp-row" data-cmd="curl -fsSL https://bleep-omega.vercel.app/install.sh | sh"><b>curl</b><code>curl -fsSL https://bleep-omega.vercel.app/install.sh | sh</code><em>Copy</em></button>
+            <a class="sp-row link" href="https://github.com/AviroopPaul/bleep-releases/releases" target="_blank" rel="noopener"><b>All releases</b><em>Open</em></a>
           </div>
         </div>
-        <p class="req">Free · Apple silicon · macOS 15+ · needs Claude Code</p>
+        <a class="btn soft gh" id="ghStar" href="https://github.com/AviroopPaul/bleep" target="_blank" rel="noopener"><svg class="ghm" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>Star on GitHub</span><span class="ghn" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.81 4.2.61a.75.75 0 0 1 .42 1.28l-3.04 2.97.72 4.19a.75.75 0 0 1-1.09.79L8 12.34l-3.76 1.98a.75.75 0 0 1-1.09-.79l.72-4.19L.83 6.37a.75.75 0 0 1 .42-1.28l4.2-.61L7.33.67A.75.75 0 0 1 8 .25z"/></svg><b></b></span></a>
+      </div>
+      <p class="hfoot rv" id="hNote" aria-live="polite">Free. Needs Claude Code and macOS 15 or later.</p>
       </div>
     </div>
     <div class="hfit" data-fit-all="1132">
@@ -770,7 +953,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
           <div class="opt">&nbsp; 3. No, and tell Claude what to do differently</div>
         </div>
         <div class="out">⎿ <em>42 passed</em>, 0 failed (3.1s)</div>
-        <div class="by"><span data-droid="head"></span>Approved by bleep. Tests are safe.</div>
+        <div class="by"><span data-bud="head"></span>Approved by bleep. Tests are safe.</div>
         <p class="nx"><b>✻</b> Fixing the mobile nav… <i>(esc to interrupt)</i></p>
       </div>
       <div class="htile"><span data-icon="cc"></span><i class="bd">1</i></div>
@@ -796,11 +979,11 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
       <em class="stamp">saved</em>
     </div>
         <div class="hpad" id="hpad"></div>
-    <div class="hfly" id="heroFly"><div class="droid" id="heroDroid" data-droid="full" title="Tap me"></div><div class="hero-bubble" id="heroBubble" aria-live="polite"></div></div>
+    <div class="hfly" id="heroFly"><div class="bud" id="heroDroid" data-bud="full" title="Tap me"></div><div class="hero-bubble" id="heroBubble" aria-live="polite"></div></div>
       </div>
     </div>
     <div class="hphone" aria-hidden="true">
-      <div class="droid" data-droid="full"></div>
+      <div class="bud" data-bud="full"></div>
       <div class="hpn glass">
         <div class="hpr"><span class="src cc" data-icon="cc"></span><div><b>npm test, approved</b><small>bleep · 42 passed</small></div><em>done</em></div>
         <div class="hpr"><span class="src ca" data-icon="ca"></span><div><b>Design review</b><small>prep is ready</small></div><em class="c">in 60 min</em></div>
@@ -842,7 +1025,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
           </svg>
         </div>
         <div class="menubar">
-          <div class="l"><span class="mbdroid" data-droid="head"></span><b>bleep</b><span>File</span><span>View</span></div>
+          <div class="l"><span class="mbdroid" data-tray></span><b>bleep</b><span>File</span><span>View</span></div>
           <div class="r"><span class="mono" style="font-size:12px">⌥⌥ to summon</span><span id="clock">Thu 8:58 AM</span></div>
         </div>
 
@@ -876,7 +1059,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
         <!-- Chat window: one continuous chat -->
         <div class="win chat open" id="chat">
           <div class="tb" data-drag="chat"><span class="lights"><i></i><i></i><i></i></span>
-            <span class="ttl"><span style="width:18px;display:inline-block" data-droid="head"></span>bleep</span>
+            <span class="ttl"><span style="width:18px;display:inline-block" data-bud="head"></span>bleep</span>
             <button class="iconbtn" id="hideDroid" title="Hide bleep">↘</button>
           </div>
           <div class="log" id="log" aria-live="polite"></div>
@@ -886,7 +1069,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
           <form class="composer" id="composer"><input id="inp" placeholder="Ask bleep anything" autocomplete="off"><button>Send</button></form>
         </div>
 
-        <div class="droid ddroid" id="ddroid" data-droid="full"><div class="bub" id="dbub">bleep!</div></div>
+        <div class="bud ddroid" id="ddroid" data-bud="full"><div class="bub" id="dbub">bleep!</div></div>
         <button class="peek" id="peek" title="Bring bleep back"><i></i></button>
         <div class="dock" id="dock">
           <button class="app" data-app="files"><span class="lbl">Files</span><span class="ico"><svg viewBox="0 0 48 48"><rect width="48" height="48" fill="#5AA8F0"/><path d="M9 16a3 3 0 0 1 3-3h8.5l3 3H36a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3z" fill="#fff"/><path d="M9 20.5h30" stroke="#5AA8F0" stroke-width="1.6"/></svg></span></button>
@@ -896,7 +1079,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
           <button class="app" data-app="notes"><span class="lbl">Notes</span><span class="ico"><svg viewBox="0 0 48 48"><rect width="48" height="48" fill="#FFFDF4"/><rect width="48" height="13" fill="#F5C842"/><path d="M10 22h28M10 28h28M10 34h20" stroke="#D9D2BC" stroke-width="2" stroke-linecap="round"/></svg></span></button>
           <button class="app" data-app="term"><span class="lbl">Terminal</span><span class="ico"><svg viewBox="0 0 48 48"><rect width="48" height="48" fill="#1F2227"/><path d="M12 17l7 6-7 6" fill="none" stroke="#7FD18A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 31h12" stroke="#E4E6EA" stroke-width="3" stroke-linecap="round"/></svg></span></button>
           <span class="sep"></span>
-          <button class="app run" data-app="bleep"><span class="lbl">bleep</span><span class="ico bl" data-droid="head"></span></button>
+          <button class="app run" data-app="bleep"><span class="lbl">bleep</span><span class="ico bl" data-bud="head"></span></button>
           <button class="app" data-app="trash"><span class="lbl">Trash</span><span class="ico" style="background:rgba(255,255,255,.35);box-shadow:none"><svg viewBox="0 0 48 48"><path d="M15 15h18l-1.6 22a2.5 2.5 0 0 1-2.5 2.3H19.1a2.5 2.5 0 0 1-2.5-2.3z" fill="rgba(255,255,255,.75)" stroke="rgba(27,31,36,.45)" stroke-width="1.4"/><path d="M13 14.5h22" stroke="rgba(27,31,36,.5)" stroke-width="2" stroke-linecap="round"/><path d="M20.5 19v15M24 19v15M27.5 19v15" stroke="rgba(27,31,36,.25)" stroke-width="1.2"/></svg></span></button>
         </div>
       </div>
@@ -916,7 +1099,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
       <div class="scount" aria-live="polite"><span class="h"><b id="stH">0</b>handled</span><span><b id="stM">0</b>muted</span></div>
       <div class="ssrc" id="stSrc" aria-hidden="true"><span><span class="src cc" data-icon="cc"></span>Claude Code</span><span><span class="src cx" data-icon="cx"></span>Codex</span><span><span class="src gm" data-icon="gm"></span>Gmail</span><span><span class="src ca" data-icon="ca"></span>Calendar</span></div>
       <div class="halo" aria-hidden="true"></div>
-      <div class="droid sdr" id="stDroid" data-droid="full"></div>
+      <div class="bud sdr" id="stDroid" data-bud="full"></div>
       <div class="stray glass"><h4><i></i>Needs you<small id="stY">0</small></h4><div class="slots" id="stSlots"><div class="slot empty">nothing yet</div></div></div>
       <button class="btn ghost sm sreplay" id="stReplay" type="button">↻ Replay</button>
     </div>
@@ -936,7 +1119,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
           <div class="stk lp" style="left:14%;top:39%;transform:rotate(2deg);--d:1s"><span class="ck">✓</span>screenshot · matches the ask</div>
           <div class="stk dark lp shake" style="left:7%;bottom:12%;transform:rotate(-3deg);--d:1.6s"><span class="ck">!</span>git push --force</div>
           <div class="stk dark lp" style="left:43%;bottom:22%;transform:rotate(3deg);--d:2.1s"><span class="ck">?</span>Neon or Supabase?</div>
-          <div class="dr droid" data-droid="full" style="right:6%;bottom:5%"></div>
+          <div class="dr bud" data-bud="full" style="right:6%;bottom:5%"></div>
         </div>
         <figcaption><b>Unblocks your coding agents</b><span>Approves the safe asks in Claude Code and Codex. Saves the risky ones for you.</span><button class="go" type="button" data-scene="agents">See it in the demo →</button></figcaption>
       </figure>
@@ -972,9 +1155,46 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
           <div class="note y lp" style="left:8%;top:9%;transform:rotate(-6deg)">pays bills the evening they are due</div>
           <div class="note p lp" style="right:8%;top:16%;transform:rotate(5deg);--d:.7s">likes prep 1 hour before</div>
           <div class="note b lp" style="left:12%;bottom:9%;transform:rotate(3deg);--d:1.4s">"Sync" = 1:1 with Priya</div>
-          <div class="dr droid" data-droid="full"></div>
+          <div class="dr bud" data-bud="full"></div>
         </div>
         <figcaption><b>Learns how you work</b><span>Plain notes you can read, edit or wipe.</span><button class="go" type="button" data-scene="memory">See it in the demo →</button></figcaption>
+      </figure>
+
+      <figure class="tile glass wide rv">
+        <div class="art a6" aria-hidden="true">
+          <div class="tm lp"><div><b>$</b> grep -ri "offsite" ~/Documents</div><div class="hit">notes/team.md: <em>offsite on 4 to 6 Dec</em></div><div class="hit">notes/todo.txt: <em>book the offsite cab</em></div><div><b>$</b> ls ~/Downloads/*.pdf</div><div>bill.pdf  ticket.pdf  lease.pdf</div></div>
+          <div class="pdf lp" style="--d:.9s"><span class="tag">PDF</span><b>Electricity bill</b><i style="width:80%"></i><i style="width:60%"></i>Due by 14 Dec 2026<br><mark>Amount due: 1,240 INR</mark></div>
+          <div class="ask lp" style="--d:1.8s">Run this command?<code>du -sh ~/Downloads</code><div class="bt"><span>Approve</span><span>Deny</span></div></div>
+        </div>
+        <figcaption><b>Reads the files on your Mac</b><span>Lists, finds, greps and reads files and PDFs in Documents, Desktop and Downloads. A command always asks you first.</span></figcaption>
+      </figure>
+
+      <figure class="tile glass rv">
+        <div class="art a7" aria-hidden="true">
+          <div class="ntf lp"><span class="ic" data-bud="head"></span><span><b>Call mom</b>Reminder from bleep</span><small>7:00 PM</small></div>
+          <div class="rb lp" style="--d:1s">Stretch for 2 minutes<div class="bt"><span>Done</span><span>Snooze 10 min</span></div></div>
+          <div class="dr bud" data-bud="full"></div>
+        </div>
+        <figcaption><b>Reminds you on time</b><span>Say "remind me at 7 to call mom". A bubble and a Mac notification show up right on time.</span></figcaption>
+      </figure>
+
+      <figure class="tile glass rv">
+        <div class="art a8" aria-hidden="true">
+          <div class="ut lp" style="left:7%"><small>Model calls</small><b>128</b></div>
+          <div class="ut lp" style="right:7%;--d:.4s"><small>Tokens</small><b>412k</b></div>
+          <div class="hm lp" style="--d:.9s"><small>When bleep works</small><div class="g" id="usHeat"></div></div>
+        </div>
+        <figcaption><b>Shows what it uses</b><span>Calls, tokens and tools by day and hour. All counted on your Mac.</span></figcaption>
+      </figure>
+
+      <figure class="tile glass wide rv">
+        <div class="art a9" aria-hidden="true">
+          <div class="qb lp" style="right:6%;top:9%">What is on my Linear board?</div>
+          <div class="ab lp" style="left:5%;top:33%;bottom:auto;--d:1s">Linear is off. Turn it on here and ask again.</div>
+          <div class="ofc lp" style="--d:1.8s"><svg viewBox="0 0 24 24"><path fill="#5E6AD2" d="M2.886 4.18A11.982 11.982 0 0 1 11.99 0C18.624 0 24 5.376 24 12.009c0 3.64-1.62 6.903-4.18 9.105L2.887 4.18ZM1.817 5.626l16.556 16.556c-.524.33-1.075.62-1.65.866L.951 7.277c.247-.575.537-1.126.866-1.65ZM.322 9.163l14.515 14.515c-.71.172-1.443.282-2.195.322L0 11.358a12 12 0 0 1 .322-2.195Zm-.17 4.862 9.823 9.824a12.02 12.02 0 0 1-9.824-9.824Z"/></svg><div><b>Linear</b>Issues and projects</div><span class="sw"></span></div>
+          <div class="dr bud" data-bud="full" style="left:6%;bottom:6%;width:26cqmin"></div>
+        </div>
+        <figcaption><b>Offers the right connector</b><span>Ask for something a connector that is off would do. Its card and switch show up right in the chat.</span></figcaption>
       </figure>
 
     </div>
@@ -987,8 +1207,8 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
     <div class="rv">
       <span class="stencil">Works with</span>
       <h2>Plugs into your day.</h2>
-      <p class="lead">Your coding agents, Gmail and Google Calendar are built in. Add any app with a remote MCP server: paste its URL and sign in.</p>
-      <div class="wlist"><span><i data-icon="cc"></i>Claude Code</span><span><i data-icon="cx"></i>Codex</span><span><i class="w" data-icon="gm"></i>Gmail</span><span><i class="w" data-icon="ca"></i>Google Calendar</span><span class="mcp">+ any MCP app</span></div>
+      <p class="lead">Your coding agents, Gmail, Google Calendar, Google Drive and the files on your Mac are built in. Add any app with a remote MCP server: paste its URL and sign in. If you ask for one that is off, bleep offers it in the chat.</p>
+      <div class="wlist"><span><i data-icon="cc"></i>Claude Code</span><span><i data-icon="cx"></i>Codex</span><span><i class="w" data-icon="gm"></i>Gmail</span><span><i class="w" data-icon="ca"></i>Google Calendar</span><span><i class="w" data-icon="dr"></i>Google Drive</span><span><i class="w" data-icon="fi"></i>Files on this Mac</span><span class="mcp">+ any MCP app</span></div>
     </div>
     <div class="orbit rv" aria-hidden="true">
       <div class="rg r2"></div><div class="rg r1"></div>
@@ -1007,7 +1227,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
         <span class="o in" style="--a:135deg"><span data-icon="cx"></span></span>
         <span class="o in" style="--a:225deg"><span data-icon="ca"></span></span>
       </div>
-      <div class="droid ocenter" data-droid="full"></div>
+      <div class="bud ocenter" data-bud="full"></div>
     </div>
   </div>
 </section>
@@ -1021,7 +1241,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
       <div class="belt" id="belt">
         <div class="lane up">approved · logged</div>
         <div class="track"></div>
-        <div class="gate" id="gate"><span data-droid="head"></span></div>
+        <div class="gate" id="gate"><span data-bud="head"></span></div>
         <div class="lane dn">waits for you</div>
       </div>
       <div class="convfoot"><span><b>auto:</b> tests · lint · reads · screenshots that match the ask</span><span><em>always asks:</em> push · deploy · delete · secrets · money · sending mail</span></div>
@@ -1034,6 +1254,29 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
   </div>
 </section>
 
+<!-- ============ BUDDIES ============ -->
+<section id="buddies">
+  <div class="wrap">
+    <div class="sec-head rv"><div><span class="stencil">Make it yours</span><h2>Pick your buddy.</h2><p>Six friends and the classic droid. Pick a color and a finish. Your menu bar icon follows along.</p></div></div>
+    <div class="pick glass rv">
+      <div class="pk-stage">
+        <div class="pk-bar" aria-hidden="true"><span class="pk-tray" data-tray></span><span>Thu 9:41 AM</span></div>
+        <div class="bud pk-big" id="pkBig" data-bud="full"></div>
+        <div class="pk-moods" role="group" aria-label="Mood" id="pkMoods"></div>
+      </div>
+      <div class="pk-side">
+        <h3 id="pkKindH">Buddy <small>Tap to try</small></h3>
+        <div class="pk-kinds" role="radiogroup" aria-labelledby="pkKindH" id="pkKinds"></div>
+        <h3 id="pkColH">Color</h3>
+        <div class="pk-colors" role="radiogroup" aria-labelledby="pkColH" id="pkColors"></div>
+        <h3 id="pkFinH">Finish</h3>
+        <div class="pk-fins" role="radiogroup" aria-labelledby="pkFinH" id="pkFins"></div>
+        <p class="pk-note" id="pkNote" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ MAKER ============ -->
 <section id="maker">
   <div class="wrap">
@@ -1042,7 +1285,7 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
       <div>
         <span class="stencil">Why I built it</span>
         <p>I run a few Claude Code and Codex sessions at once. Half of them sat idle, waiting for me to type yes to <code>npm test</code>. Meanwhile a bill was due and a meeting started in ten minutes.</p>
-        <p>So I built a small droid that watches all of it and taps me only when it matters. I use it every day.</p>
+        <p>So I built a small buddy that watches all of it and taps me only when it matters. I use it every day.</p>
         <div class="sig">Aviroop</div>
       </div>
     </figure>
@@ -1059,45 +1302,43 @@ footer a{color:var(--ink-2); text-decoration:none} footer a:hover{color:var(--in
       <details><summary>Is it free?</summary><p>Yes. bleep thinks with your own Claude plan through Claude Code, so its model use counts toward that plan.</p></details>
       <details><summary>What data leaves my Mac?</summary><p>Your mail, calendar and memory stay on your Mac. When bleep needs to think, it sends only the text it needs to Claude, through Claude Code. There is no bleep server.</p></details>
       <details><summary>Can it approve things in Claude Code or Codex?</summary><p>Only what your rules allow. Out of the box: tests, lint, file reads, and screenshots it can check against the ask. Push, deploy, delete, secrets and money always wait for you. Every approval is logged.</p></details>
+      <details><summary>Can it remind me of things?</summary><p>Yes. Say "remind me at 7 to call mom" in the chat, or add one in the Reminders tab. It shows a bubble and a Mac notification on time, even in quiet hours.</p></details>
       <details><summary>Can it send email as me?</summary><p>Only after you tap yes on the exact message. Sending, moving events and deleting always ask first.</p></details>
       <details><summary>Will it ping me all day?</summary><p>No. Rules filter the noise first. It has quiet hours and a limit on pings per hour. Most checks end with it saying nothing.</p></details>
-      <details><summary>What can it connect to?</summary><p>Gmail and Google Calendar are built in. Add any app with a remote MCP server: paste its URL in Settings and sign in.</p></details>
+      <details><summary>What can it connect to?</summary><p>Gmail, Google Calendar, Google Drive and the files on your Mac are built in. Turn each one on in Settings, Connectors. Add any app with a remote MCP server: paste its URL and sign in.</p></details>
+      <details><summary>Can it read files on my Mac?</summary><p>Only if you turn on Files on this Mac. It reads Documents, Desktop and Downloads, including the text in PDFs. It skips hidden files and keys. Before it runs any command, it shows you the exact command and waits for your yes.</p></details>
+      <details><summary>Can I change how bleep looks?</summary><p>Yes. Open Settings, then Avatar. Pick a buddy, a color and a finish. The menu bar icon changes to match.</p></details>
       <details><summary>How do I uninstall it?</summary><p>Run <code>brew uninstall --cask bleep</code>, or drag bleep from Applications to the Trash. Delete <code>~/.bleep</code> to remove its memory and settings.</p></details>
     </div>
   </div>
 </section>
 
-<div class="closer">
-<div class="wrap rv">
-  <div class="droid cdroid" id="closeDroid" data-droid="full" title="Tap me"><div class="bub" id="closeBub">bleep!</div></div>
-  <h2>Go do the real work.<br><span>bleep will tap you.</span></h2>
-  <div id="download" class="dlwrap">
-    <div class="inst" data-inst>
-          <div class="itabs" role="tablist" aria-label="How to install bleep">
-            <button type="button" role="tab" id="tab-brew-2" aria-controls="pane-2" aria-selected="true" data-tab="brew">Homebrew</button>
-            <button type="button" role="tab" id="tab-curl-2" aria-controls="pane-2" aria-selected="false" tabindex="-1" data-tab="curl">curl</button>
-          </div>
-          <div class="icmd" role="tabpanel" id="pane-2" aria-labelledby="tab-brew-2">
-            <span class="iprompt" aria-hidden="true">$</span><code data-cmd="brew">brew install --cask AviroopPaul/tap/bleep</code><code data-cmd="curl" hidden>curl -fsSL https://bleep-omega.vercel.app/install.sh | sh</code>
-            <button class="icopy" type="button">Copy</button>
-          </div>
+<section class="bwall" id="download" aria-labelledby="wall-h">
+  <div class="wall-grid" id="wallGrid" aria-hidden="true"></div>
+  <div class="wall-veil" aria-hidden="true"></div>
+  <div class="wall-in">
+    <h2 id="wall-h">Go do the real work.<br><span>bleep will tap you.</span></h2>
+    <div class="dlwrap">
+      <div class="inst" data-inst>
+        <div class="itabs" role="tablist" aria-label="How to install bleep">
+          <button type="button" role="tab" id="tab-brew-2" aria-controls="pane-2" aria-selected="true" data-tab="brew">Homebrew</button>
+          <button type="button" role="tab" id="tab-curl-2" aria-controls="pane-2" aria-selected="false" tabindex="-1" data-tab="curl">curl</button>
         </div>
-    <p class="req">Free · Apple silicon · macOS 15+ · needs Claude Code</p>
+        <div class="icmd" role="tabpanel" id="pane-2" aria-labelledby="tab-brew-2">
+          <span class="iprompt" aria-hidden="true">$</span><code data-cmd="brew">brew install --cask AviroopPaul/tap/bleep</code><code data-cmd="curl" hidden>curl -fsSL https://bleep-omega.vercel.app/install.sh | sh</code>
+          <button class="icopy" type="button">Copy</button>
+        </div>
+      </div>
+      <p class="req">Free · Apple silicon · macOS 15+ · needs Claude Code</p>
+    </div>
   </div>
-</div>
-</div>
+</section>
 </main>
 
-<footer>
-  <div class="wrap">
-    <span>bleep · a personal project by <a href="https://avirooppaul.site" target="_blank" rel="noopener">Aviroop Paul</a></span>
-    <span class="flinks"><a href="https://github.com/AviroopPaul/bleep-releases/releases" target="_blank" rel="noopener">Releases</a><a href="https://github.com/AviroopPaul/homebrew-tap" target="_blank" rel="noopener">Homebrew tap</a><span class="mono">double-tap ⌥ on this page</span></span>
-  </div>
-</footer>
 
-<div id="summon"><div class="veil"></div><div class="droid sdroid" data-droid="full"></div></div>
+<div id="summon"><div class="veil"></div><div class="bud sdroid" data-bud="full"></div></div>
 <div class="toast glass" id="toast">Try it: double-tap <kbd>⌥</kbd> on this page to summon bleep. <button class="iconbtn" id="toastX">✕</button></div>
-<button class="fab glass" id="fab" aria-label="Summon bleep"><span class="droid" data-droid="head" style="width:36px"></span></button>
+<button class="fab glass" id="fab" aria-label="Summon bleep"><span data-bud="head" style="width:36px;display:block"></span></button>
 
 <script>
 /* ================= droid art (original design) ================= */
@@ -1142,13 +1383,203 @@ const DROID_HEAD = `
   <path d="M27 49 A38 37 0 0 1 93 49" fill="none" stroke="#2F5C93" stroke-width="5.5" stroke-linecap="round"/>
   <circle cx="60" cy="40" r="15" fill="#1B1F24"/><circle cx="60" cy="40" r="9.5" fill="#2F5C93"/><circle cx="56" cy="36" r="3" fill="#fff"/>
 </svg>`;
-document.querySelectorAll('[data-droid]').forEach(el => {
-  el.insertAdjacentHTML('afterbegin', el.dataset.droid === 'head' ? DROID_HEAD : DROID_FULL);
-});
+/* ================= buddies (ported from app/src/avatar/avatars.ts; keep in step) ================= */
+const INK = '#1B1F24';
+const PALETTE = [['Blue', '#3D6BFF'], ['Violet', '#8B5CF6'], ['Pink', '#FF4FA3'], ['Coral', '#FF6B4A'], ['Sun', '#FFB020'], ['Mint', '#1FC48E'], ['Sky', '#38BDF8']];
+const FINISHES = [['flat', 'Flat'], ['glossy', 'Glossy'], ['plush', 'Plush']];
+const BUDDIES = [
+  { id: 'blip', name: 'Blip', color: '#3D6BFF', eye: '#fff', top: 28, face: { x: 60, y: 58, s: 11, w: 8, h: 14 },
+    hl: '<ellipse cx="41" cy="42" rx="9" ry="4.5" transform="rotate(-35 41 42)" fill="#fff" opacity=".45"/>',
+    body: p => `<path d="M50 28 H70 A26 26 0 0 1 96 54 V64 A26 26 0 0 1 70 90 H57 L41 103 L43 88 A26 26 0 0 1 24 64 V54 A26 26 0 0 1 50 28 Z" fill="${p}"/>` },
+  { id: 'gumdrop', name: 'Gumdrop', color: '#1FC48E', eye: INK, top: 26, face: { x: 60, y: 78, s: 10, w: 6.5, h: 9, cheeks: true },
+    hl: '<ellipse cx="50" cy="52" rx="6" ry="3.5" transform="rotate(-55 50 52)" fill="#fff" opacity=".45"/>',
+    body: p => `<path d="M60 26 C71 26 100 72 99 88 C98 101 84 106 60 106 C36 106 22 101 21 88 C20 72 49 26 60 26 Z" fill="${p}"/>` },
+  { id: 'sprout', name: 'Sprout', color: '#FF6B4A', eye: INK, top: 12, face: { x: 60, y: 74, s: 12, w: 7, h: 10, cheeks: true },
+    hl: '<ellipse cx="43" cy="54" rx="7" ry="4" transform="rotate(-50 43 54)" fill="#fff" opacity=".45"/>',
+    extra: '<g class="leaf"><path d="M60 38 V24" stroke="#1E9E5A" stroke-width="3.4" stroke-linecap="round"/><path d="M60 25 C53 12 41 13 37 19 C43 27 53 28 60 25Z" fill="#2FBF71"/><path d="M60 23 C65 8 80 7 85 13 C80 23 68 26 60 23Z" fill="#3BD07F"/></g>',
+    body: p => `<path d="M60 36 C84 36 96 56 96 76 C96 96 80 106 60 106 C40 106 24 96 24 76 C24 56 36 36 60 36Z" fill="${p}"/>` },
+  { id: 'boop', name: 'Boop', color: '#8B5CF6', top: 16, pixel: true },
+  { id: 'puff', name: 'Puff', color: '#38BDF8', eye: INK, top: 33, face: { x: 60, y: 80, s: 12, w: 7, h: 9.5, cheeks: true },
+    hl: '<ellipse cx="52" cy="44" rx="9" ry="4.5" transform="rotate(-20 52 44)" fill="#fff" opacity=".5"/>',
+    body: p => `<g fill="${p}"><circle cx="41" cy="74" r="20"/><circle cx="62" cy="58" r="25"/><circle cx="85" cy="71" r="18"/><rect x="24" y="70" width="73" height="34" rx="17"/></g>` },
+  { id: 'spark', name: 'Spark', color: '#FFB020', eye: INK, top: 20, face: { x: 60, y: 64, s: 8, w: 5.5, h: 7.5 },
+    hl: '<ellipse cx="53" cy="44" rx="3" ry="6" transform="rotate(20 53 44)" fill="#fff" opacity=".5"/>',
+    body: p => `<path d="M60 20 Q73 50 102 62 Q73 74 60 104 Q47 74 18 62 Q47 50 60 20Z" fill="${p}" stroke="${p}" stroke-width="9" stroke-linejoin="round"/>` },
+  { id: 'droid', name: 'Droid', color: '#2F5C93', top: 0, fixed: true },
+];
+/* The menu bar icons (app/src-tauri/icons/tray/*.svg), drawn in currentColor. */
+const TRAY = {
+  blip: ['16 20 88 90', '<path d="M50 28 H70 A26 26 0 0 1 96 54 V64 A26 26 0 0 1 70 90 H57 L41 103 L43 88 A26 26 0 0 1 24 64 V54 A26 26 0 0 1 50 28 Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><rect x="45" y="50" width="8" height="15" rx="4"/><rect x="67" y="50" width="8" height="15" rx="4"/>'],
+  gumdrop: ['13 18 94 96', '<path d="M60 26 C71 26 100 72 99 88 C98 101 84 106 60 106 C36 106 22 101 21 88 C20 72 49 26 60 26 Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><rect x="45" y="72" width="8" height="12" rx="4"/><rect x="67" y="72" width="8" height="12" rx="4"/>'],
+  sprout: ['16 3 88 111', '<g fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"><path d="M60 36 C84 36 96 56 96 76 C96 96 80 106 60 106 C40 106 24 96 24 76 C24 56 36 36 60 36Z"/><path d="M60 36 V24"/><path d="M60 25 C53 12 41 13 37 19 C43 27 53 28 60 25Z"/><path d="M60 23 C65 8 80 7 85 13 C80 23 68 26 60 23Z"/></g><rect x="44" y="68" width="8" height="12" rx="4"/><rect x="68" y="68" width="8" height="12" rx="4"/>'],
+  boop: ['12 6 96 106', '<path d="M42 40 H78 V46 H90 V52 H96 V64 H102 V82 H96 V94 H90 V100 H30 V94 H24 V82 H18 V64 H24 V52 H30 V46 H42 Z" fill="none" stroke="currentColor" stroke-width="7"/><path d="M60 40 V26" stroke="currentColor" stroke-width="7"/><rect x="50" y="12" width="20" height="14"/><rect x="42" y="58" width="7" height="18"/><rect x="71" y="58" width="7" height="18"/><rect x="30" y="100" width="18" height="8"/><rect x="72" y="100" width="18" height="8"/>'],
+  puff: ['12 24 97 90', '<path d="M41 104 H80 A17 17 0 0 0 97 87 V84.4 A18 18 0 0 0 86.5 53.1 A25 25 0 0 0 37.3 54.4 A20 20 0 0 0 24 84.5 V87 A17 17 0 0 0 41 104 Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><rect x="44" y="73" width="8" height="12" rx="4"/><rect x="68" y="73" width="8" height="12" rx="4"/>'],
+  spark: ['8 10 104 104', '<path d="M60 20 Q73 50 102 62 Q73 74 60 104 Q47 74 18 62 Q47 50 60 20Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><rect x="46.5" y="56" width="9" height="13" rx="4.5"/><rect x="64.5" y="56" width="9" height="13" rx="4.5"/>'],
+};
+const trayIcon = kind => TRAY[kind] ? `<svg viewBox="${TRAY[kind][0]}" fill="currentColor" aria-hidden="true">${TRAY[kind][1]}</svg>` : DROID_HEAD;
+const buddy = kind => BUDDIES.find(b => b.id === kind) || BUDDIES[0];
+const finishOf = c => buddy(c.kind).fixed ? null : buddy(c.kind).pixel ? 'flat' : c.finish;
+/* Switching buddy keeps a color you picked, but swaps a default color for the new buddy's. */
+const switchKind = (c, kind) => ({ ...c, kind, color: c.color.toUpperCase() === buddy(c.kind).color ? buddy(kind).color : c.color });
+function mix(hex, to, t) {
+  const a = parseInt(hex.slice(1), 16), b = parseInt(to.slice(1), 16);
+  return '#' + [16, 8, 0].map(s => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t).toString(16).padStart(2, '0')).join('');
+}
+function face(f, eye) {
+  const { s, w, h } = f, my = h / 2 + 5, dark = eye === INK;
+  const pill = x => `<rect x="${x - w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="${w / 2}" fill="${eye}"/>` + (dark ? `<circle cx="${x - w * .12}" cy="${-h * .2}" r="${w * .24}" fill="#fff"/>` : '');
+  const arc = x => `<path d="M${x - w / 2 - 1} 1.5 Q${x} ${-h / 2 - 3} ${x + w / 2 + 1} 1.5" fill="none" stroke="${eye}" stroke-width="${Math.max(2.4, w * .5)}" stroke-linecap="round"/>`;
+  const cheeks = f.cheeks ? [-1, 1].map(d => `<ellipse cx="${d * (s + w / 2 + 5)}" cy="${h / 2 + 1}" rx="4.6" ry="2.8" fill="#FF6F91" opacity=".5"/>`).join('') : '';
+  return `<g transform="translate(${f.x} ${f.y})"><g class="look"><g class="wide"><g class="eyes-open">${pill(-s)}${pill(s)}</g></g><g class="eyes-happy">${arc(-s)}${arc(s)}</g></g>${cheeks}
+    <g class="mouth" fill="none" stroke="${eye}" stroke-width="2.3" stroke-linecap="round"><path class="m-idle" d="M-4 ${my} Q0 ${my + 3.6} 4 ${my}"/><path class="m-happy" d="M-5.5 ${my - .5} Q0 ${my + 8} 5.5 ${my - .5} Z" fill="${eye}"/><ellipse class="m-alert" cx="0" cy="${my + 2}" rx="2.6" ry="3.3" fill="${eye}" stroke="none"/><path class="m-think" d="M-3 ${my + 1.5} L3.5 ${my}"/><ellipse class="m-listen" cx="0" cy="${my + 1.2}" rx="2.8" ry="2.2" fill="${eye}" stroke="none"/></g></g>`;
+}
+function fx(b) {
+  const t = b.top, fy = b.face ? b.face.y : 64;
+  const spark = (x, y, r) => `<path d="M${x} ${y - r} Q${x + r * .25} ${y - r * .25} ${x + r} ${y} Q${x + r * .25} ${y + r * .25} ${x} ${y + r} Q${x - r * .25} ${y + r * .25} ${x - r} ${y} Q${x - r * .25} ${y - r * .25} ${x} ${y - r}Z" fill="#FFC53D"/>`;
+  return `<g class="fx"><g class="fx-think"><circle cx="86" cy="${t - 2}" r="3.2"/><circle cx="95" cy="${t - 9}" r="3.8"/><circle cx="105" cy="${t - 17}" r="4.4"/></g>
+    <g class="fx-alert"><g><circle cx="96" cy="${t + 2}" r="10" fill="#FF4D4F"/><rect x="94.3" y="${t - 4.5}" width="3.4" height="8.5" rx="1.7" fill="#fff"/><circle cx="96" cy="${t + 7.6}" r="1.9" fill="#fff"/></g></g>
+    <g class="fx-listen"><path d="M14 ${fy - 9} Q8 ${fy} 14 ${fy + 9}"/><path d="M7 ${fy - 15} Q-2 ${fy} 7 ${fy + 15}"/><path d="M106 ${fy - 9} Q112 ${fy} 106 ${fy + 9}"/><path d="M113 ${fy - 15} Q122 ${fy} 113 ${fy + 15}"/></g>
+    <g class="fx-happy">${spark(18, t + 6, 7)}${spark(104, t + 14, 6)}${spark(100, t + 58, 5)}</g></g>`;
+}
+const PX = (cells, ox, oy, p, fill) => `<path shape-rendering="crispEdges" fill="${fill}" d="${cells.map(([x, y]) => `M${ox + x * p} ${oy + y * p}h${p}v${p}h-${p}z`).join('')}"/>`;
+const BOOP = ['..............', '......##......', '....######....', '..##########..', '.############.', '.############.', '##############', '##############', '##############', '.############.', '.############.', '..##########..', '..###....###..']
+  .flatMap((r, y) => [...r].flatMap((ch, x) => ch === '#' ? [[x, y]] : []));
+function boop(color) {
+  const p = 6, ox = 18, oy = 28, W = '#fff';
+  const body = PX(BOOP, ox, oy, p, color) + PX([[6, -1], [7, -1], [5, -2], [6, -2], [7, -2], [8, -2], [5, -3], [6, -3], [7, -3], [8, -3]], ox, oy, p, '#FFC53D') + PX([[6, 0], [7, 0]], ox, oy, p, mix(color, '#000000', .25));
+  const f = `<g class="look"><g class="wide"><g class="eyes-open">${PX([[4, 5], [4, 6], [4, 7], [9, 5], [9, 6], [9, 7]], ox, oy, p, W)}</g></g><g class="eyes-happy">${PX([[3, 7], [4, 6], [5, 7], [8, 7], [9, 6], [10, 7]], ox, oy, p, W)}</g></g>
+    <g class="mouth"><g class="m-happy">${PX([[6, 9], [7, 9]], ox, oy, p, W)}</g><g class="m-alert">${PX([[6, 9], [6, 10], [7, 9], [7, 10]], ox, oy, p, W)}</g></g>${PX([[2, 8], [11, 8]], ox, oy, p, '#FF8FB8')}`;
+  return { body, face: f };
+}
+let uid = 0;
+/* still: the cropped, calm drawing for small spots (no shadow, no mood effects). */
+function avatarSvg(c, still) {
+  const b = buddy(c.kind);
+  if (b.fixed) return still ? DROID_HEAD : DROID_FULL;
+  const id = `av${++uid}`, finish = finishOf(c);
+  let defs = '', paint = c.color, filt = '', hl = '';
+  if (finish === 'glossy') {
+    defs = `<linearGradient id="${id}g" gradientUnits="userSpaceOnUse" x1="0" y1="${b.top}" x2="0" y2="108"><stop offset="0" stop-color="${mix(c.color, '#ffffff', .38)}"/><stop offset=".55" stop-color="${c.color}"/><stop offset="1" stop-color="${mix(c.color, '#000000', .22)}"/></linearGradient>`;
+    paint = `url(#${id}g)`; hl = b.hl || '';
+  } else if (finish === 'plush') {
+    defs = `<radialGradient id="${id}g" gradientUnits="userSpaceOnUse" cx="46" cy="${b.top + 18}" r="80"><stop offset="0" stop-color="${mix(c.color, '#ffffff', .3)}"/><stop offset=".6" stop-color="${c.color}"/><stop offset="1" stop-color="${mix(c.color, '#000000', .28)}"/></radialGradient>
+      <filter id="${id}f" x="-12%" y="-12%" width="124%" height="124%"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G" result="d"/>
+        <feTurbulence type="fractalNoise" baseFrequency="2.4" numOctaves="1" seed="9" result="n2"/><feColorMatrix in="n2" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -2.2 1.0" result="lite"/>
+        <feComposite in="lite" in2="d" operator="in" result="f1"/><feComponentTransfer in="f1" result="fleck"><feFuncA type="linear" slope=".45"/></feComponentTransfer><feMerge><feMergeNode in="d"/><feMergeNode in="fleck"/></feMerge></filter>`;
+    paint = `url(#${id}g)`; filt = ` filter="url(#${id}f)"`;
+  }
+  const art = b.pixel ? boop(c.color) : { body: b.body(paint), face: face(b.face, b.eye) };
+  return `<svg viewBox="${still ? '10 4 100 106' : '0 0 120 130'}" aria-hidden="true"><defs>${defs}</defs>${still ? '' : '<ellipse class="shadow" cx="60" cy="121" rx="26" ry="4.5"/>'}
+    <g class="bob">${b.extra || ''}<g${filt}>${art.body}</g>${hl}${art.face}${still ? '' : fx(b)}</g></svg>`;
+}
+
+/* The page's buddy: Puff, sky blue, glossy (the app default). The picker below changes it everywhere. */
+const BUD_KEY = 'bleep-buddy';
+let CFG = { kind: 'puff', color: '#38BDF8', finish: 'glossy' };
+try {
+  const saved = JSON.parse(localStorage.getItem(BUD_KEY) || 'null');
+  if (saved && BUDDIES.some(b => b.id === saved.kind) && /^#[0-9a-f]{6}$/i.test(saved.color) && FINISHES.some(f => f[0] === saved.finish)) CFG = saved;
+} catch {}
+/* The still crop is square and centered on each buddy's outline, so every buddy lines up with text. */
+const CROP = {};
+function stillCrop(svg, kind) {
+  if (CROP[kind]) return CROP[kind];
+  const host = document.createElement('div');
+  host.style.cssText = 'position:absolute;left:-9999px;top:0;width:120px;visibility:hidden';
+  host.innerHTML = svg; document.body.appendChild(host);
+  const g = host.querySelector('.bob'), bb = g && g.getBBox();
+  host.remove();
+  if (!bb || !bb.width) return null;
+  const side = Math.max(bb.width, bb.height) + 4, cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+  return (CROP[kind] = `${+(cx - side / 2).toFixed(1)} ${+(cy - side / 2).toFixed(1)} ${+side.toFixed(1)} ${+side.toFixed(1)}`);
+}
+function stillSvg(c) {
+  const svg = avatarSvg(c, true);
+  if (buddy(c.kind).fixed) return svg;
+  const box = stillCrop(svg, c.kind);
+  return box ? svg.replace('viewBox="10 4 100 106"', `viewBox="${box}"`) : svg;
+}
+/* face: the live buddy (blinks, moods, looks around) in the same tight crop, for the headline. */
+function faceSvg(c) {
+  if (buddy(c.kind).fixed) return avatarSvg(c, true);
+  const box = stillCrop(avatarSvg(c, true), c.kind);
+  return box ? avatarSvg(c, false).replace('viewBox="0 0 120 130"', `viewBox="${box}"`).replace(/<ellipse class="shadow"[^>]*\/>/, '') : avatarSvg(c, false);
+}
+function drawBuddies() {
+  const fixed = buddy(CFG.kind).fixed;
+  document.querySelectorAll('[data-bud]').forEach(el => {
+    const mode = el.dataset.bud, still = mode === 'head', face = mode === 'face';
+    el.querySelector(':scope > svg')?.remove();
+    el.insertAdjacentHTML('afterbegin', still ? stillSvg(CFG) : face ? faceSvg(CFG) : avatarSvg(CFG, false));
+    el.classList.toggle('av', !fixed); el.classList.toggle('still', !fixed && still);
+    el.classList.toggle('droid', fixed && !still && !face);
+    if (!el.dataset.mood) el.dataset.mood = 'idle';
+  });
+  document.querySelectorAll('[data-tray]').forEach(el => { el.innerHTML = trayIcon(CFG.kind); });
+}
+drawBuddies();
+
+/* ================= Pick your buddy ================= */
+const q = s => document.querySelector(s);   /* $ is defined further down */
+(() => {
+  const kinds = q('#pkKinds'), colors = q('#pkColors'), fins = q('#pkFins'), moods = q('#pkMoods'), note = q('#pkNote'), big = q('#pkBig');
+  if (!kinds) return;
+  const radio = (cls, label, attrs = '') => `<button type="button" role="radio" class="${cls}" aria-checked="false" ${attrs}>${label}</button>`;
+  kinds.innerHTML = BUDDIES.map(b => radio('pk-kind', `<span></span>${b.name}`, `data-k="${b.id}" title="${b.fixed ? 'Droid, the classic' : b.name}"`)).join('');
+  colors.innerHTML = PALETTE.map(([n, h]) => radio('pk-sw', '', `data-c="${h}" aria-label="${n}" title="${n}" style="--c:${h}"`)).join('');
+  fins.innerHTML = FINISHES.map(([id, n]) => radio('chip', n, `data-f="${id}"`)).join('');
+  moods.innerHTML = [['idle', 'Idle'], ['listening', 'Listening'], ['thinking', 'Thinking'], ['alert', 'Alert'], ['happy', 'Happy']]
+    .map(([id, n]) => `<button type="button" class="chip" aria-pressed="${id === 'idle'}" data-m="${id}">${n}</button>`).join('');
+  const sync = () => {
+    const b = buddy(CFG.kind);
+    kinds.querySelectorAll('.pk-kind').forEach(el => {
+      el.setAttribute('aria-checked', el.dataset.k === CFG.kind);
+      el.firstElementChild.innerHTML = stillSvg(switchKind(CFG, el.dataset.k));
+    });
+    colors.querySelectorAll('.pk-sw').forEach(el => el.setAttribute('aria-checked', el.dataset.c.toUpperCase() === CFG.color.toUpperCase()));
+    fins.querySelectorAll('.chip').forEach(el => { el.setAttribute('aria-checked', el.dataset.f === finishOf(CFG)); el.disabled = !!b.pixel; });
+    [colors, fins, q('#pkColH'), q('#pkFinH')].forEach(el => { el.hidden = !!b.fixed; });
+    note.textContent = b.fixed ? 'The droid keeps its own colors.' : b.pixel ? 'Boop is pixel art, so it is always flat.' : 'Flat is clean. Glossy shines. Plush looks soft enough to hug.';
+  };
+  const set = c => {
+    CFG = c;
+    try { localStorage.setItem(BUD_KEY, JSON.stringify(CFG)); } catch {}
+    drawBuddies(); sync();
+    droidState(big, 'happy', 900); moods.querySelectorAll('.chip').forEach(el => el.setAttribute('aria-pressed', el.dataset.m === 'idle'));
+  };
+  kinds.addEventListener('click', e => { const k = e.target.closest('[data-k]'); if (k && k.dataset.k !== CFG.kind) set(switchKind(CFG, k.dataset.k)); });
+  colors.addEventListener('click', e => { const c = e.target.closest('[data-c]'); if (c) set({ ...CFG, color: c.dataset.c }); });
+  fins.addEventListener('click', e => { const f = e.target.closest('[data-f]'); if (f && !f.disabled) set({ ...CFG, finish: f.dataset.f }); });
+  moods.addEventListener('click', e => {
+    const m = e.target.closest('[data-m]'); if (!m) return;
+    moods.querySelectorAll('.chip').forEach(el => el.setAttribute('aria-pressed', el === m));
+    droidState(big, m.dataset.m === 'idle' ? null : m.dataset.m);
+  });
+  /* arrow keys move within each radio group */
+  [kinds, colors, fins].forEach(g => g.addEventListener('keydown', e => {
+    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (!d) return;
+    const all = [...g.querySelectorAll('[role=radio]:not(:disabled)')], i = all.indexOf(document.activeElement); if (i < 0) return;
+    e.preventDefault(); const n = all[(i + d + all.length) % all.length]; n.focus(); n.click();
+  }));
+  sync();
+})();
+
+/* usage tile: a week of activity by hour, busier in work hours */
+(() => {
+  const g = q('#usHeat'); if (!g) return;
+  let h = '';
+  for (let d = 0; d < 7; d++) for (let c = 0; c < 18; c++) {
+    const work = d < 5 && c > 3 && c < 15, v = ((d * 7 + c * 13) % 10) / 10;
+    h += `<i style="--o:${(work ? .25 + v * .75 : v * .2 + .06).toFixed(2)}"></i>`;
+  }
+  g.innerHTML = h;
+})();
 
 const ICONS = {
   gm: '<svg viewBox="50 29 92 92"><path fill="#4285f4" d="M58 108h14V74L52 59v43c0 3.32 2.69 6 6 6"/> <path fill="#34a853" d="M120 108h14c3.32 0 6-2.69 6-6V59l-20 15"/> <path fill="#fbbc04" d="M120 48v26l20-15v-8c0-7.42-8.47-11.65-14.4-7.2"/> <path fill="#ea4335" d="M72 74V48l24 18 24-18v26L96 92"/> <path fill="#c5221f" d="M52 51v8l20 15V48l-5.6-4.2c-5.94-4.45-14.4-.22-14.4 7.2"/></svg>',
   ca: '<svg viewBox="0 0 200 200"><g> <g transform="translate(3.75 3.75)"> <path fill="#FFFFFF" d="M148.882,43.618l-47.368-5.263l-57.895,5.263L38.355,96.25l5.263,52.632l52.632,6.579l52.632-6.579 l5.263-53.947L148.882,43.618z"/> <path fill="#1A73E8" d="M65.211,125.276c-3.934-2.658-6.658-6.539-8.145-11.671l9.132-3.763c0.829,3.158,2.276,5.605,4.342,7.342 c2.053,1.737,4.553,2.592,7.474,2.592c2.987,0,5.553-0.908,7.697-2.724s3.224-4.132,3.224-6.934c0-2.868-1.132-5.211-3.395-7.026 s-5.105-2.724-8.5-2.724h-5.276v-9.039H76.5c2.921,0,5.382-0.789,7.382-2.368c2-1.579,3-3.737,3-6.487 c0-2.447-0.895-4.395-2.684-5.855s-4.053-2.197-6.803-2.197c-2.684,0-4.816,0.711-6.395,2.145s-2.724,3.197-3.447,5.276 l-9.039-3.763c1.197-3.395,3.395-6.395,6.618-8.987c3.224-2.592,7.342-3.895,12.342-3.895c3.697,0,7.026,0.711,9.974,2.145 c2.947,1.434,5.263,3.421,6.934,5.947c1.671,2.539,2.5,5.382,2.5,8.539c0,3.224-0.776,5.947-2.329,8.184 c-1.553,2.237-3.461,3.947-5.724,5.145v0.539c2.987,1.25,5.421,3.158,7.342,5.724c1.908,2.566,2.868,5.632,2.868,9.211 s-0.908,6.776-2.724,9.579c-1.816,2.803-4.329,5.013-7.513,6.618c-3.197,1.605-6.789,2.421-10.776,2.421 C73.408,129.263,69.145,127.934,65.211,125.276z"/> <path fill="#1A73E8" d="M121.25,79.961l-9.974,7.25l-5.013-7.605l17.987-12.974h6.895v61.197h-9.895L121.25,79.961z"/> <path fill="#EA4335" d="M148.882,196.25l47.368-47.368l-23.684-10.526l-23.684,10.526l-10.526,23.684L148.882,196.25z"/> <path fill="#34A853" d="M33.092,172.566l10.526,23.684h105.263v-47.368H43.618L33.092,172.566z"/> <path fill="#4285F4" d="M12.039-3.75C3.316-3.75-3.75,3.316-3.75,12.039v136.842l23.684,10.526l23.684-10.526V43.618h105.263 l10.526-23.684L148.882-3.75H12.039z"/> <path fill="#188038" d="M-3.75,148.882v31.579c0,8.724,7.066,15.789,15.789,15.789h31.579v-47.368H-3.75z"/> <path fill="#FBBC04" d="M148.882,43.618v105.263h47.368V43.618l-23.684-10.526L148.882,43.618z"/> <path fill="#1967D2" d="M196.25,43.618V12.039c0-8.724-7.066-15.789-15.789-15.789h-31.579v47.368H196.25z"/> </g> </g></svg>',
+  dr: '<svg viewBox="0 0 87.3 78"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>',
+  fi: '<svg viewBox="0 0 24 24"><path fill="#1E88E5" d="M2 5.5A2.5 2.5 0 0 1 4.5 3h4.38c.66 0 1.3.26 1.77.73L12.12 5.2H19.5A2.5 2.5 0 0 1 22 7.7v10.8a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5V5.5z"/><path fill="#64B5F6" d="M2 9h20v9.5a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/></svg>',
   me: '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#5F7A5A"/><path d="M8 6h8v12l-4-3-4 3z" fill="#fff"/></svg>',
   cc: '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#FAF9F5"/><rect x=".5" y=".5" width="23" height="23" rx="5.5" fill="none" stroke="#1F1E1D" stroke-opacity=".1"/><path transform="translate(4.4 4.4) scale(.633)" fill="#D97757" d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>',
   cx: '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#000"/><path transform="translate(4.8 4.8) scale(.6)" fill="#fff" d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>',
@@ -1162,24 +1593,30 @@ const isStack = () => document.documentElement.classList.contains('phone');
 let chain = Promise.resolve();
 const enqueue = fn => (chain = chain.then(fn).catch(e => console.error(e)));
 
-/* eye tracking for every droid */
-const droids = [...document.querySelectorAll('.droid')];
+/* eye tracking for every buddy. Thinking looks up and away (CSS), so it is left alone then. */
+const droids = [...document.querySelectorAll('.bud')];
 addEventListener('pointermove', e => {
   droids.forEach(d => {
     const look = d.querySelector('.look'); if (!look) return;
+    if (d.classList.contains('av') && d.dataset.mood === 'thinking') { look.style.transform = ''; return; }
     const r = d.getBoundingClientRect(); if (!r.width) return;
-    const cx = r.left + r.width / 2, cy = r.top + r.height * .27;
+    const cx = r.left + r.width / 2, cy = r.top + r.height * (d.classList.contains('droid') ? .27 : .45);
     const dx = e.clientX - cx, dy = e.clientY - cy, m = Math.hypot(dx, dy) || 1;
     const k = Math.min(1, m / 300) * 4.5;
     look.style.transform = `translate(${(dx / m) * k}px, ${(dy / m) * k * .8}px)`;
   });
 }, { passive: true });
 
+/* Moods: data-mood for the buddies, a class for the droid. Same names: thinking, alert, happy, listening. */
 function droidState(d, cls, ms) {
-  d.classList.remove('thinking', 'alert', 'happy');
+  if (!d) return;
+  clearTimeout(d._moodT);
+  d.classList.remove('thinking', 'alert', 'happy', 'listening');
+  d.dataset.mood = 'idle';
   if (!cls) return;
-  void d.offsetWidth; d.classList.add(cls);
-  if (ms) setTimeout(() => d.classList.remove(cls), ms);
+  void d.offsetWidth; d.classList.add(cls); d.dataset.mood = cls;
+  if (cls === 'thinking') { const l = d.querySelector('.look'); if (l) l.style.transform = ''; }
+  if (ms) d._moodT = setTimeout(() => { d.classList.remove(cls); d.dataset.mood = 'idle'; }, ms);
 }
 
 /* ================= phones: laptop-shaped scenes keep their shape, scaled to fit ================= */
@@ -1810,13 +2247,136 @@ const onceInView = (el, fn, threshold = .35) => new IntersectionObserver((es, o)
   }, .6);
 })();
 
-/* closing droid: tap it for a chirp; it cheers when you copy the command */
-const closeCheer = (() => {
-  const d = $('#closeDroid'), b = $('#closeBub'); if (!d) return () => { };
-  let t;
-  const say = txt => { b.textContent = txt; b.classList.add('show'); clearTimeout(t); t = setTimeout(() => b.classList.remove('show'), 2400); };
-  d.addEventListener('click', () => { heroIntro.unlock(); heroIntro.chirp(); droidState(d, 'happy', 700); say('bleep bloop!'); });
-  return () => { droidState(d, 'happy', 700); say('See you on your Mac!'); };
+/* ================= the buddy wall (footer) =================
+   A field of buddies in every color and finish. They blink and bob out of step, look at your
+   pointer, and now and then think, listen or perk up. Tap one: it hops, says hi, and the joy
+   ripples out to its neighbors. Tap it too often and it spins. Copying the command makes the
+   whole wall cheer, from the middle out. */
+const wallCheer = (() => {
+  const grid = document.getElementById('wallGrid'); if (!grid) return () => { };
+  const wall = grid.parentElement;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const KINDS = BUDDIES.filter(b => !b.fixed).map(b => b.id);
+  const COLORS = PALETTE.map(p => p[1]);
+  const HI = ['bleep!', 'hi!', 'bloop!', 'hey you', 'boop', ':)', 'yay!', 'hello!'];
+  let cells = [], cols = 0, size = 0, seen = false, taps = [];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+
+  function build() {
+    const W = wall.clientWidth, H = wall.clientHeight, phone = W < 600;
+    const S = phone ? 74 : 104, c = Math.ceil(W / S) + 1;
+    if (c === cols && S === size && cells.length) return;
+    cols = c; size = S; grid.innerHTML = ''; cells = [];
+    const rows = Math.ceil(H / (S * .84)) + 1;
+    let last = '';
+    for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) {
+      let kind = pick(KINDS); if (kind === last) kind = pick(KINDS); last = kind;
+      const roll = Math.random();
+      const finish = phone ? (roll < .6 ? 'glossy' : 'flat') : (roll < .5 ? 'glossy' : roll < .85 ? 'flat' : 'plush');
+      const el = document.createElement('div');
+      el.className = 'wb';
+      const x = i * S + (r % 2 ? S / 2 : 0) - S * .55, y = r * S * .84 - S * .35;
+      el.style.cssText = `left:${x}px; top:${y}px; width:${S * 1.02}px; --r:${rnd(-9, 9).toFixed(1)}deg; --s:${rnd(.88, 1.04).toFixed(2)}; --d:${rnd(-3.2, 0).toFixed(2)}s; --bd:${rnd(2.6, 3.8).toFixed(2)}s; --e:${rnd(-5.2, 0).toFixed(2)}s`;
+      el.innerHTML = `<span class="av" data-mood="idle">${avatarSvg({ kind, color: pick(COLORS), finish }, false)}</span>`;
+      grid.appendChild(el);
+      cells.push({ el, av: el.firstElementChild, look: null, cx: x + S * .51, cy: y + S * .55, t: 0, busy: 0 });
+    }
+    cells.forEach(c => { c.look = c.av.querySelector('.look'); });
+  }
+
+  function mood(c, m, ms) {
+    clearTimeout(c.t);
+    c.av.dataset.mood = 'idle'; void c.av.offsetWidth;
+    c.av.dataset.mood = m; c.busy = Date.now() + (ms || 0);
+    if (m === 'thinking' && c.look) c.look.style.transform = '';
+    if (ms) c.t = setTimeout(() => { c.av.dataset.mood = 'idle'; }, ms);
+  }
+  function hop(c, cls = 'jump') {
+    if (reduce) return;
+    c.el.classList.remove('jump', 'dizzy'); void c.el.offsetWidth; c.el.classList.add(cls);
+    // animationend bubbles up from the face too; only the cell's own hop or spin counts.
+    const end = ev => { if (ev.target !== c.el) return; c.el.classList.remove(cls); c.el.removeEventListener('animationend', end); };
+    c.el.addEventListener('animationend', end);
+  }
+  function say(c, text) {
+    const b = document.createElement('div');
+    b.className = 'wpop'; b.textContent = text;
+    b.style.left = c.cx + 'px'; b.style.top = (c.cy - size * .45) + 'px';
+    grid.appendChild(b); setTimeout(() => b.remove(), 1400);
+  }
+  function ripple(from, reach, speed) {
+    cells.forEach(c => {
+      if (c === from) return;
+      const d = Math.hypot(c.cx - from.cx, c.cy - from.cy);
+      if (d > reach) return;
+      setTimeout(() => { mood(c, 'happy', 1300); if (d < reach * .55) hop(c); }, d * speed);
+    });
+  }
+
+  // Tap: happy hop and a hello; neighbors catch it. Five quick taps and it spins, a little dizzy.
+  grid.addEventListener('click', e => {
+    const r = grid.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, now = Date.now();
+    // A tap in a gap goes to the nearest buddy, so small screens are easy to tap.
+    const el = e.target.closest('.wb');
+    let c = el && cells.find(k => k.el === el);
+    if (!c) { let best = size; cells.forEach(k => { const d = Math.hypot(k.cx - x, k.cy - y); if (d < best) { best = d; c = k; } }); }
+    if (!c) return;
+    try { heroIntro.unlock(); heroIntro.chirp(); } catch { }
+    // Count taps by spot, not by buddy: a hopping buddy moves out from under the pointer.
+    taps = taps.filter(t => now - t.t < 1800); taps.push({ x, y, t: now });
+    if (taps.filter(t => Math.hypot(t.x - x, t.y - y) < size).length >= 5) { taps = []; mood(c, 'alert', 1200); hop(c, 'dizzy'); say(c, 'whoa, dizzy'); return; }
+    mood(c, 'happy', 1600); hop(c); say(c, pick(HI));
+    ripple(c, size * 2.6, 2.2);
+  });
+
+  // Eyes follow the pointer; the buddy under it leans in.
+  let px = null, py = null, raf = 0, hov = null;
+  const track = () => {
+    raf = 0;
+    cells.forEach(c => {
+      if (!c.look || c.av.dataset.mood === 'thinking') return;
+      if (px === null) { if (c.look.style.transform) c.look.style.transform = ''; return; }
+      const dx = px - c.cx, dy = py - c.cy, m = Math.hypot(dx, dy) || 1;
+      if (m > size * 3.4) { if (c.look.style.transform) c.look.style.transform = ''; return; }
+      const k = Math.min(1, m / 160) * 4.5;
+      c.look.style.transform = `translate(${(dx / m * k).toFixed(1)}px, ${(dy / m * k * .8).toFixed(1)}px)`;
+    });
+  };
+  grid.addEventListener('pointermove', e => {
+    const r = grid.getBoundingClientRect(); px = e.clientX - r.left; py = e.clientY - r.top;
+    const el = e.target.closest('.wb');
+    if (el !== hov) { hov?.classList.remove('hov'); hov = el; hov?.classList.add('hov'); }
+    if (!raf) raf = requestAnimationFrame(track);
+  }, { passive: true });
+  grid.addEventListener('pointerleave', () => { px = py = null; hov?.classList.remove('hov'); hov = null; if (!raf) raf = requestAnimationFrame(track); });
+
+  // Now and then, someone has a thought, hears something or perks up.
+  const MOODS = ['thinking', 'thinking', 'listening', 'listening', 'happy', 'alert'];
+  const idle = () => {
+    if (seen && !document.hidden && cells.length) {
+      const now = Date.now();
+      for (let n = 0; n < 2; n++) {
+        const c = pick(cells);
+        if (c.busy < now) mood(c, pick(MOODS), rnd(1800, 3400));
+      }
+    }
+    setTimeout(idle, rnd(700, 1400));
+  };
+
+  build();
+  let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(build, 200); });
+  new IntersectionObserver(es => { seen = es[0].isIntersecting; }, { threshold: .15 }).observe(wall);
+  if (!reduce) setTimeout(idle, 800);
+
+  // Copying the command: the whole wall cheers, from the middle out.
+  return () => {
+    const mid = { cx: grid.clientWidth / 2, cy: grid.clientHeight / 2 };
+    cells.forEach(c => {
+      const d = Math.hypot(c.cx - mid.cx, c.cy - mid.cy);
+      setTimeout(() => { mood(c, 'happy', 1500); hop(c); }, reduce ? 0 : d * 1.4);
+    });
+  };
 })();
 
 // topbar: a hairline under the bar once you scroll
@@ -1921,6 +2481,49 @@ $('#hideDroid').onclick = () => { hideDroid(); $('#chat').classList.remove('open
 
 
 
+/* ================= hero install: the main button copies the Homebrew command, the arrow shows the others ================= */
+(() => {
+  const main = document.getElementById('hCopy'), more = document.getElementById('hMore'), menu = document.getElementById('hMenu'), note = document.getElementById('hNote');
+  if (!main) return;
+  const NOTE = note.textContent;
+  const copy = async (text) => {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch { const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove(); return ok; }
+  };
+  const done = (how) => {
+    note.textContent = 'Copied. Paste it in Terminal to install.'; note.classList.add('ok');
+    clearTimeout(note._t); note._t = setTimeout(() => { note.textContent = NOTE; note.classList.remove('ok'); }, 2600);
+    const b = document.querySelector('.mbud'); if (b) droidState(b, 'happy', 900);
+    try { window.va && va('event', { name: 'copy_install', how }); } catch {}
+  };
+  const open = (on) => { menu.hidden = !on; more.setAttribute('aria-expanded', on); };
+  main.addEventListener('click', async () => { if (await copy(main.dataset.cmd)) done('brew'); });
+  more.addEventListener('click', (e) => { e.stopPropagation(); open(menu.hidden); if (!menu.hidden) menu.querySelector('.sp-row').focus(); });
+  menu.querySelectorAll('button.sp-row').forEach(r => r.addEventListener('click', async () => {
+    if (!(await copy(r.dataset.cmd))) return;
+    const em = r.querySelector('em'); r.classList.add('ok'); em.textContent = 'Copied';
+    setTimeout(() => { r.classList.remove('ok'); em.textContent = 'Copy'; }, 1600);
+    done(r.querySelector('b').textContent.toLowerCase());
+  }));
+  document.addEventListener('click', (e) => { if (!menu.hidden && !menu.contains(e.target)) open(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { open(false); more.focus(); } });
+  const mb = document.querySelector('.mbud');
+  if (mb) mb.addEventListener('click', () => document.getElementById('buddies')?.scrollIntoView({ behavior: 'smooth' }));
+})();
+
+/* Star on GitHub: show the live star count once there is one. Quietly skipped if GitHub is unreachable. */
+(() => {
+  const a = document.getElementById('ghStar'); if (!a) return;
+  fetch('https://api.github.com/repos/AviroopPaul/bleep', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      const n = j && j.stargazers_count; if (!n) return;
+      const box = a.querySelector('.ghn');
+      box.querySelector('b').textContent = n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n);
+      box.hidden = false; a.setAttribute('aria-label', `Star on GitHub, ${n} stars`);
+    }).catch(() => { });
+})();
+
 /* ================= install commands: Homebrew / curl tabs, kept in sync across the page ================= */
 const insts = [...document.querySelectorAll('[data-inst]')];
 function pickInstall(which) {
@@ -1951,7 +2554,7 @@ insts.forEach(box => {
     setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1600);
     try { window.va && va('event', { name: 'copy_install', how: code.dataset.cmd }); } catch {}
     const d = $('#heroDroid'); if (d) droidState(d, 'happy', 700);
-    if (box.closest('.closer')) closeCheer();
+    if (box.closest('.bwall')) wallCheer();
   });
 });
 
@@ -1965,9 +2568,10 @@ function summon(on) {
     layer.classList.add('on'); document.body.appendChild(chatEl);
     chatEl.classList.add('in-summon', 'open'); chatEl.style.left = chatEl.style.top = '';
     setTimeout(() => $('#inp').focus(), 250);
-    droidState(layer.querySelector('.droid'), 'happy', 700);
+    droidState(layer.querySelector('.bud'), 'listening');
     hideToast();
   } else {
+    droidState(layer.querySelector('.bud'), null);
     layer.classList.remove('on'); chatEl.classList.remove('in-summon');
     chatHome.parent.insertBefore(chatEl, chatHome.next);
   }

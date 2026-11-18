@@ -638,6 +638,9 @@ export function installMocks(label: string) {
         case "update_restart":
           calls.push(cmd);
           return null;
+        case "settings_open":
+          calls.push(`settings_open:${a.section ?? ""}`);
+          return null;
         default:
           return null;
       }

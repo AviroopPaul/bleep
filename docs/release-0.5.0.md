@@ -15,7 +15,7 @@ Current version: 0.3.5. Background and decisions: `docs/build-plan.md`.
 | F1 | After-meeting follow-up | Droid bubble, chat | Only when I tap "Draft recap" |
 | F2 | Travel cards | Chat card, bar, check-ins | One `small` call per booking mail |
 | F3 | Connector marketplace, with Google Drive built in | Settings > Connectors | None (built, see 4) |
-| F4 | Usage tab (replaces the context bar) | Chat panel tab next to Chat and Agents | None (built, see 5) |
+| F4 | Usage page (replaces the context bar) | Settings > Usage, opened from the gear in the chat header | None (built, see 5) |
 | F5 | Native reminders | Reminders tab, bubble, macOS notification, chat | None to fire; the main chat sets them (built, see 6) |
 | F6 | Files on this Mac | Settings > Connectors, chat | None (built, see 8) |
 | F7 | PDF reading (Drive and Mac files) | Chat | None (built, see 8) |
@@ -120,15 +120,15 @@ All features keep the calm rules: quiet hours, ping budget, dedup, pause, and "N
 
 ---
 
-## 5. F4. Usage tab
+## 5. F4. Usage page
 
 **Why:** the thin context bar under the chat header is hard to read and says little. I want one place for usage.
 
 **What changes**
 - **Remove** the context meter bar from the chat panel header (`app/src/chat/ChatPanel.tsx`, the `.meter` element).
-- **Add** a tab, "Usage", next to Chat and Agents. Reminders (F5) gets a bell tab after it.
+- **Add** a "Usage" page. It first shipped as a chat tab. It now lives in Settings > Usage, and a gear in the chat header opens Settings.
 - **Header room:** four tabs do not fit next to the "bleep" word at 400 px, so the droid head is the brand mark and the word is for screen readers only.
-- **Warning kept:** when the chat context passes 80% of the compaction threshold, the Usage tab shows a small dot. Nothing else in the header.
+- **Warning kept:** when the chat context passes 80% of the compaction threshold, the gear shows a small dot and opens Settings > Usage. Nothing else in the header.
 
 **What the tab shows**
 - **Range:** Today, 7 days, 30 days.
@@ -147,7 +147,7 @@ All features keep the calm rules: quiet hours, ping budget, dedup, pause, and "N
 - **Charts:** small SVG components, no chart library, to keep the bundle light. Colors from `theme.css`, light and dark.
 - **The Activity tab in Settings** stays as the detailed log. Usage is the overview.
 
-**Done when:** the header has no bar, the Usage tab shows 7 days of real data, and the heatmap matches the `llm_calls` rows.
+**Done when:** the header has no bar, Settings > Usage shows 7 days of real data, and the heatmap matches the `llm_calls` rows.
 
 **Status (17 Nov 2026):** built on branch `release-0.5.0-usage-reminders`. Later: a plan-limit history (needs `RateLimited` events saved).
 
@@ -254,7 +254,7 @@ Each feature is checked by hand on my real accounts against its "Done when" line
 | F1 After-meeting follow-up | no | no | no |
 | F2 Travel cards | no | no | no |
 | F3 Connector marketplace and Google Drive | yes | no | no |
-| F4 Usage tab | yes | no | no |
+| F4 Usage page | yes | no | no |
 | F5 Native reminders | yes | no | no |
 | F6 Files on this Mac | yes | no | no |
 | F7 PDF reading | yes | no | no |
@@ -262,4 +262,4 @@ Each feature is checked by hand on my real accounts against its "Done when" line
 
 **Release steps after sign-off only:** follow the bleep release checklist (bleep repo, `bleep-releases`, Homebrew tap). Update the landing page with the new features at the same time.
 
-Signed off by: _______ on _______
+Signed off by: Aviroop on 18 Nov 2026. F1 and F2 are not built; they move to a later release.

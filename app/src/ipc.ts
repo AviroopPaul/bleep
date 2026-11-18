@@ -387,7 +387,7 @@ export const api = {
   googleUseBuiltin: () => invoke<GoogleState>("google_use_builtin"),
   googleDisconnect: () => invoke<void>("google_disconnect"),
   openLink: (which: LinkName) => invoke<void>("open_link", { which }),
-  openSettings: () => invoke<void>("settings_open"),
+  openSettings: (section?: string) => invoke<void>("settings_open", { section: section ?? null }),
   setupOpen: () => invoke<void>("setup_open"),
   setupFinish: () => invoke<void>("setup_finish"),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
@@ -534,6 +534,9 @@ export interface BubbleText {
 export const onBubbleText = (cb: (b: BubbleText) => void): Promise<UnlistenFn> =>
   listen<BubbleText>("bubble://text", (e) => cb(e.payload));
 /** The buddy changed in Settings. Every window redraws it. */
+/** Open Settings at a section, when the window is already open (`settings_open` with a section). */
+export const onSettingsGoto = (cb: (section: string) => void): Promise<UnlistenFn> =>
+  listen<string>("settings://goto", (e) => cb(e.payload));
 export const onAvatarChanged = (cb: (c: AvatarConfig) => void): Promise<UnlistenFn> =>
   listen<AvatarConfig>("avatar://changed", (e) => cb(e.payload));
 export const onDroidMood = (cb: (mood: "alert" | "idle") => void): Promise<UnlistenFn> =>

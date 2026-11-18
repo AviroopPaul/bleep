@@ -32,7 +32,7 @@ pub struct AvatarConfig {
 
 impl Default for AvatarConfig {
     fn default() -> Self {
-        Self { kind: "blip".into(), color: "#3D6BFF".into(), finish: "glossy".into() }
+        Self { kind: "puff".into(), color: "#38BDF8".into(), finish: "glossy".into() }
     }
 }
 
@@ -98,11 +98,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_to_blip() {
+    fn defaults_to_puff() {
         let c: crate::config::Config = toml::from_str("").unwrap();
         assert_eq!(c.avatar, AvatarConfig::default());
-        let c: crate::config::Config = toml::from_str("[avatar]\nkind = \"puff\"\nfinish = \"plush\"").unwrap();
-        assert_eq!((c.avatar.kind.as_str(), c.avatar.finish.as_str()), ("puff", "plush"));
+        let c: crate::config::Config = toml::from_str("[avatar]\nkind = \"blip\"\nfinish = \"plush\"").unwrap();
+        assert_eq!((c.avatar.kind.as_str(), c.avatar.finish.as_str()), ("blip", "plush"));
     }
 
     #[test]

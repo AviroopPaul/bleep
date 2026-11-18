@@ -10,12 +10,12 @@ test("avatar settings: pick a buddy, color and finish", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Your buddy" })).toBeVisible();
 
   const preview = page.getByTestId("av-preview").locator("svg");
-  await expect(page.getByRole("radio", { name: "Blip" })).toHaveAttribute("aria-checked", "true");
-  await expect(preview).toHaveAttribute("data-kind", "blip");
+  await expect(page.getByRole("radio", { name: "Puff" })).toHaveAttribute("aria-checked", "true");
+  await expect(preview).toHaveAttribute("data-kind", "puff");
   await expect(preview).toHaveAttribute("data-finish", "glossy");
 
-  await page.getByRole("radio", { name: "Puff" }).click();
-  await expect(preview).toHaveAttribute("data-kind", "puff");
+  await page.getByRole("radio", { name: "Blip" }).click();
+  await expect(preview).toHaveAttribute("data-kind", "blip");
   await page.getByRole("radio", { name: "Pink" }).click();
   await expect(page.getByRole("radio", { name: "Pink" })).toHaveAttribute("aria-checked", "true");
   await page.getByRole("radio", { name: "Plush" }).click();
@@ -36,9 +36,9 @@ test("avatar settings: pick a buddy, color and finish", async ({ page }) => {
   await expect(page.getByRole("radio", { name: "Pink" })).toHaveCount(0);
 
   expect(await calls(page)).toEqual(expect.arrayContaining([
-    "avatar_set:puff:#38BDF8:glossy",
-    "avatar_set:puff:#FF4FA3:glossy",
-    "avatar_set:puff:#FF4FA3:plush",
+    "avatar_set:blip:#3D6BFF:glossy",
+    "avatar_set:blip:#FF4FA3:glossy",
+    "avatar_set:blip:#FF4FA3:plush",
     "avatar_set:boop:#FF4FA3:plush",
     "avatar_set:droid:#FF4FA3:plush",
   ]));
