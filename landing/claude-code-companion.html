@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code Companion for Mac: Auto-Approve Safe Asks | bleep</title>
+<meta name="description" content="bleep watches every Claude Code and Codex session on your Mac. It approves safe asks like tests, lint and reads by fixed rules, and holds push, deploy and delete for you.">
+<link rel="canonical" href="https://bleep-omega.vercel.app/claude-code-companion">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="author" content="Aviroop Paul">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="bleep">
+<meta property="og:url" content="https://bleep-omega.vercel.app/claude-code-companion">
+<meta property="og:title" content="Claude Code Companion for Mac: Auto-Approve Safe Asks | bleep">
+<meta property="og:description" content="bleep watches every Claude Code and Codex session on your Mac. It approves safe asks like tests, lint and reads by fixed rules, and holds push, deploy and delete for you.">
+<meta property="og:image" content="https://bleep-omega.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Claude Code Companion for Mac: Auto-Approve Safe Asks | bleep">
+<meta name="twitter:description" content="bleep watches every Claude Code and Codex session on your Mac. It approves safe asks like tests, lint and reads by fixed rules, and holds push, deploy and delete for you.">
+<meta name="twitter:image" content="https://bleep-omega.vercel.app/og.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#FDFDFD">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/pages.css">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "Article",
+   "@id": "https://bleep-omega.vercel.app/claude-code-companion#page",
+   "headline": "A Claude Code companion that approves the safe asks",
+   "name": "Claude Code Companion for Mac: Auto-Approve Safe Asks | bleep",
+   "description": "bleep watches every Claude Code and Codex session on your Mac. It approves safe asks like tests, lint and reads by fixed rules, and holds push, deploy and delete for you.",
+   "url": "https://bleep-omega.vercel.app/claude-code-companion",
+   "datePublished": "2026-11-18",
+   "dateModified": "2026-11-18",
+   "author": {
+    "@id": "https://bleep-omega.vercel.app/#author"
+   },
+   "publisher": {
+    "@id": "https://bleep-omega.vercel.app/#author"
+   },
+   "about": {
+    "@id": "https://bleep-omega.vercel.app/#app"
+   },
+   "image": "https://bleep-omega.vercel.app/og.png",
+   "inLanguage": "en"
+  },
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "bleep",
+     "item": "https://bleep-omega.vercel.app/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "For Claude Code",
+     "item": "https://bleep-omega.vercel.app/claude-code-companion"
+    }
+   ]
+  },
+  {
+   "@type": "Person",
+   "@id": "https://bleep-omega.vercel.app/#author",
+   "name": "Aviroop Paul",
+   "url": "https://avirooppaul.site",
+   "sameAs": [
+    "https://github.com/AviroopPaul",
+    "https://linkedin.com/in/avirooppaul"
+   ]
+  },
+  {
+   "@type": "SoftwareApplication",
+   "@id": "https://bleep-omega.vercel.app/#app",
+   "name": "bleep",
+   "url": "https://bleep-omega.vercel.app/",
+   "applicationCategory": "ProductivityApplication",
+   "operatingSystem": "macOS 15 or later (Apple silicon)",
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   }
+  },
+  {
+   "@type": "FAQPage",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "How do I auto-approve safe Claude Code permission prompts on Mac?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Install bleep and let setup add its Claude Code hook. bleep then approves asks that match your rules (tests, lint, reads) and holds everything else for you. The rules live in ~/.bleep/agent-rules.toml."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is this safer than Claude Code's own allow list?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "It adds checks. bleep looks at every part of a joined command, refuses shell globs, and keeps a deny list for secrets and risky commands that wins over any allow rule. It also logs every approval."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Does bleep use my Claude plan for approvals?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. Approvals are decided by rules in code, so they cost no model calls. Only the chat, check-ins and screenshot checks use the model."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Does it work with Codex?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. bleep installs a turn notice for Codex and shows those sessions next to Claude Code."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<nav class="top"><div class="bar">
+  <a class="brand" href="/"><img src="/apple-touch-icon.png" alt="" width="30" height="30">bleep</a>
+  <div class="links"><a href="/#cases">Features</a><a href="/alternatives">Compare</a><a href="/claude-code-companion">Claude Code</a><a href="/#faq">FAQ</a></div>
+  <a class="npill" href="https://github.com/AviroopPaul/bleep">GitHub</a>
+</div></nav>
+<main class="wrap">
+<p class="crumbs"><a href="/">bleep</a> / For Claude Code</p>
+<h1>A Claude Code companion that approves the safe asks</h1>
+<p class="lede">bleep watches every Claude Code and Codex session on your Mac. Tests pass, lint passes, reads pass. A force push waits for you. Free and open source.</p>
+<p class="meta">Updated 18 Nov 2026 · by <a href="https://avirooppaul.site">Aviroop Paul</a>, who makes bleep · bleep 0.5.0</p>
+
+<section class="tldr"><h2>Short answer</h2><ul>
+<li>bleep installs hooks in Claude Code and turn notices in Codex, so it sees every session that waits on you.</li>
+<li>Rules in code, not a model, decide what passes. Tests, lint and reads pass. Push, deploy, delete, secrets and money always wait for you.</li>
+<li>Every approval is logged. You see the rest in one Agent sessions window with a short summary of each ask.</li>
+</ul></section>
+
+<h2>The problem</h2>
+<p>You start three Claude Code sessions and walk away. Ten minutes later, two of them sit idle, waiting for you to type yes to <code>npm test</code>. The third wants to <code>git push --force</code>, and that one really should wait for you. bleep tells these apart.</p>
+
+<h2>How it works</h2>
+<ol>
+<li><b>Hooks.</b> In setup, bleep adds a small hook to Claude Code and a notify command to Codex. You can remove them in Settings, Agents.</li>
+<li><b>Rules.</b> Each ask is checked against <code>~/.bleep/agent-rules.toml</code>. A command joined with <code>&amp;&amp;</code>, <code>;</code> or <code>|</code> passes only if every part matches and nothing risky appears anywhere in it. Shell globs always ask.</li>
+<li><b>Screenshots.</b> When an agent asks you to look at a screenshot, bleep can check it against the ask and let it continue if it matches.</li>
+<li><b>You.</b> Anything the rules cannot read safely comes to you, with a short summary, in the chat and the Agent sessions window.</li>
+</ol>
+
+<h2>Default rules</h2>
+<div class="tbl"><table><thead><tr><th scope="col"></th><th scope="col" class="us">bleep approves</th><th scope="col">Always waits for you</th></tr></thead><tbody>
+<tr><th scope="row">Commands</th><td class="us"><code>npm test</code>, <code>npx vitest run</code>, <code>npx playwright test</code>, <code>cargo test</code>, <code>cargo clippy</code>, <code>pytest</code>, <code>go test</code>, <code>ruff check</code>, lint and type checks</td><td><code>git push</code>, <code>--force</code>, <code>rm</code>, <code>sudo</code>, deploy commands, package installs, <code>curl</code>, <code>ssh</code>, <code>git reset</code>, <code>git rebase</code></td></tr>
+<tr><th scope="row">Reading</th><td class="us"><code>Read</code>, <code>Glob</code>, <code>Grep</code>, <code>git status</code>, <code>git diff</code>, <code>git log</code>, <code>ls</code>, <code>cat</code></td><td>Anything that touches <code>.env</code>, keys, tokens, <code>.ssh</code>, <code>.aws</code>, credentials or passwords</td></tr>
+<tr><th scope="row">Other</th><td class="us">A screenshot that matches the ask</td><td>Money, sending mail, anything outside the sandbox</td></tr>
+</tbody></table></div>
+<p>You can edit the lists. A model never turns an ask into a yes.</p>
+
+<h2>Compared with other Claude Code companions</h2>
+<div class="tbl"><table><thead><tr><th scope="col"></th><th scope="col" class="us">bleep</th><th scope="col">CC-Beeper</th><th scope="col">Buddi</th></tr></thead><tbody>
+<tr><th scope="row">Alerts when a session needs you</th><td class="us">Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><th scope="row">Approves safe asks for you</th><td class="us">Yes, by rules, with a log</td><td>No</td><td>You tap approve or deny</td></tr>
+<tr><th scope="row">Codex sessions</th><td class="us">Yes</td><td>No</td><td>No</td></tr>
+<tr><th scope="row">Mail, calendar, reminders</th><td class="us">Yes</td><td>No</td><td>No</td></tr>
+<tr><th scope="row">Open source</th><td class="us">MIT</td><td>GPL-3.0</td><td>Yes</td></tr>
+</tbody></table></div>
+
+<h2>Also in bleep</h2>
+<ul>
+<li><b>Lives on your Mac.</b> A native app with a small Rust core. A floating buddy on every Space. Double-tap <code>⌥</code> to call it.</li>
+<li><b>Speaks first.</b> It checks your mail, calendar and coding agents on its own, and taps you before a meeting, when a bill is due, when a mail waits on you, or when an agent is stuck.</li>
+<li><b>Unblocks your coding agents.</b> It approves the safe Claude Code and Codex asks your rules allow, like tests, lint and file reads. Push, deploy, delete, secrets and money always wait for you.</li>
+<li><b>Any model.</b> Your Claude Code plan by default, an API key from Anthropic, OpenAI, Gemini, OpenRouter or Groq, or a local model in Ollama or LM Studio.</li>
+<li><b>Private.</b> No bleep server, no account, no telemetry. Mail, memory and logs stay in <code>~/.bleep</code>.</li>
+<li><b>Free and open source.</b> MIT license, source on <a href="https://github.com/AviroopPaul/bleep">GitHub</a>.</li>
+</ul>
+
+<h2 id="faq">Questions</h2>
+<div class="faq">
+<details><summary>How do I auto-approve safe Claude Code permission prompts on Mac?</summary><p>Install bleep and let setup add its Claude Code hook. bleep then approves asks that match your rules (tests, lint, reads) and holds everything else for you. The rules live in ~/.bleep/agent-rules.toml.</p></details>
+<details><summary>Is this safer than Claude Code's own allow list?</summary><p>It adds checks. bleep looks at every part of a joined command, refuses shell globs, and keeps a deny list for secrets and risky commands that wins over any allow rule. It also logs every approval.</p></details>
+<details><summary>Does bleep use my Claude plan for approvals?</summary><p>No. Approvals are decided by rules in code, so they cost no model calls. Only the chat, check-ins and screenshot checks use the model.</p></details>
+<details><summary>Does it work with Codex?</summary><p>Yes. bleep installs a turn notice for Codex and shows those sessions next to Claude Code.</p></details>
+</div>
+
+<section class="cta">
+  <h2>Try bleep on your Mac</h2>
+  <p>Free and open source. macOS 15+ on Apple silicon.</p>
+  <div class="cmd"><code>brew install --cask AviroopPaul/tap/bleep</code><button type="button" data-copy="brew install --cask AviroopPaul/tap/bleep">Copy</button></div>
+  <p class="alt">No Homebrew? <code>curl -fsSL https://bleep-omega.vercel.app/install.sh | sh</code> · <a href="https://github.com/AviroopPaul/bleep">Source on GitHub</a></p>
+</section>
+<footer>
+  <nav aria-label="More about bleep">
+      <a href="https://github.com/AviroopPaul/bleep">Source on GitHub</a>
+      <a href="https://github.com/AviroopPaul/bleep-releases/releases">Releases</a>
+      <a href="/changelog">Changelog</a>
+      <a href="/alternatives">Alternatives</a>
+      <a href="/vs/grok-bot">vs Grok Bot</a>
+      <a href="/vs/openclaw">vs OpenClaw</a>
+      <a href="/vs/openmausbot">vs OpenMausBot</a>
+      <a href="/claude-code-companion">For Claude Code</a>
+      <a href="/privacy">Privacy</a>
+  </nav>
+  <p>bleep is a free, open source project by <a href="https://avirooppaul.site">Aviroop Paul</a>, MIT license. Not affiliated with Anthropic, OpenAI, Google or xAI. Product names belong to their owners.</p>
+</footer>
+</main>
+<script>
+document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => {
+  navigator.clipboard && navigator.clipboard.writeText(b.dataset.copy).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 2000); });
+}));
+</script>
+</body>
+</html>

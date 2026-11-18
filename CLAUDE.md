@@ -1,6 +1,6 @@
 # bleep
 
-Floating macOS assistant. Plan and decisions: `docs/build-plan.md`. App: `app/` (Tauri 2, Rust core in `app/src-tauri`, React views in `app/src`). Landing page: `landing/` (Vercel).
+Floating macOS assistant. Plan and decisions: `docs/build-plan.md`. App: `app/` (Tauri 2, Rust core in `app/src-tauri`, React views in `app/src`). Landing page: `landing/` (Vercel). Its text pages (vs, alternatives, Claude Code, changelog, privacy) and `sitemap.xml` come from `scripts/seo/pages.py`: edit copy there and rerun it after each release. SEO/GEO plan: `docs/seo-audit.md`.
 
 ## Tests
 

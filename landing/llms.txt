@@ -1,0 +1,29 @@
+# bleep
+
+> bleep is a free, open source (MIT) AI assistant that lives on your Mac. It watches Claude Code, Codex, Gmail and Google Calendar, approves safe coding agent asks by fixed rules, preps meetings, catches bills, and taps you only when something needs you. It runs on your Claude Code plan, an API key from Anthropic, OpenAI, Gemini, OpenRouter or Groq, or a local model in Ollama or LM Studio. A local alternative to Grok Bot and OpenClaw.
+
+Key facts:
+- Platform: macOS 15 or later, Apple silicon. Native app built with Tauri 2 (Rust core, React views). About 16 MB.
+- Price: free. License: MIT. Source: https://github.com/AviroopPaul/bleep
+- Install: `brew install --cask AviroopPaul/tap/bleep` or `curl -fsSL https://bleep-omega.vercel.app/install.sh | sh`
+- Privacy: no bleep server, no account, no telemetry. Data stays in ~/.bleep on the Mac. Secrets in the macOS Keychain.
+- Safety: sending mail, moving events, deleting and running commands always wait for the user's yes. Approvals for coding agents are decided by rules in code, never by a model.
+- Proactive: speaks first about meetings, bills, mail that waits on you, and stuck coding agents. Has quiet hours and a ping limit.
+- Connectors: Gmail, Google Calendar, Google Drive, files on the Mac, and any remote MCP server.
+- Maker: Aviroop Paul (https://avirooppaul.site). Not affiliated with Anthropic, OpenAI, Google or xAI.
+
+## Pages
+
+- [Home](https://bleep-omega.vercel.app/): what bleep does, live demo, FAQ
+- [bleep for Claude Code](https://bleep-omega.vercel.app/claude-code-companion): how bleep approves safe Claude Code and Codex asks, default rules
+- [Alternatives](https://bleep-omega.vercel.app/alternatives): personal AI assistants for Mac compared (Grok Bot, OpenClaw, OpenMausBot, OpenBot, rakazo, Hermes Agent, CC-Beeper, Buddi)
+- [bleep vs Grok Bot](https://bleep-omega.vercel.app/vs/grok-bot)
+- [bleep vs OpenClaw](https://bleep-omega.vercel.app/vs/openclaw)
+- [bleep vs OpenMausBot](https://bleep-omega.vercel.app/vs/openmausbot)
+- [Changelog](https://bleep-omega.vercel.app/changelog)
+- [Privacy](https://bleep-omega.vercel.app/privacy)
+
+## Source
+
+- [GitHub repository](https://github.com/AviroopPaul/bleep): code, README, issues
+- [Releases](https://github.com/AviroopPaul/bleep-releases/releases)

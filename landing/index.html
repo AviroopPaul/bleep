@@ -3,28 +3,252 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>bleep: a little buddy for your Mac</title>
-<meta name="description" content="bleep floats on your Mac. It watches your Claude Code and Codex sessions, your mail and your calendar. It handles the small asks and tells you what needs you.">
+<title>bleep: Free, Open Source AI Assistant for Mac</title>
+<meta name="description" content="bleep is a free, open source AI assistant that floats on your Mac. It watches Claude Code, Codex, Gmail and Calendar, approves safe agent asks, and taps you only when it matters.">
 <link rel="canonical" href="https://bleep-omega.vercel.app/">
 <!-- Share preview (Open Graph + Twitter/X). Image source: scripts/og/og.html -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="bleep">
 <meta property="og:url" content="https://bleep-omega.vercel.app/">
-<meta property="og:title" content="bleep: a little buddy for your Mac">
-<meta property="og:description" content="It floats on your Mac and watches your coding agents, mail and calendar. It handles the small asks and tells you what needs you.">
+<meta property="og:title" content="bleep: Free, Open Source AI Assistant for Mac">
+<meta property="og:description" content="A free, open source AI buddy for your Mac. It watches your coding agents, mail and calendar, clears the small asks, and taps you only when it matters.">
 <meta property="og:image" content="https://bleep-omega.vercel.app/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="bleep, a small buddy, with cards for an approved test run, a meeting in 60 minutes and a bill due today.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="bleep: a little buddy for your Mac">
-<meta name="twitter:description" content="It floats on your Mac and watches your coding agents, mail and calendar. It handles the small asks and tells you what needs you.">
+<meta name="twitter:title" content="bleep: Free, Open Source AI Assistant for Mac">
+<meta name="twitter:description" content="A free, open source AI buddy for your Mac. It watches your coding agents, mail and calendar, clears the small asks, and taps you only when it matters.">
 <meta name="twitter:image" content="https://bleep-omega.vercel.app/og.png">
 <meta name="twitter:image:alt" content="bleep, a small buddy, with cards for an approved test run, a meeting in 60 minutes and a bill due today.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="bleep for LLMs">
+<meta name="author" content="Aviroop Paul">
+<meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#FDFDFD">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "WebSite",
+   "@id": "https://bleep-omega.vercel.app/#website",
+   "name": "bleep",
+   "url": "https://bleep-omega.vercel.app/",
+   "publisher": {
+    "@id": "https://bleep-omega.vercel.app/#author"
+   }
+  },
+  {
+   "@type": "SoftwareApplication",
+   "@id": "https://bleep-omega.vercel.app/#app",
+   "name": "bleep",
+   "alternateName": [
+    "bleep for Mac",
+    "bleep AI assistant"
+   ],
+   "description": "bleep is a free, open source AI assistant that floats on your Mac. It watches Claude Code, Codex, Gmail and Calendar, approves safe agent asks, and taps you only when it matters.",
+   "url": "https://bleep-omega.vercel.app/",
+   "applicationCategory": "ProductivityApplication",
+   "applicationSubCategory": "AI assistant",
+   "operatingSystem": "macOS 15 or later (Apple silicon)",
+   "softwareVersion": "0.5.0",
+   "dateModified": "2026-11-18",
+   "downloadUrl": "https://github.com/AviroopPaul/bleep-releases/releases/latest",
+   "installUrl": "https://bleep-omega.vercel.app/#install",
+   "fileSize": "16 MB",
+   "license": "https://opensource.org/licenses/MIT",
+   "isAccessibleForFree": true,
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   },
+   "screenshot": "https://bleep-omega.vercel.app/og.png",
+   "image": "https://bleep-omega.vercel.app/og.png",
+   "featureList": [
+    "Approves safe Claude Code and Codex permission asks by your rules",
+    "Meeting prep an hour ahead",
+    "Catches bills and mail that waits on you",
+    "Answers from Gmail, Google Calendar, Google Drive and files on your Mac",
+    "Reminders with Mac notifications",
+    "Editable local memory",
+    "Optional on-device wake word",
+    "Any remote MCP server as a connector",
+    "Runs on Claude Code, any API key, or local models via Ollama and LM Studio"
+   ],
+   "author": {
+    "@id": "https://bleep-omega.vercel.app/#author"
+   },
+   "sameAs": [
+    "https://github.com/AviroopPaul/bleep"
+   ]
+  },
+  {
+   "@type": "SoftwareSourceCode",
+   "name": "bleep",
+   "codeRepository": "https://github.com/AviroopPaul/bleep",
+   "programmingLanguage": [
+    "Rust",
+    "TypeScript"
+   ],
+   "license": "https://opensource.org/licenses/MIT",
+   "author": {
+    "@id": "https://bleep-omega.vercel.app/#author"
+   },
+   "targetProduct": {
+    "@id": "https://bleep-omega.vercel.app/#app"
+   }
+  },
+  {
+   "@type": "Person",
+   "@id": "https://bleep-omega.vercel.app/#author",
+   "name": "Aviroop Paul",
+   "url": "https://avirooppaul.site",
+   "sameAs": [
+    "https://github.com/AviroopPaul",
+    "https://linkedin.com/in/avirooppaul"
+   ]
+  },
+  {
+   "@type": "FAQPage",
+   "@id": "https://bleep-omega.vercel.app/#faq",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "How do I install it?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Run the command at the top in Terminal. Then press ⌘ Space and type bleep. A short setup connects Claude Code and Google."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "What do I need?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "A Mac with Apple silicon on macOS 15 or later. Intel Macs are not supported. For the model, use Claude Code (the default), an API key, or a local model in Ollama or LM Studio."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is it free?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. bleep is free and open source under the MIT license. By default it thinks with your own Claude plan through Claude Code, so its model use counts toward that plan. No API key and no extra bill."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is bleep open source?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. The full source is on GitHub under the MIT license: a Rust core built with Tauri 2 and React views. Issues and pull requests are welcome."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can I use bleep without Claude Code?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. In Settings, Model, paste an API key from Anthropic, OpenAI, Google Gemini, OpenRouter or Groq. Or pick Ollama or LM Studio to run a local model, so nothing leaves your Mac. Chat, tools and approval cards work the same way."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "What data leaves my Mac?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Your mail, calendar and memory stay on your Mac. When bleep needs to think, it sends only the text it needs to Claude, through Claude Code. If you pick a local model, nothing leaves at all. There is no bleep server, no account and no telemetry."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can it approve things in Claude Code or Codex?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Only what your rules allow. Out of the box: tests, lint, file reads, and screenshots it can check against the ask. Push, deploy, delete, secrets and money always wait for you. Every approval is logged."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can it remind me of things?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Say \"remind me at 7 to call mom\" in the chat, or add one in the Reminders tab. It shows a bubble and a Mac notification on time, even in quiet hours."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can it send email as me?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Only after you tap yes on the exact message. Sending, moving events and deleting always ask first."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Will it ping me all day?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. Rules filter the noise first. It has quiet hours and a limit on pings per hour. Most checks end with it saying nothing."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "What can it connect to?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Gmail, Google Calendar, Google Drive and the files on your Mac are built in. Turn each one on in Settings, Connectors. Add any app with a remote MCP server: paste its URL and sign in."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can it read files on my Mac?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Only if you turn on Files on this Mac. It reads Documents, Desktop and Downloads, including the text in PDFs. It skips hidden files and keys. Before it runs any command, it shows you the exact command and waits for your yes."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is bleep an alternative to Grok Bot?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "For personal work on a Mac, yes. Grok Bot runs teams of agents on xAI's cloud computers and needs a paid plan. bleep is free, runs on your Mac, and speaks first when a meeting, a bill, a waiting mail or a stuck coding agent needs you. It does not click through other apps for you. Full comparison."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How is bleep different from OpenClaw?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "OpenClaw is an assistant you message from chat apps. bleep is a native Mac app that floats on your desktop, watches your mail, calendar and coding agents on its own, and approves safe Claude Code and Codex asks by your rules. Full comparison."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can I change how bleep looks?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Open Settings, then Avatar. Pick a buddy, a color and a finish. The menu bar icon changes to match."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How do I uninstall it?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Run brew uninstall --cask bleep, or drag bleep from Applications to the Trash. Delete ~/.bleep to remove its memory and settings."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
 <!-- Vercel Web Analytics -->
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
 <script defer src="/_vercel/insights/script.js"></script>
@@ -897,6 +1121,26 @@ section{padding:120px 0 0}
 .phone .mfit{margin:0 -12px}
 .phone .mfit > .mac{height:660px}
 @media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important} }
+
+/* ---------- compare + footer (SEO pages) ---------- */
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
+.cmp-wrap{border-radius:20px; overflow-x:auto; -webkit-overflow-scrolling:touch}
+.cmp{width:100%; min-width:720px; border-collapse:collapse; font-size:15px}
+.cmp th,.cmp td{padding:14px 18px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line)}
+.cmp tbody tr:last-child th,.cmp tbody tr:last-child td{border-bottom:0}
+.cmp thead th{font:600 14px/1.2 var(--sans); color:var(--ink)}
+.cmp tbody th{font-weight:500; color:var(--ink-2); width:22%}
+.cmp td{color:var(--ink-2)}
+.cmp td:nth-child(2),.cmp thead th:nth-child(2){color:var(--ink); background:var(--blue-soft)}
+.cmp td:nth-child(2){font-weight:500}
+.cmp-links{margin:18px 0 0; color:var(--ink-2); font-size:15px}
+.cmp-links a,.faq p a{color:var(--blue); text-decoration:none}
+.cmp-links a:hover,.faq p a:hover,.sfoot a:hover{text-decoration:underline}
+.sfoot{padding:8px 0 40px; color:var(--muted); font-size:14px}
+.sfoot nav{display:flex; flex-wrap:wrap; gap:8px 20px; margin-bottom:10px}
+.sfoot a{color:var(--ink-2); text-decoration:none}
+.sfoot p{margin:0}
+.sfoot p a{color:inherit; text-decoration:underline}
 </style>
 </head>
 <body>
@@ -906,7 +1150,7 @@ section{padding:120px 0 0}
   <div class="bar">
     <a class="brand" href="#top" aria-label="bleep, back to top"><span class="btile"><span data-bud="head"></span></span><em class="wm">bleep</em></a>
     <div class="links">
-      <a href="#demo">demo</a><a href="#cases">features</a><a href="#private">privacy</a><a href="#faq">faq</a>
+      <a href="#demo">demo</a><a href="#cases">features</a><a href="#private">privacy</a><a href="#compare">compare</a><a href="#faq">faq</a>
     </div>
     <a class="npill" href="https://github.com/AviroopPaul/bleep" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>github</span></a>
   </div>
@@ -918,8 +1162,8 @@ section{padding:120px 0 0}
   <header class="hero">
     <div class="htop">
       <p class="avail rv">available on <span><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>macOS</span><i aria-hidden="true">·</i><span>Apple silicon</span></p>
-      <h1 class="meet rv">Meet <span class="bud mbud" data-bud="face" title="Your buddy. Pick another one below."></span> bleep</h1>
-      <p class="lede rv">A little buddy for the <span class="nw"><span class="hchip"><i data-icon="cc"></i>Claude Code</span>,</span> <span class="nw"><span class="hchip"><i data-icon="gm"></i>Gmail</span> and</span> <span class="hchip"><i data-icon="ca"></i>Calendar</span> you already use. It clears the small asks and taps you only when it matters.</p>
+      <h1 class="meet rv">Meet <span class="bud mbud" data-bud="face" title="Your buddy. Pick another one below."></span> bleep<span class="sr-only">, the free AI assistant for your Mac</span></h1>
+      <p class="lede rv">A free, open source AI buddy for your Mac. It watches the <span class="nw"><span class="hchip"><i data-icon="cc"></i>Claude Code</span>,</span> <span class="nw"><span class="hchip"><i data-icon="gm"></i>Gmail</span> and</span> <span class="hchip"><i data-icon="ca"></i>Calendar</span> you already use, clears the small asks, and taps you only when it matters.</p>
       <div class="hcta rv" id="install">
         <div class="split" id="hsplit">
           <button class="sp-main" type="button" id="hCopy" data-cmd="brew install --cask AviroopPaul/tap/bleep"><svg class="apl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg><span>Install for free</span></button>
@@ -933,7 +1177,7 @@ section{padding:120px 0 0}
         </div>
         <a class="btn soft gh" id="ghStar" href="https://github.com/AviroopPaul/bleep" target="_blank" rel="noopener"><svg class="ghm" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>Star on GitHub</span><span class="ghn" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.81 4.2.61a.75.75 0 0 1 .42 1.28l-3.04 2.97.72 4.19a.75.75 0 0 1-1.09.79L8 12.34l-3.76 1.98a.75.75 0 0 1-1.09-.79l.72-4.19L.83 6.37a.75.75 0 0 1 .42-1.28l4.2-.61L7.33.67A.75.75 0 0 1 8 .25z"/></svg><b></b></span></a>
       </div>
-      <p class="hfoot rv" id="hNote" aria-live="polite">Free. Needs Claude Code and macOS 15 or later.</p>
+      <p class="hfoot rv" id="hNote" aria-live="polite">Free and open source (MIT). macOS 15+ on Apple silicon.</p>
       </div>
     </div>
     <div class="hfit" data-fit-all="1132">
@@ -1109,7 +1353,7 @@ section{padding:120px 0 0}
 <!-- ============ WHAT IT DOES ============ -->
 <section id="cases">
   <div class="wrap">
-    <div class="sec-head rv"><div><span class="stencil">What it does</span><h2>Small jobs, done on time.</h2></div></div>
+    <div class="sec-head rv"><div><span class="stencil">What bleep does</span><h2>Small jobs, done on time.</h2></div></div>
     <div class="bento" id="bento">
 
       <figure class="tile glass wide rv">
@@ -1235,7 +1479,7 @@ section{padding:120px 0 0}
 <!-- ============ TRUST ============ -->
 <section id="private">
   <div class="wrap">
-    <div class="sec-head rv"><div><span class="stencil">Trust</span><h2>Built to be trusted with your inbox.</h2></div></div>
+    <div class="sec-head rv"><div><span class="stencil">Privacy and safety</span><h2>Built to be trusted with your inbox.</h2></div></div>
     <div class="conv glass rv">
       <div class="convhead"><h3>Asks before it acts</h3><p>Your rules decide. Safe asks pass. Risky ones wait for you.</p></div>
       <div class="belt" id="belt">
@@ -1292,21 +1536,48 @@ section{padding:120px 0 0}
   </div>
 </section>
 
+<!-- ============ COMPARE ============ -->
+<section id="compare">
+  <div class="wrap">
+    <div class="sec-head rv"><div><span class="stencil">How bleep compares</span><h2>A buddy on your Mac, not a bot farm in the cloud.</h2><p>bleep is one proactive assistant that lives on your desktop. Here is how it sits next to Grok Bot, OpenClaw and OpenMausBot.</p></div></div>
+    <div class="cmp-wrap glass rv">
+      <table class="cmp">
+        <caption class="sr-only">bleep compared with Grok Bot, OpenClaw and OpenMausBot</caption>
+        <thead><tr><th scope="col"></th><th scope="col">bleep</th><th scope="col">Grok Bot</th><th scope="col">OpenClaw</th><th scope="col">OpenMausBot</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Main job</th><td>Watches your agents, mail and calendar, and taps you</td><td>Cloud teammates that do work in your apps</td><td>Assistant you message from chat apps</td><td>A team of agent bots, each with its own machine</td></tr>
+          <tr><th scope="row">Runs on</th><td>Your Mac, native</td><td>xAI's cloud computers</td><td>Your machine or server</td><td>Desktop app plus VMs</td></tr>
+          <tr><th scope="row">Speaks first</th><td>Yes, on its own</td><td>On tasks you set up</td><td>On schedules you set up</td><td>When you message it</td></tr>
+          <tr><th scope="row">Approves safe Claude Code and Codex asks</th><td>Yes, by your rules</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><th scope="row">Model</th><td>Claude Code plan, any API key, or local</td><td>Grok</td><td>Your choice</td><td>Claude, Codex or Grok CLIs</td></tr>
+          <tr><th scope="row">Price</th><td>Free</td><td>Paid plan</td><td>Free, pay for the model</td><td>Free</td></tr>
+          <tr><th scope="row">Open source</th><td>Yes, MIT</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cmp-links rv">Read more: <a href="/vs/grok-bot">bleep vs Grok Bot</a> · <a href="/vs/openclaw">bleep vs OpenClaw</a> · <a href="/vs/openmausbot">bleep vs OpenMausBot</a> · <a href="/claude-code-companion">bleep for Claude Code</a> · <a href="/alternatives">All alternatives</a></p>
+  </div>
+</section>
+
 <!-- ============ FAQ ============ -->
 <section id="faq">
   <div class="wrap">
     <div class="sec-head rv"><div><span class="stencil">FAQ</span><h2>Questions.</h2></div></div>
     <div class="faq rv">
       <details open><summary>How do I install it?</summary><p>Run the command at the top in Terminal. Then press ⌘ Space and type bleep. A short setup connects Claude Code and Google.</p></details>
-      <details><summary>What do I need?</summary><p>A Mac with Apple silicon on macOS 15 or later, and Claude Code installed and signed in. Intel Macs are not supported.</p></details>
-      <details><summary>Is it free?</summary><p>Yes. bleep thinks with your own Claude plan through Claude Code, so its model use counts toward that plan.</p></details>
-      <details><summary>What data leaves my Mac?</summary><p>Your mail, calendar and memory stay on your Mac. When bleep needs to think, it sends only the text it needs to Claude, through Claude Code. There is no bleep server.</p></details>
+      <details><summary>What do I need?</summary><p>A Mac with Apple silicon on macOS 15 or later. Intel Macs are not supported. For the model, use Claude Code (the default), an API key, or a local model in Ollama or LM Studio.</p></details>
+      <details><summary>Is it free?</summary><p>Yes. bleep is free and open source under the MIT license. By default it thinks with your own Claude plan through Claude Code, so its model use counts toward that plan. No API key and no extra bill.</p></details>
+      <details><summary>Is bleep open source?</summary><p>Yes. The full source is on <a href="https://github.com/AviroopPaul/bleep">GitHub</a> under the MIT license: a Rust core built with Tauri 2 and React views. Issues and pull requests are welcome.</p></details>
+      <details><summary>Can I use bleep without Claude Code?</summary><p>Yes. In Settings, Model, paste an API key from Anthropic, OpenAI, Google Gemini, OpenRouter or Groq. Or pick Ollama or LM Studio to run a local model, so nothing leaves your Mac. Chat, tools and approval cards work the same way.</p></details>
+      <details><summary>What data leaves my Mac?</summary><p>Your mail, calendar and memory stay on your Mac. When bleep needs to think, it sends only the text it needs to Claude, through Claude Code. If you pick a local model, nothing leaves at all. There is no bleep server, no account and no telemetry.</p></details>
       <details><summary>Can it approve things in Claude Code or Codex?</summary><p>Only what your rules allow. Out of the box: tests, lint, file reads, and screenshots it can check against the ask. Push, deploy, delete, secrets and money always wait for you. Every approval is logged.</p></details>
       <details><summary>Can it remind me of things?</summary><p>Yes. Say "remind me at 7 to call mom" in the chat, or add one in the Reminders tab. It shows a bubble and a Mac notification on time, even in quiet hours.</p></details>
       <details><summary>Can it send email as me?</summary><p>Only after you tap yes on the exact message. Sending, moving events and deleting always ask first.</p></details>
       <details><summary>Will it ping me all day?</summary><p>No. Rules filter the noise first. It has quiet hours and a limit on pings per hour. Most checks end with it saying nothing.</p></details>
       <details><summary>What can it connect to?</summary><p>Gmail, Google Calendar, Google Drive and the files on your Mac are built in. Turn each one on in Settings, Connectors. Add any app with a remote MCP server: paste its URL and sign in.</p></details>
       <details><summary>Can it read files on my Mac?</summary><p>Only if you turn on Files on this Mac. It reads Documents, Desktop and Downloads, including the text in PDFs. It skips hidden files and keys. Before it runs any command, it shows you the exact command and waits for your yes.</p></details>
+      <details><summary>Is bleep an alternative to Grok Bot?</summary><p>For personal work on a Mac, yes. Grok Bot runs teams of agents on xAI's cloud computers and needs a paid plan. bleep is free, runs on your Mac, and speaks first when a meeting, a bill, a waiting mail or a stuck coding agent needs you. It does not click through other apps for you. <a href="/vs/grok-bot">Full comparison</a>.</p></details>
+      <details><summary>How is bleep different from OpenClaw?</summary><p>OpenClaw is an assistant you message from chat apps. bleep is a native Mac app that floats on your desktop, watches your mail, calendar and coding agents on its own, and approves safe Claude Code and Codex asks by your rules. <a href="/vs/openclaw">Full comparison</a>.</p></details>
       <details><summary>Can I change how bleep looks?</summary><p>Yes. Open Settings, then Avatar. Pick a buddy, a color and a finish. The menu bar icon changes to match.</p></details>
       <details><summary>How do I uninstall it?</summary><p>Run <code>brew uninstall --cask bleep</code>, or drag bleep from Applications to the Trash. Delete <code>~/.bleep</code> to remove its memory and settings.</p></details>
     </div>
@@ -1329,10 +1600,26 @@ section{padding:120px 0 0}
           <button class="icopy" type="button">Copy</button>
         </div>
       </div>
-      <p class="req">Free · Apple silicon · macOS 15+ · needs Claude Code</p>
+      <p class="req">Free and open source · Apple silicon · macOS 15+</p>
     </div>
   </div>
 </section>
+<footer class="sfoot">
+  <div class="wrap">
+    <nav aria-label="More about bleep">
+      <a href="https://github.com/AviroopPaul/bleep">Source on GitHub</a>
+      <a href="https://github.com/AviroopPaul/bleep-releases/releases">Releases</a>
+      <a href="/changelog">Changelog</a>
+      <a href="/alternatives">Alternatives</a>
+      <a href="/vs/grok-bot">vs Grok Bot</a>
+      <a href="/vs/openclaw">vs OpenClaw</a>
+      <a href="/vs/openmausbot">vs OpenMausBot</a>
+      <a href="/claude-code-companion">For Claude Code</a>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <p>bleep is a free, open source project by <a href="https://avirooppaul.site">Aviroop Paul</a>, MIT license. Not affiliated with Anthropic, OpenAI, Google or xAI.</p>
+  </div>
+</footer>
 </main>
 
 
