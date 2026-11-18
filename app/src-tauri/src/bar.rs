@@ -58,18 +58,19 @@ impl BarUi for TauriBarUi {
     }
 
     fn bubble(&self, text: &str) {
-        self.show_bubble(text, None);
+        self.show_bubble(text, json!({}));
     }
 
     fn ping(&self, text: &str, ping_id: i64) {
-        self.show_bubble(text, Some(ping_id));
+        self.show_bubble(text, json!({"ping_id": ping_id}));
     }
 }
 
 impl TauriBarUi {
     /// The bubble stays until clicked, dismissed, or replaced by a newer one. It is skipped
     /// when the droid is hidden or tucked, but the chat still gets the line.
-    fn show_bubble(&self, text: &str, ping_id: Option<i64>) {
+    /// `extra` rides along to the bubble view: `ping_id` for mail pings, `reminder_id` for reminders.
+    fn show_bubble(&self, text: &str, extra: serde_json::Value) {
         match save_ping(&self.app.state::<AppState>().store, text) {
             Ok(Some(m)) => {
                 let _ = self.app.emit("chat://ping", &m);
@@ -85,8 +86,46 @@ impl TauriBarUi {
         let (Some(r), Some(b)) = (rect_of(&d), self.app.get_webview_window("bubble")) else { return };
         let p = bubble_pos(r, screen_of(&self.app, r), BUBBLE);
         let _ = b.set_position(LogicalPosition::new(p.x, p.y));
-        let _ = self.app.emit("bubble://text", json!({"text": text, "ping_id": ping_id}));
+        let mut payload = json!({"text": text});
+        if let (Some(p), Some(e)) = (payload.as_object_mut(), extra.as_object()) {
+            p.extend(e.clone());
+        }
+        let _ = self.app.emit("bubble://text", payload);
         let _ = b.show();
+    }
+}
+
+/// The line a reminder shows, in the bubble, the notification and the chat.
+pub fn reminder_text(r: &crate::store::reminders::Reminder, how: &crate::reminders::Fire) -> String {
+    use crate::reminders::Fire;
+    match how {
+        Fire::Now { late: false } => format!("Reminder: {}", r.text),
+        Fire::Now { late: true } => format!("Reminder (late): {}", r.text),
+        Fire::Missed => {
+            let due = r.next_at().with_timezone(&chrono::Local).format("%-I:%M %p, %-d %b");
+            format!("Missed reminder: {} (due {due})", r.text)
+        }
+    }
+}
+
+/// A reminder is due: a bubble with Done and Snooze, a macOS notification, and a chat line.
+/// A missed one (the Mac slept through it) only goes to the chat.
+pub fn reminder_fired(app: &AppHandle, r: &crate::store::reminders::Reminder, how: crate::reminders::Fire) {
+    let text = reminder_text(r, &how);
+    if how == crate::reminders::Fire::Missed {
+        match save_ping(&app.state::<AppState>().store, &text) {
+            Ok(Some(m)) => {
+                let _ = app.emit("chat://ping", &m);
+            }
+            Ok(None) => {}
+            Err(e) => eprintln!("bleep: could not save reminder to chat: {e}"),
+        }
+        return;
+    }
+    TauriBarUi::new(app.clone()).show_bubble(&text, json!({"reminder_id": r.id}));
+    use tauri_plugin_notification::NotificationExt;
+    if let Err(e) = app.notification().builder().title(crate::flavor::NAME).body(&r.text).show() {
+        eprintln!("bleep: reminder notification: {e}");
     }
 }
 

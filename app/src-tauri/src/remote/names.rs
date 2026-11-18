@@ -2,7 +2,7 @@
 use reqwest::Url;
 
 /// Connector ids a remote server may not take.
-pub const BUILTIN: &[&str] = &["bleep", "gmail", "calendar", "memory", "agents", "google"];
+pub const BUILTIN: &[&str] = &["bleep", "gmail", "calendar", "drive", "files", "catalog", "memory", "reminders", "agents", "google"];
 pub const MAX_NAME: usize = 16;
 const SKIP: &[&str] = &["www", "api", "mcp", "app"];
 

@@ -17,7 +17,7 @@ test("lists built-in connectors, servers, tools and why a tool is left out", asy
   await expect(day.getByLabel("Mode for move_task")).toHaveValue("ask");
   await expect(day).toContainText("Not used: Its name is too long.");
   await expect(page.getByRole("group", { name: "wiki" }).getByRole("status")).toHaveText("Needs sign-in");
-  for (const b of ["Gmail", "Google Calendar", "Memory", "Date and time"]) await expect(page.getByRole("tabpanel").getByText(b, { exact: true })).toBeVisible();
+  for (const b of ["Gmail", "Google Calendar", "Google Drive", "Memory", "Date and time", "Reminders"]) await expect(page.getByRole("tabpanel").getByText(b, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(460);
   expect(await page.locator(".tabs").evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
 });
@@ -47,7 +47,7 @@ test("a server with no OAuth asks for a token", async ({ page }) => {
   await page.getByLabel("Server URL").fill("https://tokenonly.example.com/mcp");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText("Paste a token for it instead.", { exact: false })).toBeVisible();
-  await page.getByLabel("Token").fill("abc");
+  await page.getByLabel("Token", { exact: true }).fill("abc");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByRole("group", { name: "tokenonly" })).toContainText("Uses a token you pasted");
 });
@@ -102,4 +102,51 @@ test("a token server signs in again with a new token", async ({ page }) => {
   await wiki.getByRole("button", { name: "Sign in again" }).click();
   await expect(wiki.getByRole("status")).toHaveText("Connected");
   expect(await calls(page)).toContain("remote_sign_in:wiki");
+});
+
+test("the catalog turns Google connectors on and off, one sign-in each", async ({ page }) => {
+  await open(page, "&catalog=on");
+  await expect(page.locator(".cat-ico svg path")).toHaveCount(7);
+  const drive = page.getByRole("group", { name: "Google Drive" });
+  await expect(drive.getByRole("status")).toHaveCount(0);
+  await drive.getByRole("switch", { name: "Google Drive on" }).check();
+  await expect.poll(() => calls(page)).toContain("catalog_set:drive:true:");
+  await expect(drive.getByRole("status")).toHaveText("On");
+  const gmail = page.getByRole("group", { name: "Gmail" });
+  await expect(gmail.getByRole("switch", { name: "Gmail on" })).toBeChecked();
+  await gmail.getByRole("switch", { name: "Gmail on" }).uncheck();
+  await expect.poll(() => calls(page)).toContain("catalog_set:gmail:false:");
+  await expect(gmail.getByRole("switch", { name: "Gmail on" })).not.toBeChecked();
+});
+
+test("apps: Linear turns on, GitHub needs a token first", async ({ page }) => {
+  await open(page, "");
+  const linear = page.getByRole("group", { name: "Linear" });
+  await linear.getByRole("switch", { name: "Linear on" }).check();
+  await expect(linear.getByRole("status")).toHaveText("On, 12 tools");
+  const gh = page.getByRole("group", { name: "GitHub" });
+  const sw = gh.getByRole("switch", { name: "GitHub on" });
+  await expect(sw).toBeDisabled();
+  await gh.getByLabel("GitHub token").fill("ghp_test");
+  await sw.check();
+  await expect.poll(() => calls(page)).toContain("catalog_set:github:true:ghp_test");
+  await expect(gh.getByLabel("GitHub token")).toHaveCount(0);
+  for (const s of ["Date and time", "Memory", "Reminders"]) await expect(page.locator(".cat-always").getByText(s, { exact: true })).toBeVisible();
+});
+
+test("a failed sign-in leaves the connector off and says why", async ({ page }) => {
+  await open(page, "&catalog=fail");
+  const cal = page.getByRole("group", { name: "Google Calendar" });
+  await cal.getByRole("switch", { name: "Google Calendar on" }).click();
+  await expect(page.getByRole("alert")).toContainText("access_denied");
+  await expect(cal.getByRole("switch", { name: "Google Calendar on" })).not.toBeChecked();
+});
+
+test("Files on this Mac turns on with no sign-in", async ({ page }) => {
+  await open(page, "");
+  await expect(page.getByRole("heading", { name: "On this Mac", exact: true })).toBeVisible();
+  const files = page.getByRole("group", { name: "Files on this Mac" });
+  await files.getByRole("switch", { name: "Files on this Mac on" }).check();
+  await expect.poll(() => calls(page)).toContain("catalog_set:files:true:");
+  await expect(files.getByRole("status")).toHaveText("On");
 });

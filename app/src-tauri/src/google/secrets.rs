@@ -8,7 +8,8 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 
-pub const SERVICE: &str = "site.avirooppaul.bleep";
+/// A dev build keeps its own vault, apart from the production app.
+pub const SERVICE: &str = crate::flavor::KEYCHAIN_SERVICE;
 const VAULT: &str = "vault";
 
 pub trait Secrets: Send + Sync {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { DROID_FULL } from "./droidSvg";
 import { api, onChatEvent, onDroidMood, onVoice } from "../ipc";
+import { DEV, NAME } from "../flavor";
 
 type Mood = "idle" | "thinking" | "alert" | "happy" | "listening";
 const DRAG_PX = 4;
@@ -75,12 +76,13 @@ export function Droid() {
   return (
     <button
       className="droid-stage"
-      aria-label="bleep. Click to open the chat, double click to tuck away, drag to move."
+      aria-label={`${NAME}. Click to open the chat, double click to tuck away, drag to move.`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
       <div className={`droid ${mood === "idle" ? "" : mood}`} dangerouslySetInnerHTML={{ __html: DROID_FULL }} />
+      {DEV && <span className="droid-dev" aria-hidden="true">dev</span>}
     </button>
   );
 }

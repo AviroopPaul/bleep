@@ -59,7 +59,7 @@ pub fn open_settings(app: &AppHandle) {
     // On the screen where the droid is, not always the main one.
     let (at, size) = crate::windows::panel_on_droid_screen(app, crate::windows::Size { w: 860.0, h: 620.0 });
     let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html#settings".into()))
-        .title("bleep settings")
+        .title(format!("{} settings", crate::flavor::NAME))
         .inner_size(size.w, size.h)
         .min_inner_size(440.0, 460.0)
         .resizable(true)
@@ -117,9 +117,23 @@ pub async fn google_use_builtin(app: AppHandle, state: tauri::State<'_, AppState
 }
 
 #[tauri::command]
-pub async fn google_connect(app: AppHandle, auth: tauri::State<'_, Arc<GoogleAuth>>, sched: tauri::State<'_, Arc<Scheduler>>) -> Result<String, String> {
-    let account = auth.sign_in(SIGN_IN_WAIT).await.map_err(|e| e.to_string())?;
+pub async fn google_connect(app: AppHandle, state: tauri::State<'_, AppState>, auth: tauri::State<'_, Arc<GoogleAuth>>, sched: tauri::State<'_, Arc<Scheduler>>) -> Result<String, String> {
+    // Connect asks for the Google connectors that are on. With none on (setup, or a new
+    // install), it turns on Gmail and Calendar, as bleep always had them.
+    let on: Vec<String> = state.config.lock().unwrap().connectors.on.iter().filter(|id| crate::google::GOOGLE_CONNECTORS.contains(&id.as_str())).cloned().collect();
+    let ids: Vec<String> = if on.is_empty() { vec!["gmail".into(), "calendar".into()] } else { on };
+    let scopes: Vec<&str> = ids.iter().flat_map(|id| crate::google::scopes_for(id).iter().copied()).collect();
+    let account = auth.sign_in_for(&scopes, SIGN_IN_WAIT).await.map_err(|e| e.to_string())?;
+    {
+        let mut c = state.config.lock().unwrap();
+        for id in &ids {
+            c.connectors.set(id, true);
+        }
+        c.save(&state.paths.config_file).map_err(|e| e.to_string())?;
+    }
+    crate::marketplace::apply_on(&state, &auth);
     push_status(&app, &auth);
+    let _ = app.emit("connectors://changed", ());
     sched.refresh_now().await;
     Ok(account)
 }

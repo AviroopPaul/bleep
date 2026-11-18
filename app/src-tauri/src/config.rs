@@ -187,6 +187,59 @@ impl McpServer {
     }
 }
 
+/// Files on this Mac (0.5.0): the folders bleep may search and read. `~` is the home folder.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FilesConfig {
+    pub folders: Vec<String>,
+}
+
+impl Default for FilesConfig {
+    fn default() -> Self {
+        Self { folders: ["~/Documents", "~/Desktop", "~/Downloads"].map(String::from).to_vec() }
+    }
+}
+
+/// Settings > Connectors (0.5.0, F3): which built-in connectors are on. Remote ones keep
+/// their own `enabled` in `mcp.servers`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ConnectorsConfig {
+    pub on: Vec<String>,
+    /// Set once the list was first filled. Before 0.5.0 Gmail and Calendar were always on.
+    pub initialized: bool,
+}
+
+impl ConnectorsConfig {
+    /// First run of 0.5.0: someone who already set bleep up keeps Gmail and Calendar on.
+    /// Returns true when it changed something to save.
+    pub fn init(&mut self, setup_done: bool) -> bool {
+        if self.initialized {
+            return false;
+        }
+        if setup_done {
+            for id in ["gmail", "calendar"] {
+                if !self.on.iter().any(|x| x == id) {
+                    self.on.push(id.into());
+                }
+            }
+        }
+        self.initialized = true;
+        true
+    }
+
+    pub fn is_on(&self, id: &str) -> bool {
+        self.on.iter().any(|x| x == id)
+    }
+
+    pub fn set(&mut self, id: &str, on: bool) {
+        self.on.retain(|x| x != id);
+        if on {
+            self.on.push(id.into());
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct McpConfig {
@@ -229,6 +282,8 @@ pub struct Config {
     pub agents: AgentsConfig,
     pub memory: MemoryConfig,
     pub mcp: McpConfig,
+    pub connectors: ConnectorsConfig,
+    pub files: FilesConfig,
     pub api: ApiConfig,
     pub updates: UpdatesConfig,
     pub voice: VoiceConfig,
@@ -250,6 +305,8 @@ impl Default for Config {
             agents: AgentsConfig::default(),
             memory: MemoryConfig::default(),
             mcp: McpConfig::default(),
+            connectors: ConnectorsConfig::default(),
+            files: FilesConfig::default(),
             api: ApiConfig::default(),
             updates: UpdatesConfig::default(),
             voice: VoiceConfig::default(),
@@ -285,6 +342,20 @@ mod tests {
     use super::*;
     use crate::paths::{resolve_root, BleepPaths};
     use std::path::PathBuf;
+
+    #[test]
+    fn connectors_init_keeps_gmail_and_calendar_for_existing_setups() {
+        let mut c = ConnectorsConfig::default();
+        assert!(c.init(true));
+        assert!(c.is_on("gmail") && c.is_on("calendar") && !c.is_on("drive"));
+        assert!(!c.init(true), "only once");
+        let mut fresh = ConnectorsConfig::default();
+        fresh.init(false);
+        assert!(fresh.on.is_empty(), "a new install starts with every connector off");
+        c.set("drive", true);
+        c.set("gmail", false);
+        assert_eq!(c.on, ["calendar", "drive"]);
+    }
 
     #[test]
     fn memory_defaults_and_threshold() {

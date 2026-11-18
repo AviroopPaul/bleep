@@ -1,3 +1,4 @@
+import { DEV } from "../flavor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MailSettings } from "./MailSettings";
 import { Activity } from "./Activity";
@@ -155,10 +156,10 @@ type Tab = (typeof TABS)[number];
 const BLURB: Record<Tab, string> = {
   Model: "Provider and models",
   Voice: "Wake word and speech",
-  Google: "Account and calendar",
+  Google: "Your Google account",
   Mail: "VIPs, mutes and lists",
   Memory: "Facts and compaction",
-  Connectors: "MCP servers you add",
+  Connectors: "Google, apps and servers",
   Agents: "Coding sessions",
   Activity: "What bleep did",
   Updates: "New versions",
@@ -181,7 +182,7 @@ export function Settings() {
   return (
     <main className="settings">
       <div className="set-side">
-        <h1>Settings</h1>
+        <h1>Settings{DEV && <span className="dev-tag">(dev)</span>}</h1>
         <div className="tabs" role="tablist" aria-label="Settings" aria-orientation="vertical">
           {TABS.map((t, i) => (
             <button

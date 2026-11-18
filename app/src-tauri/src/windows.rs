@@ -13,7 +13,8 @@ pub const CHAT: Size = Size { w: 400.0, h: 600.0 };
 /// The enlarged chat. Shrunk to fit a small screen.
 pub const CHAT_BIG: Size = Size { w: 760.0, h: 860.0 };
 pub const BAR: Size = Size { w: 560.0, h: 64.0 };
-pub const BUBBLE: Size = Size { w: 240.0, h: 72.0 };
+// Tall enough for two lines plus a row of reminder buttons.
+pub const BUBBLE: Size = Size { w: 240.0, h: 96.0 };
 /// Gap between the droid and the chat panel.
 pub const GAP: f64 = 8.0;
 /// Space kept between a window and the screen edge.
@@ -285,7 +286,7 @@ fn float_everywhere(_w: &WebviewWindow) {}
 pub fn create_windows(app: &AppHandle, cfg: &Config) -> tauri::Result<()> {
     let p = restore_pos(cfg.droid_pos, &screens(app), DROID);
     let droid = WebviewWindowBuilder::new(app, "droid", WebviewUrl::App("index.html#droid".into()))
-        .title("bleep")
+        .title(crate::flavor::NAME)
         .inner_size(DROID.w, DROID.h)
         .position(p.x, p.y)
         .transparent(true)
@@ -301,7 +302,7 @@ pub fn create_windows(app: &AppHandle, cfg: &Config) -> tauri::Result<()> {
         .build()?;
     float_everywhere(&droid);
     let chat = WebviewWindowBuilder::new(app, "chat", WebviewUrl::App("index.html#chat".into()))
-        .title("bleep")
+        .title(crate::flavor::NAME)
         .inner_size(CHAT.w, CHAT.h)
         .transparent(true)
         .decorations(false)
@@ -322,7 +323,7 @@ pub fn create_windows(app: &AppHandle, cfg: &Config) -> tauri::Result<()> {
     float_everywhere(&chat);
     for (label, size) in [("bar", BAR), ("bubble", BUBBLE)] {
         let w = WebviewWindowBuilder::new(app, label, WebviewUrl::App(format!("index.html#{label}").into()))
-            .title("bleep")
+            .title(crate::flavor::NAME)
             .inner_size(size.w, size.h)
             .transparent(true)
             .decorations(false)
@@ -457,25 +458,28 @@ pub fn droid_set_visible(app: AppHandle, visible: bool) {
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let toggle = MenuItem::with_id(app, "toggle_droid", "Hide droid", true, None::<&str>)?;
     let open = MenuItem::with_id(app, "open_chat", "Open chat", true, None::<&str>)?;
-    let pause = CheckMenuItem::with_id(app, "pause", "Pause bleep", true, false, None::<&str>)?;
+    let paused_now = app.state::<UiState>().paused.load(Ordering::SeqCst);
+    let pause = CheckMenuItem::with_id(app, "pause", format!("Pause {}", crate::flavor::NAME), true, paused_now, None::<&str>)?;
     let login_on = {
         use tauri_plugin_autostart::ManagerExt;
         app.autolaunch().is_enabled().unwrap_or(false)
     };
     // A dev build must never register itself at login, so the item is greyed out there.
-    let login = CheckMenuItem::with_id(app, "login", "Launch at login", crate::startup::IS_RELEASE, login_on, None::<&str>)?;
+    let login = CheckMenuItem::with_id(app, "login", "Launch at login", crate::startup::IS_RELEASE && !crate::flavor::DEV, login_on, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
-    let setup = MenuItem::with_id(app, "setup", "Set up bleep…", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit bleep", true, None::<&str>)?;
+    let setup = MenuItem::with_id(app, "setup", format!("Set up {}…", crate::flavor::NAME), true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", format!("Quit {}", crate::flavor::NAME), true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&toggle, &open, &pause, &login, &settings, &setup, &PredefinedMenuItem::separator(app)?, &quit])?;
     // The menu bar shows bleep's droid head as an outline. Source: icons/tray.svg.
     // As a template image, macOS tints it to match a light or dark menu bar.
     let tray = TrayIconBuilder::with_id("bleep")
-        .tooltip("bleep")
+        .tooltip(crate::flavor::NAME)
         .menu(&menu)
         .show_menu_on_left_click(true)
         .icon(tauri::include_image!("icons/tray.png"))
         .icon_as_template(true);
+    // The dev build's menu bar icon reads "dev" next to the droid head.
+    let tray = if crate::flavor::DEV { tray.title("dev") } else { tray };
     tray.on_menu_event(move |app, ev| match ev.id().as_ref() {
         "toggle_droid" => {
             if let Some(d) = app.get_webview_window("droid") {
@@ -532,7 +536,7 @@ mod tests {
     #[test]
     fn bubble_sits_above_droid_or_below_at_top_edge() {
         let p = bubble_pos(droid(600.0, 600.0), SCREEN, BUBBLE);
-        assert_eq!(p, Point { x: 600.0 + 66.0 - 120.0, y: 600.0 - GAP - 72.0 });
+        assert_eq!(p, Point { x: 600.0 + 66.0 - 120.0, y: 600.0 - GAP - BUBBLE.h });
         let p = bubble_pos(droid(600.0, 40.0), SCREEN, BUBBLE);
         assert_eq!(p.y, 40.0 + 132.0 + GAP);
     }

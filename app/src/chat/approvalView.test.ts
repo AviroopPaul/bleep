@@ -28,6 +28,15 @@ describe("approvalView", () => {
     expect(v.rows).toEqual([["Arguments", "None"]]);
   });
 
+  it("command card shows the whole command, the folder and a warning", () => {
+    const cmd = "cd invoices && " + "x".repeat(300);
+    const v = approvalView(card("files_run", { command: cmd, folder: "~/Downloads" }));
+    expect(v.heading).toBe("Run this command?");
+    expect(v.rows).toEqual([["Command", cmd], ["In", "~/Downloads"]]);
+    expect(v.warn).toContain("runs as you");
+    expect(approvalView(card("files_run", { command: "ls", folder: "~" }, "done")).doneText).toBe("Ran");
+  });
+
   it("memory card shows the exact fact and where it goes", () => {
     const v = approvalView(card("memory_promote", { fact: "Sync means my 1:1 with Priya", file: "MEMORY.md" }));
     expect(v.heading).toBe("Remember this?");

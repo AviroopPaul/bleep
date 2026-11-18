@@ -72,6 +72,8 @@ impl TurnTracker {
 pub struct ToolHost {
     /// Built-in connectors and remote servers. Remote ones come and go at run time.
     connectors: std::sync::RwLock<Vec<Arc<dyn Connector>>>,
+    /// Built-in connectors that are turned off: their tools are not listed and do not run.
+    hidden: std::sync::RwLock<std::collections::HashSet<String>>,
     gate: Arc<dyn Gate>,
     turns: TurnTracker,
     log: Option<Arc<crate::store::Store>>,
@@ -79,25 +81,36 @@ pub struct ToolHost {
 
 impl ToolHost {
     pub fn new(connectors: Vec<Arc<dyn Connector>>, gate: Arc<dyn Gate>, turns: TurnTracker) -> Arc<ToolHost> {
-        Arc::new(ToolHost { connectors: connectors.into(), gate, turns, log: None })
+        Arc::new(ToolHost { connectors: connectors.into(), hidden: Default::default(), gate, turns, log: None })
     }
 
     /// Like `new`, and writes every call to the Activity log.
     pub fn new_logged(connectors: Vec<Arc<dyn Connector>>, gate: Arc<dyn Gate>, turns: TurnTracker, store: Arc<crate::store::Store>) -> Arc<ToolHost> {
-        Arc::new(ToolHost { connectors: connectors.into(), gate, turns, log: Some(store) })
+        Arc::new(ToolHost { connectors: connectors.into(), hidden: Default::default(), gate, turns, log: Some(store) })
     }
 
     fn snapshot(&self) -> Vec<Arc<dyn Connector>> {
         self.connectors.read().unwrap().clone()
     }
 
+    /// The connectors that are on.
+    fn active(&self) -> Vec<Arc<dyn Connector>> {
+        let hidden = self.hidden.read().unwrap();
+        self.snapshot().into_iter().filter(|c| !hidden.contains(c.id())).collect()
+    }
+
+    /// Turns built-in connectors off by id (Settings > Connectors). The rest are on.
+    pub fn set_hidden(&self, ids: impl IntoIterator<Item = String>) {
+        *self.hidden.write().unwrap() = ids.into_iter().collect();
+    }
+
     /// Every tool the model may see. `Never` tools are not listed.
     pub fn specs(&self) -> Vec<ToolSpec> {
-        self.snapshot().iter().flat_map(|c| c.tools()).filter(|t| t.risk != Risk::Never).collect()
+        self.active().iter().flat_map(|c| c.tools()).filter(|t| t.risk != Risk::Never).collect()
     }
 
     fn find(&self, name: &str) -> Option<(Arc<dyn Connector>, ToolSpec)> {
-        self.snapshot().into_iter().find_map(|c| c.tools().into_iter().find(|t| t.name == name).map(|t| (c.clone(), t)))
+        self.active().into_iter().find_map(|c| c.tools().into_iter().find(|t| t.name == name).map(|t| (c.clone(), t)))
     }
 
     /// Adds a connector at the end, after the built-in ones.
@@ -262,6 +275,19 @@ pub mod tests {
     fn host(c: Arc<FakeConnector>, g: Arc<FakeGate>) -> (Arc<ToolHost>, TurnTracker) {
         let turns = TurnTracker::default();
         (ToolHost::new(vec![c, Arc::new(crate::connectors::bleep::BleepConnector)], g, turns.clone()), turns)
+    }
+
+    #[tokio::test]
+    async fn a_connector_that_is_off_has_no_tools_and_cannot_run() {
+        let (g, c) = (FakeGate::new(Decision::Declined), FakeConnector::new());
+        let (h, _) = host(c, g);
+        let before = h.tools_hash();
+        h.set_hidden(["bleep".to_string()]);
+        assert!(h.specs().iter().all(|t| t.name != "bleep_now"));
+        assert!(h.call("bleep_now", json!({})).await.is_err());
+        assert_ne!(h.tools_hash(), before, "the model gets a fresh session without the tools");
+        h.set_hidden([]);
+        assert!(h.call("bleep_now", json!({})).await.is_ok());
     }
 
     #[tokio::test]

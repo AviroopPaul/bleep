@@ -25,6 +25,10 @@ macro_rules! str_enum {
     };
 }
 
+// After the macro, which they use.
+pub mod reminders;
+pub mod usage;
+
 str_enum!(Role { User = "user", Assistant = "assistant", System = "system" });
 str_enum!(Kind { Chat = "chat", Scheduled = "scheduled", System = "system", Approval = "approval", Divider = "divider", Ping = "ping" });
 str_enum!(MsgStatus { Streaming = "streaming", Done = "done", Error = "error", Interrupted = "interrupted" });
@@ -356,6 +360,19 @@ CREATE TABLE api_usage (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX api_usage_day ON api_usage(day);
+"#, r#"
+CREATE TABLE reminders (
+  id INTEGER PRIMARY KEY,
+  text TEXT NOT NULL,
+  due_at TEXT NOT NULL,
+  repeat TEXT,
+  status TEXT NOT NULL DEFAULT 'scheduled',
+  snoozed_until TEXT,
+  fired_at TEXT,
+  source TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX reminders_status ON reminders(status);
 "#];
 
 pub struct Store {

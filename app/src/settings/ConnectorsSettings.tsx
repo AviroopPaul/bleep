@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, onConnectors, type ConnectorsView, type RemoteServer, type ToolMode } from "../ipc";
 import { ADDED, authText, modeLabel, NEEDS_CLIENT, SIGNING_IN, statusText, toolCount } from "./connectorsText";
+import { Catalog } from "./Catalog";
 
 const MODES: ToolMode[] = ["ask", "auto", "off"];
 
@@ -135,9 +136,21 @@ export function ConnectorsSettingsTab() {
 
   return (
     <div className="mail-set">
+      <Catalog onError={setError} />
+      {view && view.servers.length > 0 && (
+        <section aria-labelledby="srv-h">
+          <h3 id="srv-h" className="mail-h">Your servers</h3>
+          <div className="conn-list">
+            {view.servers.map((s) => (
+              <Server key={s.name} s={s} onError={setError} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section aria-labelledby="add-h">
-        <h3 id="add-h" className="mail-h">Add an MCP server</h3>
-        <p className="set-lead">Paste the server's URL. bleep finds out how it signs in. Tools that change things always show you a card first.</p>
+        <h3 id="add-h" className="mail-h">Add a server by URL</h3>
+        <p className="set-lead">For an MCP server that is not listed above. Paste its URL and bleep finds out how it signs in.</p>
         <form
           className="fields"
           onSubmit={(e) => {
@@ -170,30 +183,6 @@ export function ConnectorsSettingsTab() {
         {note && <p className="set-lead" role="status">{note}</p>}
       </section>
 
-      {view && view.servers.length > 0 && (
-        <section aria-labelledby="srv-h">
-          <h3 id="srv-h" className="mail-h">Your servers</h3>
-          <div className="conn-list">
-            {view.servers.map((s) => (
-              <Server key={s.name} s={s} onError={setError} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {view && (
-        <section aria-labelledby="bi-h">
-          <h3 id="bi-h" className="mail-h">Built in</h3>
-          <ul className="mem-list">
-            {view.builtin.map((b) => (
-              <li key={b.id}>
-                <span className="mem-fact">{b.label}</span>
-                <span className={`pill ${b.status.state}`}>{statusText(b.status)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
       {error && <p className="set-err" role="alert">{error}</p>}
     </div>
   );

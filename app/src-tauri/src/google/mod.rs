@@ -20,6 +20,24 @@ pub const SCOPES: [&str; 3] = [
     "https://www.googleapis.com/auth/gmail.compose",
 ];
 pub const REFRESH_KEY: &str = "google-refresh-token";
+/// The scopes Google granted, space separated. Older sign-ins have none: they got `SCOPES`.
+pub const SCOPES_KEY: &str = "google-scopes";
+/// Asked for on every sign-in, so bleep knows the account whatever else is on.
+pub const BASE_SCOPES: [&str; 2] = ["openid", "email"];
+pub const DRIVE_SCOPE: &str = "https://www.googleapis.com/auth/drive.readonly";
+
+/// What each Google connector needs. Turning one on asks Google only for these.
+pub fn scopes_for(connector: &str) -> &'static [&'static str] {
+    match connector {
+        "gmail" => &SCOPES[1..3],
+        "calendar" => &SCOPES[0..1],
+        "drive" => std::slice::from_ref(&DRIVE_SCOPE),
+        _ => &[],
+    }
+}
+
+/// The Google connectors, in catalog order.
+pub const GOOGLE_CONNECTORS: [&str; 3] = ["gmail", "calendar", "drive"];
 
 /// bleep's own Google OAuth client (Desktop app type), compiled in from
 /// `BLEEP_GOOGLE_CLIENT_ID` and `BLEEP_GOOGLE_CLIENT_SECRET`. Google treats a desktop
@@ -44,6 +62,8 @@ pub struct GoogleEndpoints {
     pub token: String,
     pub revoke: String,
     pub api: String,
+    /// OpenID user info: the account's email after a sign-in without Calendar.
+    pub userinfo: String,
 }
 
 impl GoogleEndpoints {
@@ -53,6 +73,7 @@ impl GoogleEndpoints {
             token: "https://oauth2.googleapis.com/token".into(),
             revoke: "https://oauth2.googleapis.com/revoke".into(),
             api: "https://www.googleapis.com/calendar/v3".into(),
+            userinfo: "https://openidconnect.googleapis.com/v1/userinfo".into(),
         }
     }
 }
@@ -99,6 +120,8 @@ pub struct GoogleAuth {
     /// Held across a refresh so two callers never refresh at once.
     cache: tokio::sync::Mutex<Option<Cached>>,
     expired: std::sync::atomic::AtomicBool,
+    /// The Google connectors that are on (Settings > Connectors).
+    on: Mutex<std::collections::BTreeSet<String>>,
 }
 
 fn describe(e: &RequestTokenError<oauth2::HttpClientError<reqwest::Error>, BasicErrorResponse>) -> String {
@@ -111,7 +134,7 @@ fn describe(e: &RequestTokenError<oauth2::HttpClientError<reqwest::Error>, Basic
 impl GoogleAuth {
     pub fn new(cfg: GoogleConfig, ep: GoogleEndpoints, secrets: Arc<dyn Secrets>, opener: Arc<dyn Opener>) -> Arc<GoogleAuth> {
         let http = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build().expect("http client");
-        Arc::new(GoogleAuth { cfg: Mutex::new(cfg), builtin: Mutex::new(None), ep, secrets, opener, http, cache: Default::default(), expired: Default::default() })
+        Arc::new(GoogleAuth { cfg: Mutex::new(cfg), builtin: Mutex::new(None), ep, secrets, opener, http, cache: Default::default(), expired: Default::default(), on: Default::default() })
     }
 
     /// The user's own client from settings. An empty one means "use bleep's".
@@ -180,16 +203,58 @@ impl GoogleAuth {
         ConnectorStatus::Connected { account: self.secrets.get(ACCOUNT_KEY).unwrap_or_else(|| "your Google account".into()) }
     }
 
-    /// Opens the consent page in the default browser and waits for the loopback reply.
-    /// Returns the account (the primary calendar id, which is the email).
+    pub fn set_on(&self, ids: impl IntoIterator<Item = String>) {
+        *self.on.lock().unwrap() = ids.into_iter().collect();
+    }
+
+    pub fn is_on(&self, connector: &str) -> bool {
+        self.on.lock().unwrap().contains(connector)
+    }
+
+    /// The scopes this sign-in holds. A sign-in from before per-connector scopes holds `SCOPES`.
+    pub fn granted(&self) -> std::collections::BTreeSet<String> {
+        match self.secrets.get(SCOPES_KEY) {
+            Some(s) => s.split_whitespace().map(String::from).collect(),
+            None if self.secrets.get(REFRESH_KEY).is_some() => SCOPES.iter().map(|s| s.to_string()).collect(),
+            None => Default::default(),
+        }
+    }
+
+    pub fn has_scopes(&self, connector: &str) -> bool {
+        let g = self.granted();
+        scopes_for(connector).iter().all(|s| g.contains(*s))
+    }
+
+    /// Like `status`, but "needs sign-in" when the sign-in lacks this connector's scopes.
+    pub fn status_for(&self, connector: &str) -> ConnectorStatus {
+        match self.status() {
+            ConnectorStatus::Connected { .. } if !self.has_scopes(connector) => ConnectorStatus::NeedsSignIn,
+            s => s,
+        }
+    }
+
+    /// On, signed in, and allowed: the watchers for this connector may run.
+    pub fn ready(&self, connector: &str) -> bool {
+        self.is_on(connector) && matches!(self.status_for(connector), ConnectorStatus::Connected { .. })
+    }
+
+    /// Signs in with every scope of the old all-in-one sign-in. Tests and older callers.
     pub async fn sign_in(&self, wait: Duration) -> anyhow::Result<String> {
+        self.sign_in_for(&SCOPES, wait).await
+    }
+
+    /// Opens the consent page in the default browser and waits for the loopback reply.
+    /// Asks for `scopes` plus the account's email; Google keeps what was granted before
+    /// (`include_granted_scopes`). Returns the account email.
+    pub async fn sign_in_for(&self, scopes: &[&str], wait: Duration) -> anyhow::Result<String> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let redirect = format!("http://127.0.0.1:{}/", listener.local_addr()?.port());
         let client = self.client()?.set_redirect_uri(RedirectUrl::new(redirect)?);
         let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
         let (url, csrf) = client
             .authorize_url(CsrfToken::new_random)
-            .add_scopes(SCOPES.iter().map(|s| Scope::new(s.to_string())))
+            .add_scopes(BASE_SCOPES.iter().chain(scopes).map(|s| Scope::new(s.to_string())))
+            .add_extra_param("include_granted_scopes", "true")
             .add_extra_param("access_type", "offline")
             .add_extra_param("prompt", "consent")
             .set_pkce_challenge(challenge)
@@ -205,7 +270,13 @@ impl GoogleAuth {
         let Some(refresh) = tok.refresh_token() else {
             anyhow::bail!("Google sent no refresh token. Remove bleep from your Google account access page and connect again.");
         };
+        let mut granted: std::collections::BTreeSet<String> = match tok.scopes() {
+            Some(list) => list.iter().map(|s| s.to_string()).collect(),
+            None => self.granted().into_iter().chain(scopes.iter().map(|s| s.to_string())).collect(),
+        };
+        granted.retain(|s| !s.is_empty());
         self.secrets.set(REFRESH_KEY, refresh.secret())?;
+        self.secrets.set(SCOPES_KEY, &granted.into_iter().collect::<Vec<_>>().join(" "))?;
         self.expired.store(false, std::sync::atomic::Ordering::SeqCst);
         let access = tok.access_token().secret().clone();
         *self.cache.lock().await = Some(Cached { token: access.clone(), until: expiry(tok.expires_in()) });
@@ -215,8 +286,14 @@ impl GoogleAuth {
     }
 
     async fn fetch_account(&self, access: &str) -> anyhow::Result<String> {
-        let v: serde_json::Value = self.http.get(format!("{}/calendars/primary", self.ep.api)).bearer_auth(access).send().await?.error_for_status()?.json().await?;
-        v["id"].as_str().map(String::from).ok_or_else(|| anyhow::anyhow!("no calendar id"))
+        if self.has_scopes("calendar") {
+            let v: serde_json::Value = self.http.get(format!("{}/calendars/primary", self.ep.api)).bearer_auth(access).send().await?.error_for_status()?.json().await?;
+            if let Some(id) = v["id"].as_str() {
+                return Ok(id.into());
+            }
+        }
+        let v: serde_json::Value = self.http.get(&self.ep.userinfo).bearer_auth(access).send().await?.error_for_status()?.json().await?;
+        v["email"].as_str().map(String::from).ok_or_else(|| anyhow::anyhow!("no email"))
     }
 
     /// A valid access token, refreshed when needed. A revoked or expired refresh token
@@ -276,6 +353,47 @@ impl GoogleAuth {
         Err(ApiError { status: Some(401), message: "Google refused the sign-in twice.".into() })
     }
 
+    /// Like `send_json`, for a reply that is plain text (a Drive export or file body).
+    pub async fn send_text(&self, build: impl Fn() -> reqwest::RequestBuilder) -> Result<String, ApiError> {
+        for attempt in 0..2 {
+            let token = self.access_token().await.map_err(|e| ApiError { status: None, message: e.to_string() })?;
+            let resp = build().bearer_auth(&token).send().await.map_err(|e| ApiError { status: None, message: format!("Could not reach Google: {e}") })?;
+            let status = resp.status();
+            if status == reqwest::StatusCode::UNAUTHORIZED && attempt == 0 {
+                self.invalidate().await;
+                continue;
+            }
+            let text = resp.text().await.unwrap_or_default();
+            if status.is_success() {
+                return Ok(text);
+            }
+            let message = serde_json::from_str::<serde_json::Value>(&text).ok().and_then(|v| v["error"]["message"].as_str().map(String::from)).unwrap_or(text);
+            return Err(ApiError { status: Some(status.as_u16()), message });
+        }
+        Err(ApiError { status: Some(401), message: "Google refused the sign-in twice.".into() })
+    }
+
+    /// Like `send_text`, for a file body (a PDF).
+    pub async fn send_bytes(&self, build: impl Fn() -> reqwest::RequestBuilder) -> Result<Vec<u8>, ApiError> {
+        for attempt in 0..2 {
+            let token = self.access_token().await.map_err(|e| ApiError { status: None, message: e.to_string() })?;
+            let resp = build().bearer_auth(&token).send().await.map_err(|e| ApiError { status: None, message: format!("Could not reach Google: {e}") })?;
+            let status = resp.status();
+            if status == reqwest::StatusCode::UNAUTHORIZED && attempt == 0 {
+                self.invalidate().await;
+                continue;
+            }
+            let body = resp.bytes().await.map_err(|e| ApiError { status: None, message: e.to_string() })?.to_vec();
+            if status.is_success() {
+                return Ok(body);
+            }
+            let text = String::from_utf8_lossy(&body).into_owned();
+            let message = serde_json::from_str::<serde_json::Value>(&text).ok().and_then(|v| v["error"]["message"].as_str().map(String::from)).unwrap_or(text);
+            return Err(ApiError { status: Some(status.as_u16()), message });
+        }
+        Err(ApiError { status: Some(401), message: "Google refused the sign-in twice.".into() })
+    }
+
     /// Drops the cached access token (after the API answered 401).
     pub async fn invalidate(&self) {
         *self.cache.lock().await = None;
@@ -288,6 +406,7 @@ impl GoogleAuth {
         }
         self.secrets.delete(REFRESH_KEY)?;
         self.secrets.delete(ACCOUNT_KEY)?;
+        self.secrets.delete(SCOPES_KEY)?;
         *self.cache.lock().await = None;
         Ok(())
     }
@@ -323,6 +442,36 @@ mod tests {
         let opener = Arc::new(RecordingOpener::default());
         let auth = GoogleAuth::new(cfg, mock.endpoints(), secrets.clone(), opener.clone());
         Rig { mock, auth, secrets, opener }
+    }
+
+    #[tokio::test]
+    async fn per_connector_scopes_and_userinfo_account() {
+        let r = rig(client()).await;
+        let tok = r#"{"access_token":"at-d","expires_in":3599,"refresh_token":"rt-2","scope":"openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.readonly","token_type":"Bearer"}"#;
+        r.mock.on("POST /token", vec![(200, tok.into())]);
+        r.mock.on("GET /userinfo", vec![(200, r#"{"email":"me@example.com"}"#.into())]);
+        let a = r.auth.clone();
+        let t = tokio::spawn(async move { a.sign_in_for(scopes_for("drive"), Duration::from_secs(5)).await });
+        let q = browser(&r.opener, |q| format!("code=c1&state={}", q["state"])).await;
+        let asked: Vec<&str> = q["scope"].split(' ').collect();
+        assert!(asked.contains(&"email") && asked.contains(&DRIVE_SCOPE), "{asked:?}");
+        assert!(!asked.iter().any(|s| s.contains("gmail")), "only what Drive needs: {asked:?}");
+        assert_eq!(q["include_granted_scopes"], "true");
+        assert_eq!(t.await.unwrap().unwrap(), "me@example.com", "account from user info, no Calendar scope");
+        assert!(r.auth.has_scopes("drive"));
+        assert!(!r.auth.has_scopes("gmail"));
+        assert_eq!(r.auth.status_for("gmail"), ConnectorStatus::NeedsSignIn);
+        r.auth.set_on(["drive".to_string()]);
+        assert!(r.auth.ready("drive") && !r.auth.ready("gmail"));
+    }
+
+    #[test]
+    fn an_older_sign_in_counts_as_all_scopes() {
+        let secrets = Arc::new(MemorySecrets::default());
+        secrets.set(REFRESH_KEY, "rt").unwrap();
+        let auth = GoogleAuth::new(client(), GoogleEndpoints::google(), secrets, Arc::new(RecordingOpener::default()));
+        assert!(auth.has_scopes("gmail") && auth.has_scopes("calendar"));
+        assert!(!auth.has_scopes("drive"));
     }
 
     fn query(url: &str) -> HashMap<String, String> {

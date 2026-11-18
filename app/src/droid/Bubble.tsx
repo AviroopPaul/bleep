@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { api, onBubbleText, type BubbleText } from "../ipc";
 
 /** A short line over the droid. It stays until clicked or closed, and is saved to the chat.
- * Clicking it opens the chat. Mail pings can be marked "Not useful". */
+ * Clicking it opens the chat. Mail pings can be marked "Not useful". Reminders have Done
+ * and Snooze. */
 export function Bubble() {
   const [b, setB] = useState<BubbleText | null>(null);
   useEffect(() => {
@@ -11,6 +12,7 @@ export function Bubble() {
   }, []);
   if (!b?.text) return null;
   const pingId = b.ping_id;
+  const remId = b.reminder_id;
   return (
     <div className="bubble-wrap">
       <div className="bubble-box">
@@ -20,6 +22,13 @@ export function Bubble() {
         </button>
         {pingId != null && (
           <button className="bubble-nope" onClick={() => void api.bubbleNotUseful(pingId)}>Not useful</button>
+        )}
+        {remId != null && (
+          <div className="bubble-acts">
+            <button className="bubble-nope pri" onClick={() => void api.reminderDone(remId)}>Done</button>
+            <button className="bubble-nope" onClick={() => void api.reminderSnooze(remId, 10)}>10 min</button>
+            <button className="bubble-nope" onClick={() => void api.reminderSnooze(remId, 60)}>1 hour</button>
+          </div>
         )}
       </div>
     </div>

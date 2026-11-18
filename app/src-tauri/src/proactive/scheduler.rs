@@ -2,7 +2,6 @@
 //! when it is 5 minutes old or the Mac just woke, then show or hide the bar. No model calls.
 use super::cues::{bar_worthy, bubble_text, cue_key, due_cue, BarCue, CueKind};
 use crate::connectors::calendar::CalendarConnector;
-use crate::connectors::ConnectorStatus;
 use crate::google::GoogleAuth;
 use crate::store::Store;
 use chrono::{DateTime, Duration, Utc};
@@ -87,7 +86,8 @@ impl Scheduler {
 
     async fn refresh(&self, now: DateTime<Utc>) {
         let d = &self.deps;
-        if !matches!(d.auth.status(), ConnectorStatus::Connected { .. }) {
+        // Calendar off in Settings > Connectors, or not signed in: no polling.
+        if !d.auth.ready("calendar") {
             return;
         }
         let (from, to) = (now - Duration::hours(1), now + Duration::hours(36));
@@ -217,6 +217,7 @@ mod tests {
             secrets.set(REFRESH_KEY, "rt").unwrap();
         }
         let auth = GoogleAuth::new(GoogleConfig { client_id: "c".into(), client_secret: "s".into() }, mock.endpoints(), secrets, Arc::new(RecordingOpener::default()));
+        auth.set_on(["calendar".to_string()]);
         let calendar = CalendarConnector::new(auth.clone(), reqwest::Client::new(), format!("{}/calendar/v3", mock.base));
         let ui = Arc::new(FakeUi::default());
         let clock = Arc::new(Mutex::new(t0()));

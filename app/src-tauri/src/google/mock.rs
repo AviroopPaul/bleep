@@ -19,9 +19,9 @@ pub struct Hit {
 #[derive(Default)]
 struct Routes {
     /// "METHOD /path" -> replies; the last one repeats.
-    map: HashMap<String, Vec<(u16, String)>>,
+    map: HashMap<String, Vec<(u16, Vec<u8>)>>,
     /// ("METHOD /path", text the query must contain) -> reply. Checked before `map`.
-    by_query: Vec<(String, String, (u16, String))>,
+    by_query: Vec<(String, String, (u16, Vec<u8>))>,
     /// "METHOD /path" -> delay before replying.
     delay: HashMap<String, std::time::Duration>,
 }
@@ -82,11 +82,16 @@ impl MockGoogle {
 
     /// Replies for "METHOD /path", in order; the last one repeats.
     pub fn on(&self, key: &str, replies: Vec<(u16, String)>) {
-        self.routes.lock().unwrap().map.insert(key.into(), replies);
+        self.routes.lock().unwrap().map.insert(key.into(), replies.into_iter().map(|(c, b)| (c, b.into_bytes())).collect());
     }
 
     /// A reply for "METHOD /path" when the raw query contains `needle`.
     pub fn on_query(&self, key: &str, needle: &str, reply: (u16, String)) {
+        self.on_query_bytes(key, needle, (reply.0, reply.1.into_bytes()));
+    }
+
+    /// Like `on_query`, for a binary body (a PDF).
+    pub fn on_query_bytes(&self, key: &str, needle: &str, reply: (u16, Vec<u8>)) {
         self.routes.lock().unwrap().by_query.push((key.into(), needle.into(), reply));
     }
 
@@ -101,6 +106,7 @@ impl MockGoogle {
             token: format!("{}/token", self.base),
             revoke: format!("{}/revoke", self.base),
             api: format!("{}/calendar/v3", self.base),
+            userinfo: format!("{}/userinfo", self.base),
         }
     }
 

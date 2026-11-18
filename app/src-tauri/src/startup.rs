@@ -8,8 +8,9 @@ use tauri_plugin_autostart::ManagerExt;
 pub const IS_RELEASE: bool = !cfg!(debug_assertions);
 
 /// On by default (spec 8.8), set once on first run, and never for a dev build.
+/// A dev build ("bleep (dev)") never does either.
 pub fn should_enable_autostart(cfg: &Config, release: bool) -> bool {
-    release && !cfg.autostart_set
+    release && !crate::flavor::DEV && !cfg.autostart_set
 }
 
 pub fn first_run(app: &AppHandle) {

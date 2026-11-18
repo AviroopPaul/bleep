@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, healthOk, onApproval, onChatEvent, onChatExpanded, onCompacting, onNotice, onPing, onVoice, type ChatContext, type Message, type RuntimeHealth } from "../ipc";
-import { meterLabel, meterLevel } from "../settings/memoryText";
+import { meterLevel } from "../settings/memoryText";
 import { chatReducer, emptyChat, formatBackAt } from "./chatReducer";
 import { ToolSteps } from "./ToolSteps";
 import { ApprovalCard } from "./ApprovalCard";
+import { OfferCard } from "../settings/Catalog";
 import { Markdown } from "./Markdown";
 import { DROID_HEAD } from "../droid/droidSvg";
 import { AgentsView, useAgents } from "../agents/AgentsView";
+import { UsageView } from "../usage/UsageView";
+import { RemindersView, useReminders } from "../reminders/RemindersView";
+import { DEV, NAME } from "../flavor";
 
 const PAGE = 50;
 const SUGGESTIONS = ["What time is it in Tokyo?", "What day is it today?"];
@@ -16,6 +20,12 @@ function pingTime(at: string): string {
   const d = new Date(at);
   if (!at || Number.isNaN(d.getTime())) return "bleep";
   return `bleep, ${new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(d)}`;
+}
+
+/** Connectors the model offered in this turn, once each. */
+function offers(m: Message): string[] {
+  const ids = m.tool_steps.filter((s) => s.name === "connector_offer" && s.ok).map((s) => (s.args as { id?: unknown })?.id);
+  return [...new Set(ids.filter((x): x is string => typeof x === "string"))];
 }
 
 function Bubble({ m }: { m: Message }) {
@@ -29,6 +39,7 @@ function Bubble({ m }: { m: Message }) {
     <div className={`msg bot ${m.status === "error" ? "error" : ""}`}>
       <ToolSteps steps={m.tool_steps} />
       {m.approvals?.map((a) => <ApprovalCard key={a.id} a={a} />)}
+      {offers(m).map((id) => <OfferCard key={id} id={id} />)}
       {waiting ? (
         <span className="typing" aria-label="bleep is thinking"><i /><i /><i /></span>
       ) : (
@@ -54,13 +65,15 @@ export function ChatPanel() {
   const input = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
   const keepFrom = useRef<number | null>(null);
-  const [view, setView] = useState<"chat" | "agents">("chat");
+  const [view, setView] = useState<"chat" | "agents" | "usage" | "reminders">("chat");
   // After the wake phrase: listening for the request.
   const [listening, setListening] = useState(false);
   // Replies to spoken requests are read aloud when they finish.
   const spoken = useRef(new Set<number>());
   const sendRef = useRef<(text: string, byVoice?: boolean) => Promise<void>>(async () => {});
   const agents = useAgents();
+  const reminders = useReminders();
+  const due = reminders.list.filter((r) => r.status === "fired").length;
   const waiting = agents.view.sessions.filter((x) => x.state === "waiting").length;
 
   const checkHealth = useCallback(() => api.health().then(setHealth).catch(() => setHealth(null)), []);
@@ -163,7 +176,8 @@ export function ChatPanel() {
   const ok = healthOk(health);
   const busy = sending || compacting || state.streamingId !== null;
   const used = state.context?.used ?? ctx?.used ?? null;
-  const meter = ctx ? meterLabel(used, ctx.threshold) : "";
+  // Near compaction, the Usage tab shows a dot. The numbers live in the tab.
+  const ctxHigh = !!ctx && used != null && meterLevel(used, ctx.threshold) === "high";
   const canSend = ok && !busy && draft.trim().length > 0;
 
   const send = async (text: string, byVoice = false) => {
@@ -212,12 +226,23 @@ export function ChatPanel() {
   return (
     <div className="panel">
       <header className="panel-head" data-tauri-drag-region>
-        <span className="head-droid" dangerouslySetInnerHTML={{ __html: DROID_HEAD }} />
-        <h1>bleep</h1>
+        <span className="head-mark">
+          <span className="head-droid" dangerouslySetInnerHTML={{ __html: DROID_HEAD }} />
+          {DEV && <span className="head-dev" aria-hidden="true">dev</span>}
+        </span>
+        {/* Four tabs need the room, so the droid head is the brand mark here. */}
+        <h1 className="sr-only">{NAME}</h1>
         <div className="views" role="tablist" aria-label="View">
           <button role="tab" className="view-tab" aria-selected={view === "chat"} onClick={() => setView("chat")}>Chat</button>
           <button role="tab" className="view-tab" aria-selected={view === "agents"} aria-label={waiting ? `Agents, ${waiting} need you` : "Agents"} onClick={() => setView("agents")}>
             Agents{waiting > 0 && <span className="view-count" aria-hidden="true">{waiting}</span>}
+          </button>
+          <button role="tab" className="view-tab" aria-selected={view === "usage"} aria-label={ctxHigh ? "Usage, chat context is near compaction" : "Usage"} onClick={() => setView("usage")}>
+            Usage{ctxHigh && <span className="view-dot" aria-hidden="true" />}
+          </button>
+          <button role="tab" className="view-tab icon" aria-selected={view === "reminders"} aria-label={due ? `Reminders, ${due} due` : "Reminders"} title="Reminders" onClick={() => setView("reminders")}>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1 1H3l1-1ZM6.5 14h3" /></svg>
+            {due > 0 && <span className="view-count" aria-hidden="true">{due}</span>}
           </button>
         </div>
         <span className="spacer" data-tauri-drag-region />
@@ -238,23 +263,11 @@ export function ChatPanel() {
         <button className="iconbtn" aria-label="Close chat" title="Close (Esc)" onClick={() => void api.hideChat()}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
         </button>
-        {meter && (
-          <div
-            className={`meter ${meterLevel(used ?? 0, ctx!.threshold)}`}
-            role="meter"
-            aria-label="Chat context"
-            aria-valuemin={0}
-            aria-valuemax={ctx!.threshold}
-            aria-valuenow={used ?? 0}
-            aria-valuetext={meter}
-            title={`Chat context: ${meter}. bleep compacts the chat at the second number.`}
-          >
-            <i style={{ width: `${Math.min(100, ((used ?? 0) / ctx!.threshold) * 100)}%` }} />
-          </div>
-        )}
       </header>
 
       {view === "agents" && <AgentsView view={agents.view} refresh={() => void agents.refresh()} />}
+      {view === "usage" && <UsageView ctx={ctx ? { ...ctx, used } : null} />}
+      {view === "reminders" && <RemindersView list={reminders.list} refresh={() => void reminders.refresh()} />}
 
       {view === "chat" && health && !ok && (
         <div className="banner" role="status">

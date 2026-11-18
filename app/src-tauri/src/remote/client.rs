@@ -130,6 +130,10 @@ impl RemoteConnector {
     }
 
     /// Sets (or clears, with `None`) my mode for one of the server's tools.
+    pub fn set_enabled(&self, on: bool) {
+        self.cfg.write().unwrap().enabled = on;
+    }
+
     pub fn set_mode(&self, tool: &str, mode: Option<ToolMode>) {
         {
             let mut c = self.cfg.write().unwrap();

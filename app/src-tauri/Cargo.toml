@@ -12,6 +12,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
 
+[features]
+# "bleep (dev)": its own data folder, Keychain items and bundle id. See src/flavor.rs.
+dev = []
+
 [dependencies]
 tauri = { version = "2.12", features = ["macos-private-api", "tray-icon"] }
 serde = { version = "1", features = ["derive"] }
@@ -55,6 +59,8 @@ transcribe-rs = { version = "0.3", features = ["onnx"] }
 ort = { version = "=2.0.0-rc.12", default-features = false }
 sha2 = "0.10"
 ndarray = "0.17"
+tauri-plugin-notification = "2"
+pdf-extract = "0.12.1"
 
 [dev-dependencies]
 tempfile = "3"
