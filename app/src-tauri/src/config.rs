@@ -287,6 +287,8 @@ pub struct Config {
     pub api: ApiConfig,
     pub updates: UpdatesConfig,
     pub voice: VoiceConfig,
+    /// The floating buddy. See `avatar.rs`.
+    pub avatar: crate::avatar::AvatarConfig,
 }
 
 impl Default for Config {
@@ -310,6 +312,7 @@ impl Default for Config {
             api: ApiConfig::default(),
             updates: UpdatesConfig::default(),
             voice: VoiceConfig::default(),
+            avatar: crate::avatar::AvatarConfig::default(),
         }
     }
 }

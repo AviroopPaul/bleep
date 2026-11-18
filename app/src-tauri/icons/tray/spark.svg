@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 10 104 104">
+  <!-- spark as an outline for the menu bar. macOS uses it as a template image: only the
+       alpha counts. Shapes match src/avatar/avatars.ts. Render: scripts/tray-icons.mjs -->
+  <path d="M60 20 Q73 50 102 62 Q73 74 60 104 Q47 74 18 62 Q47 50 60 20Z" fill="none" stroke="#000" stroke-width="8" stroke-linejoin="round"/>
+  <rect x="46.5" y="56" width="9" height="13" rx="4.5"/><rect x="64.5" y="56" width="9" height="13" rx="4.5"/>
+</svg>

@@ -7,7 +7,7 @@ import { ToolSteps } from "./ToolSteps";
 import { ApprovalCard } from "./ApprovalCard";
 import { OfferCard } from "../settings/Catalog";
 import { Markdown } from "./Markdown";
-import { DROID_HEAD } from "../droid/droidSvg";
+import { Avatar, useAvatar } from "../avatar/Avatar";
 import { AgentsView, useAgents } from "../agents/AgentsView";
 import { UsageView } from "../usage/UsageView";
 import { RemindersView, useReminders } from "../reminders/RemindersView";
@@ -52,6 +52,7 @@ function Bubble({ m }: { m: Message }) {
 
 export function ChatPanel() {
   const [state, dispatch] = useReducer(chatReducer, emptyChat);
+  const avatar = useAvatar();
   const [health, setHealth] = useState<RuntimeHealth | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -227,10 +228,10 @@ export function ChatPanel() {
     <div className="panel">
       <header className="panel-head" data-tauri-drag-region>
         <span className="head-mark">
-          <span className="head-droid" dangerouslySetInnerHTML={{ __html: DROID_HEAD }} />
+          <span className="head-droid">{avatar && <Avatar cfg={avatar} still />}</span>
           {DEV && <span className="head-dev" aria-hidden="true">dev</span>}
         </span>
-        {/* Four tabs need the room, so the droid head is the brand mark here. */}
+        {/* Four tabs need the room, so the buddy's head is the brand mark here. */}
         <h1 className="sr-only">{NAME}</h1>
         <div className="views" role="tablist" aria-label="View">
           <button role="tab" className="view-tab" aria-selected={view === "chat"} onClick={() => setView("chat")}>Chat</button>

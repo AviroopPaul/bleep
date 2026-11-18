@@ -1,6 +1,7 @@
 pub mod agents;
 pub mod agentwatch;
 pub mod approvals;
+pub mod avatar;
 pub mod bar;
 pub mod chat;
 pub mod compaction;
@@ -492,6 +493,8 @@ pub fn run() {
             updater::update_install,
             updater::update_set_auto,
             updater::update_restart,
+            avatar::avatar_get,
+            avatar::avatar_set,
             voice::voice_settings,
             voice::voice_status,
             voice::voice_set,

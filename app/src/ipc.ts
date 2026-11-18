@@ -254,6 +254,8 @@ export interface RuntimeHealth {
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { AvatarConfig } from "./avatar/avatars";
+export type { AvatarConfig } from "./avatar/avatars";
 
 export interface Preset {
   id: string;
@@ -433,6 +435,8 @@ export const api = {
   updateInstall: () => invoke<UpdateView>("update_install"),
   updateSetAuto: (on: boolean) => invoke<UpdateView>("update_set_auto", { on }),
   updateRestart: () => invoke<void>("update_restart"),
+  avatarGet: () => invoke<AvatarConfig>("avatar_get"),
+  avatarSet: (config: AvatarConfig) => invoke<AvatarConfig>("avatar_set", { config }),
   voiceSettings: () => invoke<VoiceView>("voice_settings"),
   voiceStatus: () => invoke<VoiceStatus>("voice_status"),
   voiceSet: (config: VoiceConfig) => invoke<VoiceView>("voice_set", { config }),
@@ -529,6 +533,9 @@ export interface BubbleText {
 }
 export const onBubbleText = (cb: (b: BubbleText) => void): Promise<UnlistenFn> =>
   listen<BubbleText>("bubble://text", (e) => cb(e.payload));
+/** The buddy changed in Settings. Every window redraws it. */
+export const onAvatarChanged = (cb: (c: AvatarConfig) => void): Promise<UnlistenFn> =>
+  listen<AvatarConfig>("avatar://changed", (e) => cb(e.payload));
 export const onDroidMood = (cb: (mood: "alert" | "idle") => void): Promise<UnlistenFn> =>
   listen<{ mood: "alert" | "idle" }>("droid://mood", (e) => cb(e.payload.mood));
 export const onNotice = (cb: (text: string) => void): Promise<UnlistenFn> =>

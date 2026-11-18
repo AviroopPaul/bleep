@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="13 18 94 96">
+  <!-- gumdrop as an outline for the menu bar. macOS uses it as a template image: only the
+       alpha counts. Shapes match src/avatar/avatars.ts. Render: scripts/tray-icons.mjs -->
+  <path d="M60 26 C71 26 100 72 99 88 C98 101 84 106 60 106 C36 106 22 101 21 88 C20 72 49 26 60 26 Z" fill="none" stroke="#000" stroke-width="8" stroke-linejoin="round"/>
+  <rect x="45" y="72" width="8" height="12" rx="4"/><rect x="67" y="72" width="8" height="12" rx="4"/>
+</svg>

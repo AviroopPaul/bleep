@@ -28,10 +28,10 @@ test("chat shows history, streams a tool step and a reply, and locks input while
   expect(errors).toEqual([]);
 });
 
-test("droid view renders the droid", async ({ page }) => {
+test("droid view renders the buddy", async ({ page }) => {
   await page.goto("/?mock=1#droid");
   await expect(page.getByRole("button", { name: /bleep/ })).toBeVisible();
-  await expect(page.locator(".droid svg")).toHaveCount(1);
+  await expect(page.locator(".droid-stage .av svg")).toHaveCount(1);
   await page.setViewportSize({ width: 132, height: 132 });
   await page.screenshot({ path: test.info().outputPath("droid.png") });
 });

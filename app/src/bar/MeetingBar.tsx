@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { api, onBarCue, onBarHide, type BarCue } from "../ipc";
-import { DROID_HEAD } from "../droid/droidSvg";
+import { Avatar, useAvatar } from "../avatar/Avatar";
 import { clockText, whenText } from "./barText";
 
 /** Slim bar under the menu bar before a meeting. Built from the calendar cache, no model call. */
 export function MeetingBar() {
   const [cue, setCue] = useState<BarCue | null>(null);
+  const avatar = useAvatar();
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export function MeetingBar() {
   const start = new Date(cue.start);
   return (
     <section className="bar" aria-label="Next meeting">
-      <span className="bar-droid" aria-hidden="true" dangerouslySetInnerHTML={{ __html: DROID_HEAD }} />
+      <span className="bar-droid" aria-hidden="true">{avatar && <Avatar cfg={avatar} still />}</span>
       <div className="bar-text">
         <strong className="bar-title" title={cue.title}>{cue.title}</strong>
         <span className="bar-meta">{whenText(start, new Date())} · {clockText(start)}</span>
