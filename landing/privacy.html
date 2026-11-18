@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy | bleep</title>
+<meta name="description" content="How bleep handles your data: no bleep server, no telemetry, data in ~/.bleep on your Mac, and only the text it needs goes to the model you pick.">
+<link rel="canonical" href="https://bleep-omega.vercel.app/privacy">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="author" content="Aviroop Paul">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="bleep">
+<meta property="og:url" content="https://bleep-omega.vercel.app/privacy">
+<meta property="og:title" content="Privacy | bleep">
+<meta property="og:description" content="How bleep handles your data: no bleep server, no telemetry, data in ~/.bleep on your Mac, and only the text it needs goes to the model you pick.">
+<meta property="og:image" content="https://bleep-omega.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Privacy | bleep">
+<meta name="twitter:description" content="How bleep handles your data: no bleep server, no telemetry, data in ~/.bleep on your Mac, and only the text it needs goes to the model you pick.">
+<meta name="twitter:image" content="https://bleep-omega.vercel.app/og.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#FDFDFD">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/pages.css">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "WebPage",
+   "@id": "https://bleep-omega.vercel.app/privacy#page",
+   "name": "Privacy | bleep",
+   "description": "How bleep handles your data: no bleep server, no telemetry, data in ~/.bleep on your Mac, and only the text it needs goes to the model you pick.",
+   "url": "https://bleep-omega.vercel.app/privacy",
+   "datePublished": "2026-11-18",
+   "dateModified": "2026-11-18",
+   "author": {
+    "@id": "https://bleep-omega.vercel.app/#author"
+   },
+   "publisher": {
+    "@id": "https://bleep-omega.vercel.app/#author"
+   },
+   "about": {
+    "@id": "https://bleep-omega.vercel.app/#app"
+   },
+   "image": "https://bleep-omega.vercel.app/og.png",
+   "inLanguage": "en"
+  },
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "bleep",
+     "item": "https://bleep-omega.vercel.app/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Privacy",
+     "item": "https://bleep-omega.vercel.app/privacy"
+    }
+   ]
+  },
+  {
+   "@type": "Person",
+   "@id": "https://bleep-omega.vercel.app/#author",
+   "name": "Aviroop Paul",
+   "url": "https://avirooppaul.site",
+   "sameAs": [
+    "https://github.com/AviroopPaul",
+    "https://linkedin.com/in/avirooppaul"
+   ]
+  },
+  {
+   "@type": "SoftwareApplication",
+   "@id": "https://bleep-omega.vercel.app/#app",
+   "name": "bleep",
+   "url": "https://bleep-omega.vercel.app/",
+   "applicationCategory": "ProductivityApplication",
+   "operatingSystem": "macOS 15 or later (Apple silicon)",
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   }
+  }
+ ]
+}
+</script>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<nav class="top"><div class="bar">
+  <a class="brand" href="/"><img src="/apple-touch-icon.png" alt="" width="30" height="30">bleep</a>
+  <div class="links"><a href="/#cases">Features</a><a href="/alternatives">Compare</a><a href="/claude-code-companion">Claude Code</a><a href="/#faq">FAQ</a></div>
+  <a class="npill" href="https://github.com/AviroopPaul/bleep">GitHub</a>
+</div></nav>
+<main class="wrap">
+<p class="crumbs"><a href="/">bleep</a> / Privacy</p>
+<h1>Privacy</h1>
+<p class="lede">bleep is built to be trusted with your inbox. This page says what it reads, where it keeps it, and what leaves your Mac.</p>
+<p class="meta">Updated 18 Nov 2026 · by <a href="https://avirooppaul.site">Aviroop Paul</a>, who makes bleep · bleep 0.5.0</p>
+
+<h2>The short version</h2>
+<ul>
+<li><b>bleep has no server.</b> There is no bleep account and no telemetry in the app.</li>
+<li><b>Your data stays on your Mac.</b> Mail summaries, memory, reminders, settings and logs are in <code>~/.bleep</code>. Google tokens and API keys are in the macOS Keychain.</li>
+<li><b>The model gets only what it needs.</b> When bleep thinks, it sends the text it needs to the model you picked, through your own Claude Code login or API key. With a local model in Ollama or LM Studio, nothing leaves your Mac.</li>
+</ul>
+
+<h2>Google data</h2>
+<p>If you connect Google, bleep asks for read access to Gmail, permission to create Gmail drafts, Google Calendar events and, if you turn it on, Google Drive. bleep reads this data on your Mac to answer you and to notice what needs you. It never sends mail, moves events or deletes anything without your tap on the exact action. It does not sell your data or use it for ads. You can disconnect Google in Settings at any time and remove access in your Google account.</p>
+
+<h2>Voice</h2>
+<p>The wake word is off by default. When it is on, speech to text runs on your Mac. Audio is never saved or sent anywhere.</p>
+
+<h2>Updates</h2>
+<p>bleep checks GitHub for a new release every few hours. That request carries no personal data. You can turn off automatic updates in Settings, Updates.</p>
+
+<h2>This website</h2>
+<p>This site uses Vercel Web Analytics, which counts page views without cookies. It has no ads and no third-party trackers.</p>
+
+<h2>Remove everything</h2>
+<p>Run <code>brew uninstall --cask --zap bleep</code>, or quit bleep, drag it to the Trash and delete <code>~/.bleep</code>. Remove the Claude Code and Codex hooks first in Settings, Agents.</p>
+
+<h2>Contact</h2>
+<p>Questions or a security report: <a href="https://github.com/AviroopPaul/bleep/security/advisories/new">report privately on GitHub</a> or open an <a href="https://github.com/AviroopPaul/bleep/issues">issue</a>.</p>
+
+
+
+
+<footer>
+  <nav aria-label="More about bleep">
+      <a href="https://github.com/AviroopPaul/bleep">Source on GitHub</a>
+      <a href="https://github.com/AviroopPaul/bleep-releases/releases">Releases</a>
+      <a href="/changelog">Changelog</a>
+      <a href="/alternatives">Alternatives</a>
+      <a href="/vs/grok-bot">vs Grok Bot</a>
+      <a href="/vs/openclaw">vs OpenClaw</a>
+      <a href="/vs/openmausbot">vs OpenMausBot</a>
+      <a href="/claude-code-companion">For Claude Code</a>
+      <a href="/privacy">Privacy</a>
+  </nav>
+  <p>bleep is a free, open source project by <a href="https://avirooppaul.site">Aviroop Paul</a>, MIT license. Not affiliated with Anthropic, OpenAI, Google or xAI. Product names belong to their owners.</p>
+</footer>
+</main>
+<script>
+document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => {
+  navigator.clipboard && navigator.clipboard.writeText(b.dataset.copy).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 2000); });
+}));
+</script>
+</body>
+</html>

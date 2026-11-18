@@ -1,0 +1,19 @@
+name: Feature request
+description: An idea for bleep.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: moment
+    attributes:
+      label: The moment
+      description: When do you wish bleep did something different? Describe the real situation.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should bleep do?
+  - type: textarea
+    id: other
+    attributes:
+      label: How do you handle it today?
