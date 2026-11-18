@@ -94,7 +94,7 @@ test("the setting list works with the keyboard", async ({ page }) => {
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("tab", { name: "Mail" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tabpanel")).toContainText("VIPs");
-  for (const name of ["Memory", "Connectors", "Agents", "Activity", "Updates"]) {
+  for (const name of ["Agents", "Memory", "Usage", "Activity", "Updates"]) {
     await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
   }

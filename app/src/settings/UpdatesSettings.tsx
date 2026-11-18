@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, onUpdate, type UpdateView } from "../ipc";
 import { checkedText, phaseText } from "./updateText";
+import { DEV, NAME } from "../flavor";
 
 const PILL: Record<string, string> = { ready: "connected", available: "needs_sign_in", error: "error" };
 
@@ -24,6 +25,14 @@ export function UpdatesSettingsTab() {
   };
 
   if (!v) return null;
+  if (DEV) {
+    return (
+      <section className="set-card" aria-labelledby="upd-h">
+        <div className="set-head"><h2 id="upd-h">{NAME} {v.current}</h2></div>
+        <p className="set-lead">This is a local dev build. It never updates itself, so it cannot turn into the production app. Build and install a new dev build from the repo.</p>
+      </section>
+    );
+  }
   const p = v.phase;
   const busy = p.state === "checking" || p.state === "downloading";
   const avail = p.state === "available" ? p : null;

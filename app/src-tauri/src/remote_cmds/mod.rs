@@ -60,7 +60,9 @@ fn changed(app: &AppHandle) {
 
 #[tauri::command]
 pub fn connectors_list(state: tauri::State<'_, AppState>, auth: tauri::State<'_, Arc<GoogleAuth>>) -> ConnectorsView {
-    ConnectorsView { builtin: builtins(auth.status()), servers: state.remotes.views() }
+    // Servers from the catalog show there (Settings > Connectors), not under "Your servers".
+    let servers = state.remotes.views().into_iter().filter(|s| crate::marketplace::entry(&s.name).is_none()).collect();
+    ConnectorsView { builtin: builtins(auth.status()), servers }
 }
 
 #[tauri::command]

@@ -443,7 +443,7 @@ impl Connector for CalendarConnector {
     }
 
     fn status(&self) -> ConnectorStatus {
-        self.auth.status()
+        self.auth.status_for("calendar")
     }
 
     async fn call(&self, tool: &str, args: Value) -> Result<Value, String> {

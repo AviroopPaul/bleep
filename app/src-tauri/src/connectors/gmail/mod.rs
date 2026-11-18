@@ -265,7 +265,7 @@ impl Connector for GmailConnector {
     }
 
     fn status(&self) -> ConnectorStatus {
-        self.auth.status()
+        self.auth.status_for("gmail")
     }
 
     async fn call(&self, tool: &str, args: Value) -> Result<Value, String> {

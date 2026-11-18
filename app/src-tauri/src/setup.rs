@@ -18,7 +18,7 @@ pub fn open_setup(app: &AppHandle) {
     }
     let (at, size) = crate::windows::panel_on_droid_screen(app, crate::windows::Size { w: 520.0, h: 640.0 });
     let built = WebviewWindowBuilder::new(app, "setup", WebviewUrl::App("index.html#setup".into()))
-        .title("Set up bleep")
+        .title(format!("Set up {}", crate::flavor::NAME))
         .inner_size(size.w, size.h)
         .resizable(false)
         .position(at.x, at.y)

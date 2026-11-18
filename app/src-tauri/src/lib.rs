@@ -1,20 +1,24 @@
 pub mod agents;
 pub mod agentwatch;
 pub mod approvals;
+pub mod avatar;
 pub mod bar;
 pub mod chat;
 pub mod compaction;
 pub mod config;
 pub mod connectors;
+pub mod flavor;
 pub mod google;
 pub mod hotkey;
 pub mod mail;
+pub mod marketplace;
 pub mod mcp;
 pub mod memory;
 pub mod memory_cmds;
 pub mod opener;
 pub mod paths;
 pub mod proactive;
+pub mod reminders;
 pub mod remote;
 pub mod remote_cmds;
 mod model_cmds;
@@ -25,6 +29,7 @@ pub mod startup;
 pub mod store;
 pub mod updater;
 pub mod voice;
+pub mod usage;
 pub mod windows;
 
 use chat::{ChatEmit, ChatService};
@@ -44,6 +49,8 @@ pub struct AppState {
     pub approvals: Arc<approvals::Approvals>,
     pub memory: Arc<memory::Memory>,
     pub remotes: Arc<remote::manager::Remotes>,
+    /// Every tool bleep serves. Settings > Connectors hides the ones that are off.
+    pub tools: Arc<mcp::host::ToolHost>,
     /// The runtime everything uses; Settings swaps what is inside (Phase 9).
     pub runtime: Arc<runtime::switch::SwitchRuntime>,
     pub make_runtime: RuntimeFactory,
@@ -64,6 +71,7 @@ struct Parts {
     triager: Arc<mail::triage::Triager>,
     /// The runtime for proactive work, stopped by the spend cap.
     capped: Arc<dyn runtime::AgentRuntime>,
+    reminders: Arc<reminders::Reminders>,
 }
 
 /// Approve or Decline on a card.
@@ -106,8 +114,28 @@ fn open_claude_login(state: tauri::State<'_, AppState>) -> Result<(), String> {
 
 fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let paths = BleepPaths::from_env();
+    if flavor::DEV && std::env::var("BLEEP_HOME").map_or(true, |v| v.is_empty()) {
+        match flavor::seed_from(&BleepPaths::prod_root(), &paths.root) {
+            Ok(true) => {
+                eprintln!("bleep (dev): copied the production data to {}", paths.root.display());
+                // Two apps listening for one wake word would both answer. Turn it on in the
+                // dev build's own settings to test voice there.
+                let mut c = Config::load(&paths.config_file)?;
+                if c.voice.wake {
+                    c.voice.wake = false;
+                    c.save(&paths.config_file)?;
+                }
+            }
+            Ok(false) => {}
+            Err(e) => eprintln!("bleep (dev): could not copy the production data: {e}"),
+        }
+    }
     paths.ensure()?;
-    let config = Config::load(&paths.config_file)?;
+    let mut config = Config::load(&paths.config_file)?;
+    // 0.5.0: connectors have on and off switches. Existing setups keep Gmail and Calendar on.
+    if config.connectors.init(config.setup_done) {
+        config.save(&paths.config_file)?;
+    }
     let store = Arc::new(Store::open(&paths.db)?);
     let n = store.mark_streaming_as_interrupted()?;
     if n > 0 {
@@ -128,6 +156,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let http = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30)).build()?;
     let calendar = connectors::calendar::CalendarConnector::new(google.clone(), http.clone(), google::GoogleEndpoints::google().api);
     let gmail = connectors::gmail::GmailConnector::new(google.clone(), http.clone(), GMAIL_API.into(), store.clone());
+    let drive = connectors::drive::DriveConnector::new(google.clone(), http.clone(), connectors::drive::DRIVE_API.into());
     let watcher = mail::watch::MailWatcher::new(google.clone(), http, GMAIL_API.into(), store.clone());
     let h = handle.clone();
     let approvals = approvals::Approvals::new(store.clone(), Arc::new(move |a| {
@@ -142,8 +171,31 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
         Err(e) => eprintln!("bleep: daily-note index: {e}"),
     }
     let memory_tools = Arc::new(connectors::memory::MemoryConnector::new(memory.clone(), Arc::new(chrono::Local::now)));
+    let reminders = {
+        let (h1, h2) = (handle.clone(), handle.clone());
+        reminders::Reminders::new(
+            store.clone(),
+            Arc::new(move |r, how| bar::reminder_fired(&h1, r, how)),
+            Arc::new(move || {
+                let _ = h2.emit("reminders://changed", ());
+            }),
+            Arc::new(chrono::Utc::now),
+        )
+    };
+    let reminder_tools = Arc::new(reminders::ReminderConnector(reminders.clone()));
     let turns = mcp::host::TurnTracker::default();
-    let tool_host = mcp::host::ToolHost::new_logged(vec![Arc::new(connectors::bleep::BleepConnector), calendar.clone(), gmail, memory_tools], approvals.clone(), turns.clone(), store.clone());
+    let files = connectors::files::FilesConnector::new(&config.files.folders, dirs::home_dir().unwrap_or_default(), Arc::new(connectors::files::Spotlight));
+    let offer = {
+        let h = handle.clone();
+        Arc::new(marketplace::OfferConnector(Arc::new(move |id: &str| {
+            let state = h.try_state::<AppState>()?;
+            let auth = h.try_state::<Arc<google::GoogleAuth>>()?;
+            marketplace::view(&state, &auth).items.into_iter().find(|i| i.id == id)
+        })))
+    };
+    let tool_host = mcp::host::ToolHost::new_logged(vec![Arc::new(connectors::bleep::BleepConnector), calendar.clone(), gmail, drive, files, memory_tools, reminder_tools, offer], approvals.clone(), turns.clone(), store.clone());
+    google.set_on(config.connectors.on.iter().filter(|id| google::GOOGLE_CONNECTORS.contains(&id.as_str())).cloned());
+    tool_host.set_hidden(marketplace::hidden_builtin(&config.connectors.on));
     let mcp = tauri::async_runtime::block_on(mcp::McpServer::start(mcp::new_token(), tool_host.clone()))?;
     // Remote MCP servers I added (Phase 7): their cached tools join the host at once.
     let own_port = reqwest::Url::parse(&mcp.url()).ok().and_then(|u| u.port());
@@ -222,8 +274,8 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
             }
         }
     });
-    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, memory, remotes, runtime, make_runtime, budget, _mcp: mcp };
-    Ok(Parts { state, google, calendar, watcher, triager, capped })
+    let state = AppState { paths, config: Mutex::new(config), store, chat, approvals, memory, remotes, tools: tool_host, runtime, make_runtime, budget, _mcp: mcp };
+    Ok(Parts { state, google, calendar, watcher, triager, capped, reminders })
 }
 
 /// Agent watch (Phase 4): the hook socket, the hub, and the Codex client.
@@ -252,11 +304,14 @@ fn start_agent_watch(app: &tauri::App, store: Arc<Store>, runtime: Arc<dyn runti
     let codex = agentwatch::codex::CodexWatch::new(watch.clone(), store);
     app.manage(codex.clone());
     app.manage(watch.clone());
-    // An older install lacks the reply hook and the long permission wait.
-    match agentwatch::install::upgrade_claude(&agentwatch::install::HookFiles::real(&paths)) {
-        Ok(true) => eprintln!("bleep: updated the Claude Code hooks"),
-        Ok(false) => {}
-        Err(e) => eprintln!("bleep: could not update the Claude Code hooks: {e}"),
+    // An older install lacks the reply hook and the long permission wait. A dev build never
+    // rewrites the hooks: they belong to the production app.
+    if !flavor::DEV {
+        match agentwatch::install::upgrade_claude(&agentwatch::install::HookFiles::real(&paths)) {
+            Ok(true) => eprintln!("bleep: updated the Claude Code hooks"),
+            Ok(false) => {}
+            Err(e) => eprintln!("bleep: could not update the Claude Code hooks: {e}"),
+        }
     }
     let sock = paths.sock.clone();
     tauri::async_runtime::spawn(async move {
@@ -265,7 +320,8 @@ fn start_agent_watch(app: &tauri::App, store: Arc<Store>, runtime: Arc<dyn runti
         }
     });
     let h = app.handle().clone();
-    tauri::async_runtime::spawn(codex.run(agents::codex_home(), Arc::new(move || h.state::<AppState>().config.lock().unwrap().agents.codex_watch)));
+    // A dev build never answers Codex approvals: the production app does.
+    tauri::async_runtime::spawn(codex.run(agents::codex_home(), Arc::new(move || !flavor::DEV && h.state::<AppState>().config.lock().unwrap().agents.codex_watch)));
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -275,19 +331,26 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            let Parts { state, google, calendar, watcher, triager, capped } = init(app)?;
+            let Parts { state, google, calendar, watcher, triager, capped, reminders } = init(app)?;
             let budget = state.budget.clone();
             let chat = state.chat.clone();
             let cfg = state.config.lock().unwrap().clone();
             let store = state.store.clone();
             app.manage(state);
             let ui = windows::UiState::default();
+            // A dev build starts paused, so it does not ping or check in twice next to the
+            // production app. Reminders still fire. Resume from the tray.
+            ui.paused.store(flavor::DEV, std::sync::atomic::Ordering::SeqCst);
             let paused = ui.paused.clone();
+            app.manage(reminders.clone());
+            tauri::async_runtime::spawn(reminders.run());
             app.manage(ui);
             app.manage(google.clone());
+            let gmail_auth = google.clone();
             app.manage(Arc::new(voice::Voice::new(app.state::<AppState>().paths.root.join("models"))));
             windows::create_windows(app.handle(), &cfg)?;
             windows::follow_active_screen(app.handle());
@@ -334,7 +397,10 @@ pub fn run() {
                 every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
                 loop {
                     every.tick().await;
-                    pipeline.tick(chrono::Utc::now()).await;
+                    // Gmail off in Settings > Connectors, or not signed in: no mail watch.
+                    if gmail_auth.ready("gmail") {
+                        pipeline.tick(chrono::Utc::now()).await;
+                    }
                     checkins.tick().await;
                     patterns.tick().await;
                 }
@@ -427,12 +493,22 @@ pub fn run() {
             updater::update_install,
             updater::update_set_auto,
             updater::update_restart,
+            avatar::avatar_get,
+            avatar::avatar_set,
             voice::voice_settings,
             voice::voice_status,
             voice::voice_set,
             voice::voice_speak,
             voice::voice_stop_speaking,
-            voice::voice_test_speaker
+            voice::voice_test_speaker,
+            usage::usage_summary,
+            marketplace::catalog_list,
+            marketplace::catalog_set,
+            reminders::reminders_list,
+            reminders::reminder_add,
+            reminders::reminder_done,
+            reminders::reminder_snooze,
+            reminders::reminder_delete
         ])
         .run(tauri::generate_context!())
         .expect("error while running bleep");

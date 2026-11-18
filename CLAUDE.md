@@ -13,6 +13,8 @@ Floating macOS assistant. Plan and decisions: `docs/build-plan.md`. App: `app/` 
 
 `source ~/.config/zsh/secrets.zsh && npm run tauri build` in `app/`. The secrets file gives `BLEEP_GOOGLE_CLIENT_ID` and `BLEEP_GOOGLE_CLIENT_SECRET`, compiled in as bleep's Google app. Never print their values.
 
+**Dev build:** `npm run build:dev` in `app/` builds "bleep (dev)" (cargo feature `dev`, `src-tauri/tauri.dev.conf.json`) and installs it to `/Applications/bleep (dev).app`, next to production. It has its own data (`~/.bleep-dev`), Keychain item and bundle id, never updates itself, and never touches the Claude Code hooks. See `src-tauri/src/flavor.rs`. Use it to test unreleased work.
+
 ## Copy
 
 No em dashes in any user-facing text, prompts included.

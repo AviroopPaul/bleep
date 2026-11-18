@@ -216,6 +216,28 @@ impl Remotes {
         c.connect().await
     }
 
+    /// Turns a server on (its tools come back, and it connects) or off (its tools go, its
+    /// sign-in stays). Returns the config to save.
+    pub async fn set_enabled(&self, name: &str, on: bool) -> Result<McpServer, String> {
+        let c = self.find(name)?;
+        c.set_enabled(on);
+        if on {
+            self.host.replace(c.clone());
+            if let Err(e) = c.connect().await {
+                eprintln!("bleep: connect {name}: {e}");
+            }
+        } else {
+            self.host.remove(name);
+        }
+        Ok(c.config())
+    }
+
+    /// The server added for this URL, if any.
+    pub fn by_url(&self, url: &str) -> Option<McpServer> {
+        let norm = |u: &str| u.trim_end_matches('/').to_ascii_lowercase();
+        self.list.lock().unwrap().iter().map(|c| c.config()).find(|c| norm(&c.url) == norm(url))
+    }
+
     pub async fn refresh(&self, name: &str) -> Result<(), String> {
         self.find(name)?.refresh_tools().await
     }

@@ -2,6 +2,8 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type { ModelSettings as ModelSettingsT, ModelSave, Preset } from "./ipc";
+import type { CatalogItem, CatalogView, ReminderItem, UsageView } from "./ipc";
+import { normalize, type AvatarConfig } from "./avatar/avatars";
 import type { ActivityItem, AgentAsk, AgentChatLine, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode, UpdateView, VoiceConfig, VoiceStatus, VoiceView } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
@@ -17,6 +19,9 @@ export function installMocks(label: string) {
   let card: Approval | null = null;
   const q = new URLSearchParams(window.location.search);
   const calls: string[] = [];
+  // ?avatar=puff:plush:FF4FA3 starts with that buddy.
+  const [avKind, avFinish, avColor] = (q.get("avatar") ?? "").split(":");
+  let avatar: AvatarConfig = normalize(avKind ? { kind: avKind as AvatarConfig["kind"], finish: avFinish as AvatarConfig["finish"], color: avColor ? `#${avColor}` : undefined } : undefined);
   (window as unknown as { __calls: string[] }).__calls = calls;
   const cueKind = q.get("cue");
   const mins = cueKind === "ten" ? 8 : 42;
@@ -119,6 +124,9 @@ export function installMocks(label: string) {
     return upd;
   };
   // ?pinged=1: a droid bubble that was saved to the chat.
+  // ?offer=linear: the last answer offered a connector that is off.
+  const offer = q.get("offer");
+  if (offer) history.push({ ...row(3, "user", "what is on my board?"), }, { ...row(4, "assistant", "Linear is off. Turn it on here and ask again."), tool_steps: [{ id: "t1", name: "connector_offer", args: { id: offer }, ok: true, preview: null }] });
   if (q.get("pinged")) history.push({ ...row(history.length + 1, "system", "Design review in 1 hour"), kind: "ping" });
   if (memOn) history.push({ ...row(3, "system", "Compacted 250K into a 3K summary. Facts saved to memory."), kind: "divider" });
   if (memOn) next = 4;
@@ -152,6 +160,22 @@ export function installMocks(label: string) {
     ? [dayblocks(), { name: "wiki", url: "https://mcp.example.com/mcp", auth: "token", enabled: true, status: { state: "needs_sign_in" }, tools: [] }]
     : [];
   let cancelAdd: (() => void) | null = null;
+  // The marketplace: ?catalog=on has Gmail and Calendar on and connected.
+  const catOn = q.get("catalog") === "on";
+  const cat = (id: string, name: string, blurb: string, kind: CatalogItem["kind"], token = false): CatalogItem => {
+    const on = catOn && (id === "gmail" || id === "calendar");
+    return { id, name, blurb, kind, token, on, status: on ? { state: "connected", account: "me@example.com" } : { state: "needs_sign_in" }, tools: 0 };
+  };
+  let catalog: CatalogItem[] = [
+    cat("gmail", "Gmail", "Sorts your mail, finds bills and drafts replies. Sending always asks you first.", "google"),
+    cat("calendar", "Google Calendar", "Your meetings, the meeting bar, and event changes after you approve.", "google"),
+    cat("drive", "Google Drive", "Finds and reads your Docs, Sheets, Slides and text files. Read only.", "google"),
+    cat("files", "Files on this Mac", "Lists, finds, greps and reads files in Documents, Desktop and Downloads. Commands ask you first.", "local"),
+    cat("linear", "Linear", "Your issues and projects. Changes ask you first.", "remote"),
+    cat("notion", "Notion", "Your pages and databases. Changes ask you first.", "remote"),
+    cat("github", "GitHub", "Repos, issues and pull requests. Needs a personal access token.", "remote", true),
+  ];
+  const catView = (): CatalogView => ({ items: catalog, always_on: ["Date and time", "Memory", "Reminders"] });
   const connView = (): ConnectorsView => ({
     builtin: [
       { id: "gmail", label: "Gmail", status: { state: "connected", account: "me@example.com" } },
@@ -175,7 +199,43 @@ export function installMocks(label: string) {
   let memSet: MemorySettings = { compact_at: 250_000, threshold: 250_000, window: 1_000_000, nightly: "22:00" };
   const bubble = q.get("bubble");
   const ping = q.get("ping");
-  if (bubble) setTimeout(() => emit("bubble://text", { text: bubble, ping_id: ping ? Number(ping) : null }), 200);
+  const remBubble = q.get("remind");
+  if (bubble) setTimeout(() => emit("bubble://text", { text: bubble, ping_id: ping ? Number(ping) : null, reminder_id: remBubble ? Number(remBubble) : null }), 200);
+  // Usage (?usage=1 fills it; ?usage=empty has no calls) and reminders (?rem=1 seeds three).
+  const localAt = (mins: number) => {
+    const d = new Date(Date.now() + mins * 60_000);
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  };
+  let rems: ReminderItem[] = q.has("rem")
+    ? [
+        { id: 1, text: "Pay the electricity bill", due: localAt(-5), next: localAt(-5), repeat: "none", status: "fired", snoozed: false },
+        { id: 2, text: "Call mom", due: localAt(120), next: localAt(120), repeat: "none", status: "scheduled", snoozed: false },
+        { id: 3, text: "Stand up and stretch", due: localAt(24 * 60), next: localAt(24 * 60), repeat: "weekdays", status: "scheduled", snoozed: false },
+      ]
+    : [];
+  let remNext = 10;
+  const usageFor = (days: number): UsageView => {
+    const empty = q.get("usage") === "empty";
+    const heat = Array.from({ length: 7 }, (_, d) => Array.from({ length: 24 }, (_, h) => (empty || d > 4 || h < 8 || h > 19 ? 0 : ((d * 7 + h * 3) % 6)) + (h === 9 && !empty ? 5 : 0)));
+    const daily = Array.from({ length: days }, (_, i) => {
+      const d = new Date(Date.now() - (days - 1 - i) * 86_400_000);
+      const p2 = (n: number) => String(n).padStart(2, "0");
+      const tokens: Record<string, number> = empty ? {} : { chat: 40_000 + ((i * 17_000) % 90_000), triage: (i % 3) * 6_000, compaction: i === days - 2 ? 30_000 : 0 };
+      return { day: `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`, calls: empty ? 0 : 12 + (i % 5), tokens: Object.fromEntries(Object.entries(tokens).filter(([, n]) => n > 0)) };
+    });
+    return {
+      days, calls: empty ? 0 : 84 * days, failed: empty ? 0 : 2, tokens_in: empty ? 0 : 1_240_000, tokens_out: empty ? 0 : 38_000,
+      cost: q.get("usage") === "api" ? 0.42 : null, unpriced: 0, heat, daily,
+      purposes: empty ? [] : ["chat", "triage", "compaction"],
+      models: empty ? [] : [
+        { runtime: "claude", model: "sonnet", calls: 60 * days, tokens_in: 1_200_000, tokens_out: 36_000, cost: null },
+        { runtime: "claude", model: "haiku", calls: 24 * days, tokens_in: 40_000, tokens_out: 2_000, cost: null },
+      ],
+      tools: empty ? [] : [{ tool: "calendar_list", calls: 31, failed: 0 }, { tool: "gmail_search", calls: 18, failed: 1 }, { tool: "reminder_create", calls: 6, failed: 0 }],
+      agents: { auto: empty ? 0 : 14, approved: empty ? 0 : 5, denied: empty ? 0 : 1, answered: 0, expired: 0, queued: 0 },
+    };
+  };
   const later = (ms: number, f: () => void) => setTimeout(f, ms);
   const chatEv = (id: number, event: ChatEmit["event"]) => emit("chat://event", { message_id: id, event });
   // Voice: ?voice=on starts with the wake word on and listening. Tests drive events with __voice.
@@ -440,6 +500,20 @@ export function installMocks(label: string) {
           return null;
         case "spend_today":
           return { runtime: model.runtime, spend: { cost: spendCost, unpriced: 0, calls: modelOn ? 12 : 0 }, cap: model.api.daily_cap_usd, over: model.runtime === "api" && spendCost >= model.api.daily_cap_usd };
+        case "catalog_list":
+          return catView();
+        case "catalog_set": {
+          calls.push(`catalog_set:${a.id}:${a.on}:${a.token ?? ""}`);
+          const item = catalog.find((c) => c.id === a.id);
+          if (!item) throw "No such connector.";
+          if (a.on && item.token && !a.token && item.status.state !== "connected") throw `${item.name} needs a token. Paste one and turn it on again.`;
+          if (a.on && q.get("catalog") === "fail") throw "Google sign-in failed: access_denied";
+          catalog = catalog.map((c) =>
+            c.id !== a.id ? c : { ...c, on: !!a.on, status: a.on ? { state: "connected", account: c.kind === "google" ? "me@example.com" : c.kind === "local" ? "this Mac" : `${c.id}.app` } : c.status, tools: a.on && c.kind === "remote" ? 12 : c.tools },
+          );
+          later(10, () => void emit("connectors://changed", {}));
+          return catView();
+        }
         case "connectors_list":
           return connView();
         case "remote_add": {
@@ -491,7 +565,38 @@ export function installMocks(label: string) {
           later(10, () => void emit("connectors://changed", {}));
           return null;
         case "chat_context":
-          return { used: memOn ? 120_000 : null, threshold: memSet.threshold, window: memSet.window };
+          return { used: q.has("ctxhigh") ? 215_000 : memOn ? 120_000 : null, threshold: memSet.threshold, window: memSet.window };
+        case "avatar_get":
+          return avatar;
+        case "avatar_set": {
+          avatar = normalize(a.config as AvatarConfig);
+          calls.push(`avatar_set:${avatar.kind}:${avatar.color}:${avatar.finish}`);
+          later(5, () => void emit("avatar://changed", avatar));
+          return avatar;
+        }
+        case "usage_summary":
+          calls.push(`usage_summary:${a.days}`);
+          return usageFor(Number(a.days));
+        case "reminders_list":
+          return rems;
+        case "reminder_add": {
+          calls.push(`reminder_add:${a.text}:${a.at}:${a.repeat}`);
+          const r: ReminderItem = { id: remNext++, text: String(a.text), due: String(a.at), next: String(a.at), repeat: a.repeat as ReminderItem["repeat"], status: "scheduled", snoozed: false };
+          rems = [...rems, r].sort((x, y) => (x.status === "fired" ? -1 : y.status === "fired" ? 1 : x.next.localeCompare(y.next)));
+          return r;
+        }
+        case "reminder_done":
+          calls.push(`reminder_done:${a.id}`);
+          rems = rems.map((r) => (r.id === a.id ? { ...r, status: r.repeat === "none" ? "done" : "scheduled" } : r));
+          return null;
+        case "reminder_snooze":
+          calls.push(`reminder_snooze:${a.id}:${a.minutes}`);
+          rems = rems.map((r) => (r.id === a.id ? { ...r, status: "scheduled", snoozed: true, next: localAt(Number(a.minutes)) } : r));
+          return null;
+        case "reminder_delete":
+          calls.push(`reminder_delete:${a.id}`);
+          rems = rems.filter((r) => r.id !== a.id);
+          return null;
         case "voice_settings":
           return voiceView();
         case "voice_status":
@@ -532,6 +637,9 @@ export function installMocks(label: string) {
           return upd;
         case "update_restart":
           calls.push(cmd);
+          return null;
+        case "settings_open":
+          calls.push(`settings_open:${a.section ?? ""}`);
           return null;
         default:
           return null;

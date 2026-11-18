@@ -1,7 +1,7 @@
 {
   "name": "bleep",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "build:hook": "cargo build --release --manifest-path bleep-hook/Cargo.toml && mkdir -p src-tauri/binaries && cp bleep-hook/target/release/bleep-hook src-tauri/binaries/bleep-hook-$(rustc -vV | sed -n 's/^host: //p')",
     "test": "vitest run --dir src",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "build:dev": "./scripts/install-dev.sh"
   },
   "dependencies": {
     "@fontsource/fredoka": "^5",

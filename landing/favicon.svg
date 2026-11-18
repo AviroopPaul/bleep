@@ -1,9 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 -10 80 80">
-  <line x1="60" y1="20" x2="60" y2="8" stroke="#1B1F24" stroke-width="3.5" stroke-linecap="round"/>
-  <circle cx="60" cy="7" r="5.5" fill="#E9C46A" stroke="#1B1F24" stroke-width="2.6"/>
-  <path d="M22 58 A38 37 0 0 1 98 58 Z" fill="#F7F6F2" stroke="#1B1F24" stroke-width="3.5" stroke-linejoin="round"/>
-  <path d="M27 49 A38 37 0 0 1 93 49" fill="none" stroke="#2F5C93" stroke-width="5.5" stroke-linecap="round"/>
-  <circle cx="60" cy="40" r="15" fill="#1B1F24"/>
-  <circle cx="60" cy="40" r="9.5" fill="#2F5C93"/>
-  <circle cx="56" cy="36" r="3" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="18 26 86 86">
+  <!-- Puff, the default buddy (app/src/avatar/avatars.ts), sky blue and glossy -->
+  <defs><linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="0" y1="33" x2="0" y2="108"><stop offset="0" stop-color="#84D6FB"/><stop offset=".55" stop-color="#38BDF8"/><stop offset="1" stop-color="#2C93C1"/></linearGradient></defs>
+  <g fill="url(#bg)"><circle cx="41" cy="74" r="20"/><circle cx="62" cy="58" r="25"/><circle cx="85" cy="71" r="18"/><rect x="24" y="70" width="73" height="34" rx="17"/></g><ellipse cx="52" cy="44" rx="9" ry="4.5" transform="rotate(-20 52 44)" fill="#fff" opacity=".5"/><g transform="translate(60 80)"><rect x="-15.5" y="-4.75" width="7" height="9.5" rx="3.5" fill="#1B1F24"/><circle cx="-12.84" cy="-1.9" r="1.68" fill="#fff"/><rect x="8.5" y="-4.75" width="7" height="9.5" rx="3.5" fill="#1B1F24"/><circle cx="11.16" cy="-1.9" r="1.68" fill="#fff"/><ellipse cx="-20.5" cy="5.75" rx="4.6" ry="2.8" fill="#FF6F91" opacity=".5"/><ellipse cx="20.5" cy="5.75" rx="4.6" ry="2.8" fill="#FF6F91" opacity=".5"/><path d="M-4 9.75 Q0 13.35 4 9.75" fill="none" stroke="#1B1F24" stroke-width="2.3" stroke-linecap="round"/></g>
 </svg>

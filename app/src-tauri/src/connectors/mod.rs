@@ -12,6 +12,9 @@ pub enum ConnectorStatus {
 
 pub mod bleep;
 pub mod calendar;
+pub mod doc_text;
+pub mod drive;
+pub mod files;
 pub mod gmail;
 pub mod memory;
 

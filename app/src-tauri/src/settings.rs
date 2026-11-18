@@ -44,13 +44,27 @@ fn push_status(app: &AppHandle, auth: &GoogleAuth) {
     let _ = app.emit("google://status", auth.status());
 }
 
+/// Opens Settings. `section` (like "usage") picks the page; the chat's gear uses it.
 #[tauri::command]
-pub fn settings_open(app: AppHandle) {
-    open_settings(&app);
+pub fn settings_open(app: AppHandle, section: Option<String>) {
+    open_settings_at(&app, section.as_deref());
 }
 
 pub fn open_settings(app: &AppHandle) {
+    open_settings_at(app, None);
+}
+
+/// Only plain lowercase names reach the URL.
+fn section_ok(s: &str) -> bool {
+    !s.is_empty() && s.len() <= 24 && s.bytes().all(|b| b.is_ascii_lowercase())
+}
+
+pub fn open_settings_at(app: &AppHandle, section: Option<&str>) {
+    let section = section.filter(|s| section_ok(s));
     if let Some(w) = app.get_webview_window("settings") {
+        if let Some(s) = section {
+            let _ = app.emit_to("settings", "settings://goto", s);
+        }
         crate::windows::bring_to_droid_screen(app, &w);
         let _ = w.show();
         let _ = w.set_focus();
@@ -58,8 +72,8 @@ pub fn open_settings(app: &AppHandle) {
     }
     // On the screen where the droid is, not always the main one.
     let (at, size) = crate::windows::panel_on_droid_screen(app, crate::windows::Size { w: 860.0, h: 620.0 });
-    let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html#settings".into()))
-        .title("bleep settings")
+    let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(match section { Some(s) => format!("index.html#settings/{s}"), None => "index.html#settings".into() }.into()))
+        .title(format!("{} settings", crate::flavor::NAME))
         .inner_size(size.w, size.h)
         .min_inner_size(440.0, 460.0)
         .resizable(true)
@@ -117,9 +131,23 @@ pub async fn google_use_builtin(app: AppHandle, state: tauri::State<'_, AppState
 }
 
 #[tauri::command]
-pub async fn google_connect(app: AppHandle, auth: tauri::State<'_, Arc<GoogleAuth>>, sched: tauri::State<'_, Arc<Scheduler>>) -> Result<String, String> {
-    let account = auth.sign_in(SIGN_IN_WAIT).await.map_err(|e| e.to_string())?;
+pub async fn google_connect(app: AppHandle, state: tauri::State<'_, AppState>, auth: tauri::State<'_, Arc<GoogleAuth>>, sched: tauri::State<'_, Arc<Scheduler>>) -> Result<String, String> {
+    // Connect asks for the Google connectors that are on. With none on (setup, or a new
+    // install), it turns on Gmail and Calendar, as bleep always had them.
+    let on: Vec<String> = state.config.lock().unwrap().connectors.on.iter().filter(|id| crate::google::GOOGLE_CONNECTORS.contains(&id.as_str())).cloned().collect();
+    let ids: Vec<String> = if on.is_empty() { vec!["gmail".into(), "calendar".into()] } else { on };
+    let scopes: Vec<&str> = ids.iter().flat_map(|id| crate::google::scopes_for(id).iter().copied()).collect();
+    let account = auth.sign_in_for(&scopes, SIGN_IN_WAIT).await.map_err(|e| e.to_string())?;
+    {
+        let mut c = state.config.lock().unwrap();
+        for id in &ids {
+            c.connectors.set(id, true);
+        }
+        c.save(&state.paths.config_file).map_err(|e| e.to_string())?;
+    }
+    crate::marketplace::apply_on(&state, &auth);
     push_status(&app, &auth);
+    let _ = app.emit("connectors://changed", ());
     sched.refresh_now().await;
     Ok(account)
 }
@@ -198,6 +226,14 @@ pub fn open_url(app: AppHandle, url: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn settings_sections_are_plain_names() {
+        assert!(section_ok("usage") && section_ok("connectors"));
+        for bad in ["", "Usage", "a/b", "x?y=1", "../chat", &"a".repeat(25)] {
+            assert!(!section_ok(bad), "{bad}");
+        }
+    }
 
     #[test]
     fn mail_lists_are_lowercased_deduped_and_cleaned() {

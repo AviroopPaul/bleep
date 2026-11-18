@@ -25,7 +25,8 @@ impl MemFile {
     }
 }
 
-/// Every place bleep keeps data on disk. Root is `$BLEEP_HOME` or `~/.bleep`.
+/// Every place bleep keeps data on disk. Root is `$BLEEP_HOME`, or `~/.bleep` (`~/.bleep-dev`
+/// for a dev build).
 #[derive(Clone, Debug)]
 pub struct BleepPaths {
     pub root: PathBuf,
@@ -46,13 +47,29 @@ pub struct BleepPaths {
 pub fn resolve_root(bleep_home: Option<String>) -> PathBuf {
     match bleep_home.filter(|s| !s.is_empty()) {
         Some(p) => PathBuf::from(p),
-        None => dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join(".bleep"),
+        None => home().join(crate::flavor::HOME_DIR),
     }
+}
+
+fn home() -> PathBuf {
+    dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"))
 }
 
 impl BleepPaths {
     pub fn from_env() -> Self {
-        Self::from_root(resolve_root(std::env::var("BLEEP_HOME").ok()))
+        let custom = std::env::var("BLEEP_HOME").ok().filter(|s| !s.is_empty());
+        let mut p = Self::from_root(resolve_root(custom.clone()));
+        if crate::flavor::DEV && custom.is_none() {
+            // A dev build shares the production app's Claude sign-in, so it needs no second
+            // login. Its chat sessions stay its own: they run in its own working folder.
+            p.claude_home = home().join(crate::flavor::PROD_HOME_DIR).join("claude-home");
+        }
+        p
+    }
+
+    /// The production data folder a dev build seeds from.
+    pub fn prod_root() -> PathBuf {
+        home().join(crate::flavor::PROD_HOME_DIR)
     }
 
     pub fn from_root(root: PathBuf) -> Self {

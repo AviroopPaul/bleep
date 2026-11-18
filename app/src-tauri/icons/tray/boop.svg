@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 6 96 106">
+  <!-- boop as an outline for the menu bar. macOS uses it as a template image: only the
+       alpha counts. Shapes match src/avatar/avatars.ts. Render: scripts/tray-icons.mjs -->
+  <path d="M42 40 H78 V46 H90 V52 H96 V64 H102 V82 H96 V94 H90 V100 H30 V94 H24 V82 H18 V64 H24 V52 H30 V46 H42 Z" fill="none" stroke="#000" stroke-width="7" stroke-linejoin="miter"/>
+  <path d="M60 40 V26" stroke="#000" stroke-width="7"/>
+  <rect x="50" y="12" width="20" height="14"/>
+  <rect x="42" y="58" width="7" height="18"/><rect x="71" y="58" width="7" height="18"/>
+  <rect x="30" y="100" width="18" height="8"/><rect x="72" y="100" width="18" height="8"/>
+</svg>

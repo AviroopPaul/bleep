@@ -108,3 +108,31 @@ test("dark mode: memory tab, divider and meter are readable", async ({ page }) =
   await page.goto("/?mock=1&memory=1#chat");
   expect(await contrast(page, ".divider"), ".divider").toBeGreaterThanOrEqual(4.5);
 });
+
+test("dark mode: usage and reminders are readable", async ({ page }) => {
+  await page.goto("/?mock=1&memory=1&usage=1#settings/usage");
+  for (const sel of [".us-k", ".us-v", ".us-n", ".us-sec-h h2", ".us-sec-h span", ".us-wd", ".us-legend li", ".us-table td", ".us-tool", ".us-num", ".us-pill[aria-checked=true]", ".us-pill[aria-checked=false]", ".set-kicker", ".set-title", ".set-sub", ".tab-group-h", ".tab[aria-selected=true]", ".tab[aria-selected=false]"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+  await page.goto("/?mock=1&memory=1&rem=1#chat");
+  await page.getByRole("tab", { name: /Reminders/ }).click();
+  for (const sel of [".rm-title", ".rm-meta", ".rm-row.due .rm-meta", ".rm-add input", ".ag-h"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+test("dark mode: the connector catalog is readable", async ({ page }) => {
+  await page.goto("/?mock=1&g=builtin&catalog=on#settings");
+  await page.getByRole("tab", { name: "Connectors" }).click();
+  for (const sel of [".cat-name", ".cat-blurb", ".cat-card.on .pill", ".cat-always li", ".mail-h"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+test("dark mode: a connector offered in the chat is readable", async ({ page }) => {
+  await page.goto("/?mock=1&offer=linear#chat");
+  await expect(page.locator(".offer .cat-name")).toHaveText("Linear");
+  for (const sel of [".offer .cat-name", ".offer .cat-blurb"]) {
+    expect(await contrast(page, sel), sel).toBeGreaterThanOrEqual(4.5);
+  }
+});

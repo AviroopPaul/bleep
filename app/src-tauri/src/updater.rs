@@ -199,7 +199,8 @@ pub fn start(app: &tauri::AppHandle) {
         now: Arc::new(Utc::now),
     });
     app.manage(up.clone());
-    if cfg!(debug_assertions) {
+    // A dev build must never update itself to the production release.
+    if cfg!(debug_assertions) || crate::flavor::DEV {
         return;
     }
     tauri::async_runtime::spawn(async move {
@@ -218,13 +219,22 @@ pub fn update_state(up: Up<'_>) -> UpdateView {
     up.view()
 }
 
+/// Why the dev build has no updates.
+pub const DEV_NOTE: &str = "bleep (dev) does not update itself. Build and install a new dev build from the repo.";
+
 #[tauri::command]
 pub async fn update_check(up: Up<'_>) -> Result<UpdateView, String> {
+    if crate::flavor::DEV {
+        return Err(DEV_NOTE.into());
+    }
     Ok(up.inner().clone().check().await)
 }
 
 #[tauri::command]
 pub async fn update_install(up: Up<'_>) -> Result<UpdateView, String> {
+    if crate::flavor::DEV {
+        return Err(DEV_NOTE.into());
+    }
     Ok(up.inner().clone().install().await)
 }
 

@@ -60,6 +60,24 @@ export interface ConnectorsView {
   servers: RemoteServer[];
 }
 
+// marketplace::CatalogView (0.5.0, F3).
+export interface CatalogItem {
+  id: string;
+  name: string;
+  blurb: string;
+  kind: "google" | "remote" | "local";
+  /** Needs a pasted token to turn on. */
+  token: boolean;
+  on: boolean;
+  status: ConnectorStatus;
+  tools: number;
+}
+
+export interface CatalogView {
+  items: CatalogItem[];
+  always_on: string[];
+}
+
 export interface AddServer {
   url: string;
   name?: string | null;
@@ -236,6 +254,8 @@ export interface RuntimeHealth {
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { AvatarConfig } from "./avatar/avatars";
+export type { AvatarConfig } from "./avatar/avatars";
 
 export interface Preset {
   id: string;
@@ -298,6 +318,51 @@ export interface ModelSave {
   key: string | null;
 }
 
+// usage::UsageView (0.5.0, F4).
+export interface UsageDay {
+  day: string;
+  calls: number;
+  tokens: Record<string, number>;
+}
+
+export interface UsageModel {
+  runtime: string;
+  model: string;
+  calls: number;
+  tokens_in: number;
+  tokens_out: number;
+  cost: number | null;
+}
+
+export interface UsageView {
+  days: number;
+  calls: number;
+  failed: number;
+  tokens_in: number;
+  tokens_out: number;
+  cost: number | null;
+  unpriced: number;
+  /** 7 rows (Monday first) of 24 local hours. */
+  heat: number[][];
+  daily: UsageDay[];
+  purposes: string[];
+  models: UsageModel[];
+  tools: { tool: string; calls: number; failed: number }[];
+  agents: { auto: number; approved: number; denied: number; answered: number; expired: number; queued: number };
+}
+
+// reminders::reminder_json (0.5.0, F5). Times are local, "YYYY-MM-DDTHH:MM".
+export type RepeatKind = "none" | "daily" | "weekdays" | "weekly" | "monthly";
+export interface ReminderItem {
+  id: number;
+  text: string;
+  due: string;
+  next: string;
+  repeat: RepeatKind;
+  status: "scheduled" | "fired" | "done";
+  snoozed: boolean;
+}
+
 export const api = {
   history: (beforeId: number | null, limit = 50) => invoke<Message[]>("chat_history", { beforeId, limit }),
   send: (text: string) => invoke<number>("chat_send", { text }),
@@ -322,7 +387,7 @@ export const api = {
   googleUseBuiltin: () => invoke<GoogleState>("google_use_builtin"),
   googleDisconnect: () => invoke<void>("google_disconnect"),
   openLink: (which: LinkName) => invoke<void>("open_link", { which }),
-  openSettings: () => invoke<void>("settings_open"),
+  openSettings: (section?: string) => invoke<void>("settings_open", { section: section ?? null }),
   setupOpen: () => invoke<void>("setup_open"),
   setupFinish: () => invoke<void>("setup_finish"),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
@@ -370,12 +435,22 @@ export const api = {
   updateInstall: () => invoke<UpdateView>("update_install"),
   updateSetAuto: (on: boolean) => invoke<UpdateView>("update_set_auto", { on }),
   updateRestart: () => invoke<void>("update_restart"),
+  avatarGet: () => invoke<AvatarConfig>("avatar_get"),
+  avatarSet: (config: AvatarConfig) => invoke<AvatarConfig>("avatar_set", { config }),
   voiceSettings: () => invoke<VoiceView>("voice_settings"),
   voiceStatus: () => invoke<VoiceStatus>("voice_status"),
   voiceSet: (config: VoiceConfig) => invoke<VoiceView>("voice_set", { config }),
   voiceSpeak: (text: string) => invoke<void>("voice_speak", { text }),
   voiceStopSpeaking: () => invoke<void>("voice_stop_speaking"),
   voiceTestSpeaker: (voice: string, speaker: string) => invoke<void>("voice_test_speaker", { voice, speaker }),
+  catalogList: () => invoke<CatalogView>("catalog_list"),
+  catalogSet: (id: string, on: boolean, token?: string | null) => invoke<CatalogView>("catalog_set", { id, on, token: token ?? null }),
+  usageSummary: (days: number) => invoke<UsageView>("usage_summary", { days }),
+  remindersList: () => invoke<ReminderItem[]>("reminders_list"),
+  reminderAdd: (text: string, at: string, repeat: RepeatKind) => invoke<ReminderItem>("reminder_add", { text, at, repeat }),
+  reminderDone: (id: number) => invoke<void>("reminder_done", { id }),
+  reminderSnooze: (id: number, minutes: number) => invoke<void>("reminder_snooze", { id, minutes }),
+  reminderDelete: (id: number) => invoke<void>("reminder_delete", { id }),
 };
 
 // config::VoiceConfig. Empty device names mean the system default.
@@ -415,6 +490,7 @@ export interface VoiceView {
 // voice::VoiceEvent: the wake phrase was heard, then the request (or nothing).
 export type VoiceEvent = { kind: "wake" } | { kind: "heard"; text: string } | { kind: "idle" };
 export const onVoice = (cb: (e: VoiceEvent) => void): Promise<UnlistenFn> => listen<VoiceEvent>("voice://event", (e) => cb(e.payload));
+export const onReminders = (cb: () => void): Promise<UnlistenFn> => listen("reminders://changed", () => cb());
 
 // updater::Phase and updater::UpdateView.
 export type UpdatePhase =
@@ -452,9 +528,17 @@ export interface BubbleText {
   text: string;
   /** Set for mail pings, which can be marked "Not useful". */
   ping_id?: number | null;
+  /** Set for reminders, which have Done and Snooze. */
+  reminder_id?: number | null;
 }
 export const onBubbleText = (cb: (b: BubbleText) => void): Promise<UnlistenFn> =>
   listen<BubbleText>("bubble://text", (e) => cb(e.payload));
+/** The buddy changed in Settings. Every window redraws it. */
+/** Open Settings at a section, when the window is already open (`settings_open` with a section). */
+export const onSettingsGoto = (cb: (section: string) => void): Promise<UnlistenFn> =>
+  listen<string>("settings://goto", (e) => cb(e.payload));
+export const onAvatarChanged = (cb: (c: AvatarConfig) => void): Promise<UnlistenFn> =>
+  listen<AvatarConfig>("avatar://changed", (e) => cb(e.payload));
 export const onDroidMood = (cb: (mood: "alert" | "idle") => void): Promise<UnlistenFn> =>
   listen<{ mood: "alert" | "idle" }>("droid://mood", (e) => cb(e.payload.mood));
 export const onNotice = (cb: (text: string) => void): Promise<UnlistenFn> =>

@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import "./theme.css";
 
 async function boot() {
-  const view = window.location.hash.replace("#", "") || "chat";
+  const view = window.location.hash.replace("#", "").split("/")[0] || "chat";
   if (new URLSearchParams(window.location.search).has("mock")) {
     (await import("./mocks")).installMocks(view);
   }
