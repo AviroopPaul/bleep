@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 24 97 90">
+  <!-- puff as an outline for the menu bar. macOS uses it as a template image: only the
+       alpha counts. Shapes match src/avatar/avatars.ts. Render: scripts/tray-icons.mjs -->
+  <path d="M41 104 H80 A17 17 0 0 0 97 87 V84.4 A18 18 0 0 0 86.5 53.1 A25 25 0 0 0 37.3 54.4 A20 20 0 0 0 24 84.5 V87 A17 17 0 0 0 41 104 Z" fill="none" stroke="#000" stroke-width="8" stroke-linejoin="round"/>
+  <rect x="44" y="73" width="8" height="12" rx="4"/><rect x="68" y="73" width="8" height="12" rx="4"/>
+</svg>

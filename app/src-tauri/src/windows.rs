@@ -455,7 +455,7 @@ pub fn droid_set_visible(app: AppHandle, visible: bool) {
 }
 
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
-    let toggle = MenuItem::with_id(app, "toggle_droid", "Hide droid", true, None::<&str>)?;
+    let toggle = MenuItem::with_id(app, "toggle_droid", "Hide buddy", true, None::<&str>)?;
     let open = MenuItem::with_id(app, "open_chat", "Open chat", true, None::<&str>)?;
     let pause = CheckMenuItem::with_id(app, "pause", "Pause bleep", true, false, None::<&str>)?;
     let login_on = {
@@ -468,20 +468,20 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let setup = MenuItem::with_id(app, "setup", "Set up bleep…", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit bleep", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&toggle, &open, &pause, &login, &settings, &setup, &PredefinedMenuItem::separator(app)?, &quit])?;
-    // The menu bar shows bleep's droid head as an outline. Source: icons/tray.svg.
+    // The menu bar shows the chosen buddy as an outline. Sources: icons/tray.svg, icons/tray/*.svg.
     // As a template image, macOS tints it to match a light or dark menu bar.
     let tray = TrayIconBuilder::with_id("bleep")
         .tooltip("bleep")
         .menu(&menu)
         .show_menu_on_left_click(true)
-        .icon(tauri::include_image!("icons/tray.png"))
+        .icon(crate::avatar::tray_icon(&crate::avatar::current(app).kind))
         .icon_as_template(true);
     tray.on_menu_event(move |app, ev| match ev.id().as_ref() {
         "toggle_droid" => {
             if let Some(d) = app.get_webview_window("droid") {
                 let show = !d.is_visible().unwrap_or(true);
                 droid_set_visible(app.clone(), show);
-                let _ = toggle.set_text(if show { "Hide droid" } else { "Show droid" });
+                let _ = toggle.set_text(if show { "Hide buddy" } else { "Show buddy" });
             }
         }
         "open_chat" => open_chat(app, Anchor::Droid),

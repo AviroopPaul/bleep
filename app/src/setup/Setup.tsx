@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, healthOk, onGoogleStatus, type AgentSettings, type GoogleState, type RuntimeHealth } from "../ipc";
-import { DROID_FULL } from "../droid/droidSvg";
+import { Avatar, useAvatar } from "../avatar/Avatar";
 import { GoogleSettings } from "../settings/Settings";
 import { AgentSettingsTab } from "../settings/AgentSettings";
 
@@ -9,7 +9,8 @@ export const STEPS = ["Welcome", "Claude", "Google", "Agents", "Done"] as const;
 const INSTALL_URL = "https://code.claude.com/docs/en/setup";
 
 function Droid() {
-  return <div className="su-droid droid" aria-hidden="true" dangerouslySetInnerHTML={{ __html: DROID_FULL }} />;
+  const avatar = useAvatar();
+  return <div className="su-droid" aria-hidden="true">{avatar && <Avatar cfg={avatar} />}</div>;
 }
 
 function Check({ ok, label }: { ok: boolean; label: string }) {

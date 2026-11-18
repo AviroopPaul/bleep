@@ -2,6 +2,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type { ModelSettings as ModelSettingsT, ModelSave, Preset } from "./ipc";
+import { normalize, type AvatarConfig } from "./avatar/avatars";
 import type { ActivityItem, AgentAsk, AgentChatLine, AgentSession, AgentSettings, Approval, BarCue, ChatEmit, ConnectorsView, GoogleState, MailConfig, MemorySettings, MemoryView, Message, Proposal, RemoteServer, ToolMode, UpdateView, VoiceConfig, VoiceStatus, VoiceView } from "./ipc";
 
 const row = (id: number, role: Message["role"], content: string): Message => ({
@@ -17,6 +18,9 @@ export function installMocks(label: string) {
   let card: Approval | null = null;
   const q = new URLSearchParams(window.location.search);
   const calls: string[] = [];
+  // ?avatar=puff:plush:FF4FA3 starts with that buddy.
+  const [avKind, avFinish, avColor] = (q.get("avatar") ?? "").split(":");
+  let avatar: AvatarConfig = normalize(avKind ? { kind: avKind as AvatarConfig["kind"], finish: avFinish as AvatarConfig["finish"], color: avColor ? `#${avColor}` : undefined } : undefined);
   (window as unknown as { __calls: string[] }).__calls = calls;
   const cueKind = q.get("cue");
   const mins = cueKind === "ten" ? 8 : 42;
@@ -492,6 +496,14 @@ export function installMocks(label: string) {
           return null;
         case "chat_context":
           return { used: memOn ? 120_000 : null, threshold: memSet.threshold, window: memSet.window };
+        case "avatar_get":
+          return avatar;
+        case "avatar_set": {
+          avatar = normalize(a.config as AvatarConfig);
+          calls.push(`avatar_set:${avatar.kind}:${avatar.color}:${avatar.finish}`);
+          later(5, () => void emit("avatar://changed", avatar));
+          return avatar;
+        }
         case "voice_settings":
           return voiceView();
         case "voice_status":

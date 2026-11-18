@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="16 3 88 111">
+  <!-- sprout as an outline for the menu bar. macOS uses it as a template image: only the
+       alpha counts. Shapes match src/avatar/avatars.ts. Render: scripts/tray-icons.mjs -->
+  <g fill="none" stroke="#000" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M60 36 C84 36 96 56 96 76 C96 96 80 106 60 106 C40 106 24 96 24 76 C24 56 36 36 60 36Z"/>
+    <path d="M60 36 V24"/>
+    <path d="M60 25 C53 12 41 13 37 19 C43 27 53 28 60 25Z"/>
+    <path d="M60 23 C65 8 80 7 85 13 C80 23 68 26 60 23Z"/>
+  </g>
+  <rect x="44" y="68" width="8" height="12" rx="4"/><rect x="68" y="68" width="8" height="12" rx="4"/>
+</svg>

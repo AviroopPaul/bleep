@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { DROID_FULL } from "./droidSvg";
+import { Avatar, useAvatar } from "../avatar/Avatar";
 import { api, onChatEvent, onDroidMood, onVoice } from "../ipc";
 
-type Mood = "idle" | "thinking" | "alert" | "happy" | "listening";
+import type { Mood } from "../avatar/avatars";
 const DRAG_PX = 4;
 const DOUBLE_MS = 260;
 
 export function Droid() {
   const [mood, setMood] = useState<Mood>("idle");
+  const avatar = useAvatar();
   const timer = useRef<number | undefined>(undefined);
   const press = useRef<{ x: number; y: number; dragged: boolean } | null>(null);
   const clickTimer = useRef<number | undefined>(undefined);
@@ -80,7 +81,7 @@ export function Droid() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div className={`droid ${mood === "idle" ? "" : mood}`} dangerouslySetInnerHTML={{ __html: DROID_FULL }} />
+      {avatar && <Avatar cfg={avatar} mood={mood} />}
     </button>
   );
 }

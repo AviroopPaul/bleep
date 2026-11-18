@@ -41,7 +41,9 @@ button { font: inherit; color: inherit; }
 /* ---------- droid ---------- */
 .droid-stage { width: 100%; height: 100%; display: grid; place-items: center; cursor: grab; background: transparent; border: 0; padding: 8px; }
 .droid-stage:active { cursor: grabbing; }
-.droid { width: 92px; }
+.droid, .av { display: block; }
+.droid-stage > .droid, .droid-stage > .av { width: 92px; }
+.su-droid > *, .head-droid > *, .bar-droid > * { width: 100%; }
 .droid svg { width: 100%; height: auto; display: block; overflow: visible; }
 .droid .bob { animation: bob 3.2s ease-in-out infinite; }
 .droid .shadow { animation: shadow 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
@@ -407,3 +409,72 @@ button { font: inherit; color: inherit; }
 .droid.listening .ant { animation: listenAnt 0.9s ease-in-out infinite; }
 @keyframes listenAnt { 0%, 100% { fill: var(--sage); } 50% { fill: #cfe8c8; } }
 .composer.listening textarea::placeholder { color: var(--sage); font-weight: 700; }
+
+/* ---------- avatar (the buddies, src/avatar/avatars.ts) ---------- */
+/* Moods are data-mood on .av. Keyframes have an av- prefix so the droid's keep working. */
+.av { --fx: var(--ink); }
+.av svg { width: 100%; height: auto; display: block; overflow: visible; }
+.av .shadow { fill: rgba(0, 0, 0, 0.18); transform-box: fill-box; transform-origin: center; animation: av-shadow 3.2s ease-in-out infinite; }
+.av .bob { transform-box: view-box; transform-origin: 60px 108px; animation: av-bob 3.2s ease-in-out infinite; }
+.av .eyes-open { transform-box: fill-box; transform-origin: center; animation: av-blink 5.2s infinite; }
+.av .wide, .av .look { transform-box: fill-box; transform-origin: center; transition: transform 0.25s ease; }
+.av .leaf { transform-box: view-box; transform-origin: 60px 36px; animation: av-sway 3.2s ease-in-out infinite; }
+.av .eyes-happy, .av .mouth > *, .av .fx > g { display: none; }
+.av[data-mood="idle"] .m-idle, .av[data-mood="happy"] .m-happy, .av[data-mood="alert"] .m-alert,
+.av[data-mood="thinking"] .m-think, .av[data-mood="listening"] .m-listen { display: inline; }
+.av[data-mood="happy"] .eyes-open { display: none; }
+.av[data-mood="happy"] .eyes-happy, .av[data-mood="happy"] .fx-happy { display: inline; }
+.av[data-mood="happy"] .bob { animation: av-hop 0.9s ease-out 2; }
+.av[data-mood="happy"] .leaf { animation: av-wave 0.45s ease-in-out infinite alternate; }
+/* Alert can last a whole meeting bar: shake twice, then keep only the badge pulsing. */
+.av[data-mood="alert"] .bob { animation: av-shake 0.45s ease-in-out 2; }
+.av[data-mood="alert"] .wide { transform: scale(1.18, 1.28); }
+.av[data-mood="alert"] .fx-alert { display: inline; }
+.av[data-mood="alert"] .leaf { animation: av-perk 0.2s ease-in-out 4 alternate; }
+.av[data-mood="thinking"] .look { transform: translate(3px, -3px); }
+.av[data-mood="thinking"] .bob { animation: av-bob 4.6s ease-in-out infinite; }
+.av[data-mood="thinking"] .fx-think { display: inline; }
+.av[data-mood="listening"] .wide { transform: scale(1.1, 1.12); }
+.av[data-mood="listening"] .bob { animation: av-lean 2s ease-in-out infinite; }
+.av[data-mood="listening"] .fx-listen { display: inline; }
+.av[data-mood="listening"] .leaf { animation: none; transform: scaleY(1.12); }
+.av .fx-think circle { fill: var(--fx); transform-box: fill-box; animation: av-dot 1.1s ease-in-out infinite; }
+.av .fx-think circle:nth-child(2) { animation-delay: 0.18s; }
+.av .fx-think circle:nth-child(3) { animation-delay: 0.36s; }
+.av .fx-alert g { transform-box: fill-box; transform-origin: center; animation: av-pulse 0.6s ease-in-out infinite; }
+.av .fx-listen path { fill: none; stroke: #22c55e; stroke-width: 3.2; stroke-linecap: round; animation: av-wavefx 1.2s ease-out infinite; }
+.av .fx-listen path:nth-child(2n) { animation-delay: 0.3s; }
+.av .fx-happy path { transform-box: fill-box; transform-origin: center; animation: av-pop 1.2s ease-out infinite; }
+.av .fx-happy path:nth-child(2) { animation-delay: 0.35s; }
+.av .fx-happy path:nth-child(3) { animation-delay: 0.7s; }
+.av.still .bob, .av.still .eyes-open, .av.still .leaf { animation: none; }
+@keyframes av-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes av-shadow { 0%, 100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(0.86); opacity: 0.7; } }
+@keyframes av-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@keyframes av-hop { 0%, 100% { transform: translateY(0) scale(1, 1); } 15% { transform: translateY(0) scale(1.07, 0.9); } 45% { transform: translateY(-15px) scale(0.95, 1.06); } 75% { transform: translateY(0) scale(1.05, 0.95); } }
+@keyframes av-shake { 0%, 100% { transform: translateX(0) rotate(0); } 25% { transform: translateX(-3px) rotate(-5deg); } 75% { transform: translateX(3px) rotate(5deg); } }
+@keyframes av-lean { 0%, 100% { transform: rotate(-6deg) translateY(0); } 50% { transform: rotate(-6deg) translateY(-3px); } }
+@keyframes av-sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes av-wave { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@keyframes av-perk { from { transform: scaleY(1.15) rotate(-3deg); } to { transform: scaleY(1.15) rotate(3deg); } }
+@keyframes av-dot { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+@keyframes av-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+@keyframes av-wavefx { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes av-pop { 0% { opacity: 0; transform: scale(0.2) rotate(0); } 30% { opacity: 1; transform: scale(1.1) rotate(25deg); } 100% { opacity: 0; transform: scale(0.5) rotate(70deg); } }
+
+/* Settings > Avatar */
+.av-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.av-tile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 7px; border: 1px solid var(--line); border-radius: 12px; background: var(--input); cursor: pointer; font: 700 12px var(--sans); color: var(--ink-2); }
+.av-tile > span:first-child { width: 44px; height: 46px; display: grid; place-items: center; }
+.av-tile > span:first-child > * { width: 100%; }
+.av-tile[aria-checked="true"] { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; color: var(--ink); }
+.av-stage { display: grid; place-items: center; height: 168px; border-radius: 12px; margin-bottom: 10px; background: radial-gradient(120% 90% at 30% 10%, var(--raised) 0%, var(--input) 75%); border: 1px solid var(--line); }
+.av-stage > * { width: 112px; }
+.av-moods, .av-finish { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 99px; background: var(--input); border: 1px solid var(--line); }
+.av-moods button, .av-finish button { border: 0; background: none; font: 700 12.5px var(--sans); color: var(--ink-2); padding: 5px 11px; border-radius: 99px; cursor: pointer; }
+.av-moods button[aria-pressed="true"], .av-finish button[aria-checked="true"] { background: var(--raised); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
+.av-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.av-swatches button { width: 26px; height: 26px; border-radius: 50%; border: 0; cursor: pointer; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35); }
+.av-swatches button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--raised), 0 0 0 4px var(--ink); }
+.av-label { display: block; font: 700 12.5px var(--sans); color: var(--ink-2); margin: 14px 0 6px; }
+.av-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }

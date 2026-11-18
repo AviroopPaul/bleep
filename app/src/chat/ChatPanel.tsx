@@ -6,7 +6,7 @@ import { chatReducer, emptyChat, formatBackAt } from "./chatReducer";
 import { ToolSteps } from "./ToolSteps";
 import { ApprovalCard } from "./ApprovalCard";
 import { Markdown } from "./Markdown";
-import { DROID_HEAD } from "../droid/droidSvg";
+import { Avatar, useAvatar } from "../avatar/Avatar";
 import { AgentsView, useAgents } from "../agents/AgentsView";
 
 const PAGE = 50;
@@ -41,6 +41,7 @@ function Bubble({ m }: { m: Message }) {
 
 export function ChatPanel() {
   const [state, dispatch] = useReducer(chatReducer, emptyChat);
+  const avatar = useAvatar();
   const [health, setHealth] = useState<RuntimeHealth | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -212,7 +213,7 @@ export function ChatPanel() {
   return (
     <div className="panel">
       <header className="panel-head" data-tauri-drag-region>
-        <span className="head-droid" dangerouslySetInnerHTML={{ __html: DROID_HEAD }} />
+        <span className="head-droid">{avatar && <Avatar cfg={avatar} still />}</span>
         <h1>bleep</h1>
         <div className="views" role="tablist" aria-label="View">
           <button role="tab" className="view-tab" aria-selected={view === "chat"} onClick={() => setView("chat")}>Chat</button>

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bleep buddies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1B1F24; --ink-2:#3A424C; --muted:#66707B; --line:rgba(27,31,36,.12);
+  --paper:#F7F6F2; --card:#fff; --chip:#EFEDE7;
+  --display:"Fredoka", ui-rounded, sans-serif;
+  --sans:"Nunito", ui-rounded, -apple-system, sans-serif;
+  --fx:#1B1F24;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --ink:#F2F1EC; --ink-2:#C9CDD2; --muted:#9AA3AD; --line:rgba(255,255,255,.12); --paper:#15181C; --card:#1E2228; --chip:#2A2F36; }
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--paper); color:var(--ink); font:15px/1.55 var(--sans); -webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px; margin:0 auto; padding:40px 16px 80px}
+h1,h2,h3{font-family:var(--display); font-weight:600; letter-spacing:-.01em; margin:0}
+h1{font-size:44px; line-height:1.05; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+h1 .inl{width:58px; display:inline-block}
+h2{font-size:26px; margin:56px 0 6px}
+.sub{color:var(--muted); margin:6px 0 0; max-width:720px}
+.refs{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin:22px 0 0}
+.ref{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px 16px}
+.ref b{font-family:var(--display); font-weight:600}
+.ref p{margin:4px 0 0; color:var(--ink-2); font-size:14px}
+.rules{margin:14px 0 0; padding:12px 16px; border-radius:14px; background:var(--chip); font-size:14px}
+
+/* toolbar */
+.bar{position:sticky; top:0; z-index:10; background:color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter:blur(10px); margin:28px -16px 0; padding:12px 16px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:10px 22px; align-items:center}
+.seg{display:inline-flex; background:var(--chip); border-radius:999px; padding:3px; gap:2px; flex-wrap:wrap}
+.seg button{border:0; background:none; font:700 13px var(--sans); color:var(--ink-2); padding:6px 12px; border-radius:999px; cursor:pointer}
+.seg button.on{background:var(--card); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.bar label{font:800 11px var(--sans); text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-right:6px}
+
+/* cards */
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:18px; margin-top:18px}
+.card{background:var(--card); border:1px solid var(--line); border-radius:22px; overflow:hidden; display:flex; flex-direction:column}
+.card.sel{outline:3px solid #3D6BFF; outline-offset:-1px}
+.stage{height:230px; display:grid; place-items:center; position:relative}
+.stage .av{width:150px}
+.desk-light .stage, .desk-light .scene, .scene.desk-light{background:radial-gradient(120% 90% at 30% 10%, #FFFFFF 0%, #EEEBE4 70%)}
+.desk-dark .stage, .desk-dark .scene, .scene.desk-dark{background:radial-gradient(120% 90% at 30% 10%, #2B3038 0%, #16191E 75%)}
+.desk-wall .stage, .desk-wall .scene, .scene.desk-wall{background:linear-gradient(135deg,#FFD6A5 0%,#FDB4C8 35%,#B9B4FF 70%,#9ED8FF 100%)}
+.desk-dark{--fx:#F2F1EC}
+.body{padding:14px 16px 16px; display:flex; flex-direction:column; gap:10px; flex:1}
+.title{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+.title h3{font-size:22px}
+.title span{font:700 12px var(--sans); color:var(--muted)}
+.blurb{margin:0; color:var(--ink-2); font-size:14px}
+.sw{display:flex; gap:7px; flex-wrap:wrap}
+.sw button{width:24px; height:24px; border-radius:50%; border:0; cursor:pointer; box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
+.sw button.on{box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--ink)}
+.sizes{display:flex; align-items:flex-end; gap:14px; padding:10px 12px; background:var(--chip); border-radius:12px}
+.sizes div{display:flex; flex-direction:column; align-items:center; gap:4px; font:700 10px var(--sans); color:var(--muted)}
+.choose{margin-top:auto; border:0; border-radius:12px; padding:10px; font:800 14px var(--sans); background:var(--ink); color:var(--paper); cursor:pointer}
+.card.sel .choose{background:#3D6BFF; color:#fff}
+
+/* scenes */
+.scene{border-radius:22px; border:1px solid var(--line); overflow:hidden; position:relative; margin-top:16px}
+.crew{display:flex; justify-content:center; align-items:flex-end; gap:6px; padding:36px 16px 26px; flex-wrap:wrap}
+.crew .av{width:118px}
+.twocol{display:grid; grid-template-columns:1.2fr 1fr; gap:18px}
+@media (max-width:860px){ .twocol{grid-template-columns:1fr} h1{font-size:34px} }
+
+/* settings mock */
+.win{background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden; box-shadow:0 20px 50px -20px rgba(0,0,0,.35); margin-top:16px}
+.win .tb{height:34px; display:flex; align-items:center; gap:7px; padding:0 12px; border-bottom:1px solid var(--line); font:700 12px var(--sans); color:var(--muted)}
+.win .tb i{width:11px; height:11px; border-radius:50%; display:inline-block}
+.win .cols{display:grid; grid-template-columns:150px 1fr; min-height:340px}
+.win nav{border-right:1px solid var(--line); padding:10px 8px; display:flex; flex-direction:column; gap:2px; font:600 13px var(--sans); color:var(--ink-2)}
+.win nav span{padding:6px 10px; border-radius:8px}
+.win nav span.on{background:var(--chip); color:var(--ink); font-weight:800}
+.pane{padding:16px 18px; display:flex; flex-direction:column; gap:14px}
+.pane h4{margin:0; font:800 11px var(--sans); text-transform:uppercase; letter-spacing:.08em; color:var(--muted)}
+.tiles{display:grid; grid-template-columns:repeat(6,1fr); gap:8px}
+.tile{border:1px solid var(--line); background:var(--paper); border-radius:12px; padding:8px 4px 6px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; font:700 11px var(--sans); color:var(--ink-2)}
+.tile .av{width:40px}
+.tile.on{border-color:#3D6BFF; box-shadow:0 0 0 2px #3D6BFF inset}
+@media (max-width:560px){ .tiles{grid-template-columns:repeat(3,1fr)} .win .cols{grid-template-columns:1fr} .win nav{display:none} }
+
+/* desktop corner */
+.desk{height:100%; min-height:340px; position:relative}
+.desk .menubar{height:24px; background:rgba(255,255,255,.55); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:flex-end; gap:12px; padding:0 12px; font:700 11px var(--sans); color:#1B1F24}
+.desk .menubar .mb{width:18px; display:inline-block}
+.desk .float{position:absolute; right:40px; bottom:40px; width:92px}
+.desk .bub{position:absolute; right:126px; bottom:110px; background:#1B1F24; color:#fff; font:700 12px var(--sans); padding:7px 11px; border-radius:12px 12px 4px 12px; white-space:nowrap}
+
+/* hero mock */
+.hero{padding:44px 16px 10px; text-align:center; color:#1B1F24}
+.hero .h{font:600 clamp(40px,7vw,76px)/1 var(--display); display:flex; justify-content:center; align-items:center; gap:.18em; flex-wrap:wrap; letter-spacing:-.02em}
+.hero .h .av{width:1.05em}
+.hero p{max-width:540px; margin:16px auto 0; color:#3A424C}
+.hero .cta{display:inline-block; margin-top:18px; background:#1B1F24; color:#fff; font:800 14px var(--sans); padding:12px 20px; border-radius:999px}
+.hero .crew .av{width:84px}
+.icons{display:flex; gap:18px; align-items:flex-end; justify-content:center; padding:4px 0 30px}
+.icons div{display:flex; flex-direction:column; align-items:center; gap:6px; font:700 10px var(--sans); color:#3A424C}
+.next{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:6px 20px; margin-top:16px}
+.next li{margin:8px 0}
+
+/* ---------- avatar engine ---------- */
+.av.still .shadow{display:none}
+.av svg{width:100%; height:auto; display:block; overflow:visible}
+.av .shadow{fill:rgba(0,0,0,.16); transform-box:fill-box; transform-origin:center; animation:shadow 3.2s ease-in-out infinite}
+.desk-dark .av .shadow{fill:rgba(0,0,0,.45)}
+.av .bob{transform-box:view-box; transform-origin:60px 108px; animation:bob 3.2s ease-in-out infinite}
+.av .eyes-open{transform-box:fill-box; transform-origin:center; animation:blink 5.2s infinite}
+.av .wide, .av .look{transform-box:fill-box; transform-origin:center; transition:transform .25s ease}
+.av .leaf{transform-box:view-box; transform-origin:60px 36px; animation:sway 3.2s ease-in-out infinite}
+.av .eyes-happy, .av .mouth > *, .av .fx > g{display:none}
+.av[data-mood="idle"] .m-idle, .av[data-mood="happy"] .m-happy, .av[data-mood="alert"] .m-alert,
+.av[data-mood="thinking"] .m-think, .av[data-mood="listening"] .m-listen{display:inline}
+.av[data-mood="happy"] .eyes-open{display:none}
+.av[data-mood="happy"] .eyes-happy{display:inline}
+.av[data-mood="happy"] .bob{animation:hop .9s ease-out infinite}
+.av[data-mood="happy"] .fx-happy{display:inline}
+.av[data-mood="happy"] .leaf{animation:wave .45s ease-in-out infinite alternate}
+.av[data-mood="alert"] .bob{animation:shake .45s ease-in-out infinite}
+.av[data-mood="alert"] .wide{transform:scale(1.18,1.28)}
+.av[data-mood="alert"] .fx-alert{display:inline}
+.av[data-mood="alert"] .leaf{animation:perk .2s ease-in-out infinite alternate}
+.av[data-mood="thinking"] .look{transform:translate(3px,-3px)}
+.av[data-mood="thinking"] .bob{animation:bob 4.6s ease-in-out infinite}
+.av[data-mood="thinking"] .fx-think{display:inline}
+.av[data-mood="listening"] .wide{transform:scale(1.1,1.12)}
+.av[data-mood="listening"] .bob{animation:lean 2s ease-in-out infinite}
+.av[data-mood="listening"] .fx-listen{display:inline}
+.av[data-mood="listening"] .leaf{animation:none; transform:scaleY(1.12)}
+.av .fx-think circle{fill:var(--fx); transform-box:fill-box; animation:dot 1.1s ease-in-out infinite}
+.av .fx-think circle:nth-child(2){animation-delay:.18s}
+.av .fx-think circle:nth-child(3){animation-delay:.36s}
+.av .fx-alert g{transform-box:fill-box; transform-origin:center; animation:pulse .6s ease-in-out infinite}
+.av .fx-listen path{fill:none; stroke:#22C55E; stroke-width:3.2; stroke-linecap:round; animation:wavefx 1.2s ease-out infinite}
+.av .fx-listen path:nth-child(2n){animation-delay:.3s}
+.av .fx-happy path{transform-box:fill-box; transform-origin:center; animation:pop 1.2s ease-out infinite}
+.av .fx-happy path:nth-child(2){animation-delay:.35s}
+.av .fx-happy path:nth-child(3){animation-delay:.7s}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes shadow{0%,100%{transform:scaleX(1); opacity:1}50%{transform:scaleX(.86); opacity:.75}}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes hop{0%,100%{transform:translateY(0) scale(1,1)}15%{transform:translateY(0) scale(1.07,.9)}45%{transform:translateY(-15px) scale(.95,1.06)}75%{transform:translateY(0) scale(1.05,.95)}}
+@keyframes shake{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-3px) rotate(-5deg)}75%{transform:translateX(3px) rotate(5deg)}}
+@keyframes lean{0%,100%{transform:rotate(-6deg) translateY(0)}50%{transform:rotate(-6deg) translateY(-3px)}}
+@keyframes sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes wave{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
+@keyframes perk{from{transform:scaleY(1.15) rotate(-3deg)}to{transform:scaleY(1.15) rotate(3deg)}}
+@keyframes dot{0%,100%{opacity:.25; transform:translateY(0)}50%{opacity:1; transform:translateY(-3px)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+@keyframes wavefx{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@keyframes pop{0%{opacity:0; transform:scale(.2) rotate(0)}30%{opacity:1; transform:scale(1.1) rotate(25deg)}100%{opacity:0; transform:scale(.5) rotate(70deg)}}
+@media (prefers-reduced-motion: reduce){ .av *{animation:none !important} }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="plush" x="-12%" y="-12%" width="124%" height="124%">
+      <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="2.4" numOctaves="1" seed="9" result="n2"/>
+      <feColorMatrix in="n2" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -2.2 1.0" result="lite"/>
+      <feComposite in="lite" in2="d" operator="in" result="f1"/><feComponentTransfer in="f1" result="fleck"><feFuncA type="linear" slope=".45"/></feComponentTransfer>
+      <feMerge><feMergeNode in="d"/><feMergeNode in="fleck"/></feMerge>
+    </filter>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <h1>meet <span class="inl av" id="titleAv"></span> the bleep buddies</h1>
+  <p class="sub">Options for the floating avatar. Each buddy has five moods, seven colors and three finishes. Pick one per card, then see it in Settings, on the desktop and on the website below.</p>
+
+  <div class="refs">
+    <div class="ref"><b>From dusk bot</b><p>Flat pixel critters in single bold colors. Many shapes, one family. Two tall white eyes, nothing else.</p></div>
+    <div class="ref"><b>From OpenBot</b><p>Soft plush shapes with felt texture and tiny eyes. They read as toys, not machines.</p></div>
+    <div class="ref"><b>From MausBot</b><p>One simple shape with a glossy gradient, white eyes and a small smile. Works from 16px to hero size.</p></div>
+  </div>
+  <div class="rules"><b>Our rules:</b> one simple shape, a face of two eyes, no outlines, bold color, every buddy original to bleep. Moods map to what the droid does today: idle, listening (wake word), thinking, alert (meetings, errors) and happy (done).</div>
+
+  <div class="bar">
+    <div><label>Mood</label><span class="seg" id="moodSeg"></span></div>
+    <div><label>Finish</label><span class="seg" id="finishSeg"></span></div>
+    <div><label>Desktop</label><span class="seg" id="deskSeg"></span></div>
+  </div>
+
+  <div id="deskRoot" class="desk-light">
+    <div class="grid" id="grid"></div>
+
+    <h2>The crew</h2>
+    <p class="sub">All six together. Good for the website hero and for a future "one buddy per agent" idea.</p>
+    <div class="scene"><div class="crew" id="crew"></div></div>
+  </div>
+
+  <h2>In the app</h2>
+  <p class="sub">Settings gets an Avatar page. Your pick shows here, at 92px on the desktop and at 18px in the menu bar.</p>
+  <div class="twocol">
+    <div class="win">
+      <div class="tb"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><span style="margin-left:8px">bleep settings</span></div>
+      <div class="cols">
+        <nav><span>General</span><span class="on">Avatar</span><span>Connectors</span><span>Voice</span><span>Updates</span></nav>
+        <div class="pane">
+          <div><h4>Buddy</h4></div>
+          <div class="tiles" id="tiles"></div>
+          <div><h4>Color</h4></div>
+          <div class="sw" id="setSw"></div>
+          <div><h4>Finish</h4></div>
+          <div><span class="seg" id="setFinish"></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="scene desk-wall" style="margin-top:16px">
+      <div class="desk">
+        <div class="menubar"><span>Wed 18 Nov</span><span class="mb av still" data-fixed="idle" id="mbAv"></span><span>9:41</span></div>
+        <div class="bub">Standup in 5 min</div>
+        <div class="float av" id="floatAv"></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>On the website</h2>
+  <p class="sub">The hero puts the buddy inside the headline, like all three references do. Favicons use the same face.</p>
+  <div class="scene desk-light">
+    <div class="hero">
+      <div class="h"><span>meet</span><span class="av" data-fixed="idle" id="heroAv"></span><span>bleep</span></div>
+      <p>A little buddy that floats on your Mac. It reads your mail, watches your calendar and taps you when something needs you.</p>
+      <span class="cta">Download for Mac</span>
+      <div class="crew" id="heroCrew"></div>
+    </div>
+    <div class="icons" id="icons"></div>
+  </div>
+
+  <h2>Next steps after you pick</h2>
+  <div class="next"><ul>
+    <li><b>Settings key:</b> <code>avatar: { kind, color, finish }</code> in <code>settings.rs</code>, default to your pick.</li>
+    <li><b>Renderer:</b> replace <code>droidSvg.ts</code> with <code>avatars.ts</code> (one SVG builder, shared mood CSS). <code>Droid.tsx</code> already sets the five moods.</li>
+    <li><b>Small spots:</b> chat panel head, meeting bar, setup screen and menu bar icon use the same builder.</li>
+    <li><b>Website:</b> swap the droid in the hero, desktop demo, favicon and og image. Retitle "a little droid" copy.</li>
+  </ul></div>
+</div>
+
+<script>
+const PALETTE = [
+  ["Blue","#3D6BFF"],["Violet","#8B5CF6"],["Pink","#FF4FA3"],["Coral","#FF6B4A"],
+  ["Sun","#FFB020"],["Mint","#1FC48E"],["Sky","#38BDF8"]
+];
+const MOODS = ["idle","listening","thinking","alert","happy"];
+const INK = "#1B1F24";
+
+function mix(hex, to, t){
+  const a = parseInt(hex.slice(1),16), b = parseInt(to.slice(1),16);
+  const c = [16,8,0].map(s => Math.round(((a>>s)&255)*(1-t) + ((b>>s)&255)*t));
+  return "#" + c.map(v => v.toString(16).padStart(2,"0")).join("");
+}
+
+// Face for smooth buddies. Coordinates are relative to the face center.
+function face(f, eye){
+  const {s, w, h} = f, my = h/2 + 5;
+  const dark = eye === INK;
+  const pill = x => `<rect x="${x-w/2}" y="${-h/2}" width="${w}" height="${h}" rx="${w/2}" fill="${eye}"/>` +
+    (dark ? `<circle cx="${x-w*0.12}" cy="${-h*0.2}" r="${w*0.24}" fill="#fff"/>` : "");
+  const arc = x => `<path d="M${x-w/2-1} 1.5 Q${x} ${-h/2-3} ${x+w/2+1} 1.5" fill="none" stroke="${eye}" stroke-width="${Math.max(2.4,w*0.5)}" stroke-linecap="round"/>`;
+  const cheeks = f.cheeks ? [-1,1].map(d => `<ellipse cx="${d*(s+w/2+5)}" cy="${h/2+1}" rx="4.6" ry="2.8" fill="#FF6F91" opacity=".5"/>`).join("") : "";
+  return `<g transform="translate(${f.x} ${f.y})">
+    <g class="look"><g class="wide"><g class="eyes-open">${pill(-s)}${pill(s)}</g></g>
+    <g class="eyes-happy">${arc(-s)}${arc(s)}</g></g>${cheeks}
+    <g class="mouth" fill="none" stroke="${eye}" stroke-width="2.3" stroke-linecap="round">
+      <path class="m-idle" d="M-4 ${my} Q0 ${my+3.6} 4 ${my}"/>
+      <path class="m-happy" d="M-5.5 ${my-0.5} Q0 ${my+8} 5.5 ${my-0.5} Z" fill="${eye}"/>
+      <ellipse class="m-alert" cx="0" cy="${my+2}" rx="2.6" ry="3.3" fill="${eye}" stroke="none"/>
+      <path class="m-think" d="M-3 ${my+1.5} L3.5 ${my}"/>
+      <ellipse class="m-listen" cx="0" cy="${my+1.2}" rx="2.8" ry="2.2" fill="${eye}" stroke="none"/>
+    </g></g>`;
+}
+
+// Mood effects drawn around the buddy.
+function fx(c){
+  const t = c.top, fy = c.face ? c.face.y : 64;
+  const spark = (x,y,r) => `<path d="M${x} ${y-r} Q${x+r*0.25} ${y-r*0.25} ${x+r} ${y} Q${x+r*0.25} ${y+r*0.25} ${x} ${y+r} Q${x-r*0.25} ${y+r*0.25} ${x-r} ${y} Q${x-r*0.25} ${y-r*0.25} ${x} ${y-r}Z" fill="#FFC53D"/>`;
+  return `<g class="fx">
+    <g class="fx-think"><circle cx="86" cy="${t-2}" r="3.2"/><circle cx="95" cy="${t-9}" r="3.8"/><circle cx="105" cy="${t-17}" r="4.4"/></g>
+    <g class="fx-alert"><g><circle cx="96" cy="${t+2}" r="10" fill="#FF4D4F"/><rect x="94.3" y="${t-4.5}" width="3.4" height="8.5" rx="1.7" fill="#fff"/><circle cx="96" cy="${t+7.6}" r="1.9" fill="#fff"/></g></g>
+    <g class="fx-listen"><path d="M14 ${fy-9} Q8 ${fy} 14 ${fy+9}"/><path d="M7 ${fy-15} Q-2 ${fy} 7 ${fy+15}"/><path d="M106 ${fy-9} Q112 ${fy} 106 ${fy+9}"/><path d="M113 ${fy-15} Q122 ${fy} 113 ${fy+15}"/></g>
+    <g class="fx-happy">${spark(18,t+6,7)}${spark(104,t+14,6)}${spark(100,t+58,5)}</g>
+  </g>`;
+}
+
+const PX = (cells, ox, oy, p, fill) => `<path shape-rendering="crispEdges" fill="${fill}" d="${cells.map(([x,y]) => `M${ox+x*p} ${oy+y*p}h${p}v${p}h-${p}z`).join("")}"/>`;
+function gridCells(rows){ const out=[]; rows.forEach((r,y)=>[...r].forEach((ch,x)=>{ if(ch==="#") out.push([x,y]); })); return out; }
+const BOOP = gridCells([
+  "..............",
+  "......##......",
+  "....######....",
+  "..##########..",
+  ".############.",
+  ".############.",
+  "##############",
+  "##############",
+  "##############",
+  ".############.",
+  ".############.",
+  "..##########..",
+  "..###....###..",
+]);
+const BOOP_ANT = [[6,-1],[7,-1],[5,-2],[6,-2],[7,-2],[8,-2],[5,-3],[6,-3],[7,-3],[8,-3],[6,0],[7,0]];
+
+const CHARS = [
+  { id:"blip", name:"Blip", tag:"chat bubble", color:"#3D6BFF", eye:"#fff", top:28,
+    blurb:"A speech bubble that talks back. The most on-brand: bleep is a chat.",
+    face:{x:60,y:58,s:11,w:8,h:14},
+    hl:'<ellipse cx="41" cy="42" rx="9" ry="4.5" transform="rotate(-35 41 42)" fill="#fff" opacity=".45"/>',
+    body:p => `<path d="M50 28 H70 A26 26 0 0 1 96 54 V64 A26 26 0 0 1 70 90 H57 L41 103 L43 88 A26 26 0 0 1 24 64 V54 A26 26 0 0 1 50 28 Z" fill="${p}"/>` },
+  { id:"gumdrop", name:"Gumdrop", tag:"plush candy", color:"#1FC48E", eye:INK, top:26,
+    blurb:"A soft gumdrop with rosy cheeks. Looks best in the Plush finish.",
+    face:{x:60,y:78,s:10,w:6.5,h:9,cheeks:true},
+    hl:'<ellipse cx="50" cy="52" rx="6" ry="3.5" transform="rotate(-55 50 52)" fill="#fff" opacity=".45"/>',
+    body:p => `<path d="M60 26 C71 26 100 72 99 88 C98 101 84 106 60 106 C36 106 22 101 21 88 C20 72 49 26 60 26 Z" fill="${p}"/>` },
+  { id:"sprout", name:"Sprout", tag:"bean with a leaf", color:"#FF6B4A", eye:INK, top:12,
+    blurb:"A bean with a sprout. The leaves do the acting: sway, perk up, wave.",
+    face:{x:60,y:74,s:12,w:7,h:10,cheeks:true},
+    hl:'<ellipse cx="43" cy="54" rx="7" ry="4" transform="rotate(-50 43 54)" fill="#fff" opacity=".45"/>',
+    extra:`<g class="leaf"><path d="M60 38 V24" stroke="#1E9E5A" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M60 25 C53 12 41 13 37 19 C43 27 53 28 60 25Z" fill="#2FBF71"/>
+      <path d="M60 23 C65 8 80 7 85 13 C80 23 68 26 60 23Z" fill="#3BD07F"/></g>`,
+    body:p => `<path d="M60 36 C84 36 96 56 96 76 C96 96 80 106 60 106 C40 106 24 96 24 76 C24 56 36 36 60 36Z" fill="${p}"/>` },
+  { id:"boop", name:"Boop", tag:"pixel blob", color:"#8B5CF6", eye:"#fff", top:16, pixel:true,
+    blurb:"A pixel blob with a light-up antenna and stubby feet. Always flat, crisp at any size.",
+    face:{y:68} },
+  { id:"puff", name:"Puff", tag:"little cloud", color:"#38BDF8", eye:INK, top:33,
+    blurb:"A cloud that drifts around your screen. Calm, round, friendly.",
+    face:{x:60,y:80,s:12,w:7,h:9.5,cheeks:true},
+    hl:'<ellipse cx="52" cy="44" rx="9" ry="4.5" transform="rotate(-20 52 44)" fill="#fff" opacity=".5"/>',
+    body:p => `<g fill="${p}"><circle cx="41" cy="74" r="20"/><circle cx="62" cy="58" r="25"/><circle cx="85" cy="71" r="18"/><rect x="24" y="70" width="73" height="34" rx="17"/></g>` },
+  { id:"spark", name:"Spark", tag:"twinkle star", color:"#FFB020", eye:INK, top:20,
+    blurb:"A chubby four-point star. Quick, bright, a bit of magic.",
+    face:{x:60,y:64,s:8,w:5.5,h:7.5},
+    hl:'<ellipse cx="53" cy="44" rx="3" ry="6" transform="rotate(20 53 44)" fill="#fff" opacity=".5"/>',
+    body:p => `<path d="M60 20 Q73 50 102 62 Q73 74 60 104 Q47 74 18 62 Q47 50 60 20Z" fill="${p}" stroke="${p}" stroke-width="9" stroke-linejoin="round"/>` },
+];
+
+let uidN = 0;
+function avatarSVG(c, color, finish){
+  const u = "g" + (++uidN);
+  let defs = "", paint = color, filt = "", hl = "";
+  if (c.pixel) finish = "flat";
+  if (finish === "glossy"){
+    defs = `<linearGradient id="${u}" gradientUnits="userSpaceOnUse" x1="0" y1="${c.top}" x2="0" y2="108"><stop offset="0" stop-color="${mix(color,"#ffffff",.38)}"/><stop offset=".55" stop-color="${color}"/><stop offset="1" stop-color="${mix(color,"#000000",.22)}"/></linearGradient>`;
+    paint = `url(#${u})`; hl = c.hl || "";
+  } else if (finish === "plush"){
+    defs = `<radialGradient id="${u}" gradientUnits="userSpaceOnUse" cx="46" cy="${c.top+18}" r="80"><stop offset="0" stop-color="${mix(color,"#ffffff",.3)}"/><stop offset=".6" stop-color="${color}"/><stop offset="1" stop-color="${mix(color,"#000000",.28)}"/></radialGradient>`;
+    paint = `url(#${u})`; filt = ' filter="url(#plush)"';
+  }
+  let body, faceSvg;
+  if (c.pixel){
+    const p = 6, ox = 18, oy = 28, W = "#fff";
+    body = `<g shape-rendering="crispEdges">${PX(BOOP, ox, oy, p, color)}${PX(BOOP_ANT.slice(0,10), ox, oy, p, "#FFC53D")}${PX(BOOP_ANT.slice(10), ox, oy, p, mix(color,"#000000",.25))}</g>`;
+    faceSvg = `<g class="look"><g class="wide"><g class="eyes-open">${PX([[4,5],[4,6],[4,7],[9,5],[9,6],[9,7]],ox,oy,p,W)}</g></g>
+      <g class="eyes-happy">${PX([[3,7],[4,6],[5,7],[8,7],[9,6],[10,7]],ox,oy,p,W)}</g></g>
+      <g class="mouth"><g class="m-happy">${PX([[6,9],[7,9]],ox,oy,p,W)}</g><g class="m-alert">${PX([[6,9],[6,10],[7,9],[7,10]],ox,oy,p,W)}</g></g>
+      ${PX([[2,8],[11,8]],ox,oy,p,"#FF8FB8")}`;
+  } else {
+    body = c.body(paint);
+    faceSvg = face(c.face, c.eye);
+  }
+  return `<svg viewBox="0 0 120 130" aria-hidden="true"><defs>${defs}</defs>
+    <ellipse class="shadow" cx="60" cy="121" rx="26" ry="4.5"/>
+    <g class="bob">${c.extra||""}<g${filt}>${body}</g>${hl}${faceSvg}${fx(c)}</g></svg>`;
+}
+
+// ---------- state ----------
+const state = {
+  mood:"idle", cycle:false, finish:"glossy", desk:"light",
+  colors:Object.fromEntries(CHARS.map(c => [c.id, c.color])),
+  pick:"blip",
+};
+const byId = id => CHARS.find(c => c.id === id);
+
+function segment(el, items, get, set){
+  el.innerHTML = items.map(([v,l]) => `<button data-v="${v}">${l}</button>`).join("");
+  const sync = () => el.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === get()));
+  el.onclick = e => { const b = e.target.closest("button"); if (b){ set(b.dataset.v); sync(); } };
+  sync(); return sync;
+}
+
+function put(el, c, color){ el.innerHTML = avatarSVG(c, color ?? state.colors[c.id], state.finish); el.dataset.mood = el.dataset.fixed || state.mood; }
+
+function renderGrid(){
+  const g = document.getElementById("grid");
+  g.innerHTML = CHARS.map(c => `
+    <div class="card${state.pick===c.id?" sel":""}" data-id="${c.id}">
+      <div class="stage"><div class="av" data-k="big"></div></div>
+      <div class="body">
+        <div class="title"><h3>${c.name}</h3><span>${c.tag}</span></div>
+        <p class="blurb">${c.blurb}</p>
+        <div class="sw">${PALETTE.map(([n,h]) => `<button title="${n}" data-c="${h}" style="background:${h}" class="${state.colors[c.id]===h?"on":""}"></button>`).join("")}</div>
+        <div class="sizes">${[92,30,24,18].map(s => `<div><span class="av" data-k="s" style="width:${s}px"></span>${s}px</div>`).join("")}</div>
+        <button class="choose">${state.pick===c.id?"Chosen":"Choose "+c.name}</button>
+      </div>
+    </div>`).join("");
+  g.querySelectorAll(".card").forEach(card => {
+    const c = byId(card.dataset.id);
+    card.querySelectorAll(".av").forEach(el => put(el, c));
+  });
+}
+document.getElementById("grid").addEventListener("click", e => {
+  const card = e.target.closest(".card"); if (!card) return;
+  const id = card.dataset.id;
+  const sw = e.target.closest(".sw button");
+  if (sw){ state.colors[id] = sw.dataset.c; renderAll(); return; }
+  if (e.target.closest(".choose")){ state.pick = id; renderAll(); }
+});
+
+function renderScenes(){
+  const crew = (el, fixed) => { el.innerHTML = CHARS.map(c => `<span class="av" data-id="${c.id}"${fixed?' data-fixed="idle"':""}></span>`).join("");
+    el.querySelectorAll(".av").forEach((a,i) => { put(a, byId(a.dataset.id)); a.querySelector(".bob").style.animationDelay = (-i*0.5)+"s"; }); };
+  crew(document.getElementById("crew"));
+  crew(document.getElementById("heroCrew"), true);
+  const p = byId(state.pick);
+  ["titleAv","heroAv","floatAv","mbAv"].forEach(id => put(document.getElementById(id), p));
+  // settings
+  const tiles = document.getElementById("tiles");
+  tiles.innerHTML = CHARS.map(c => `<div class="tile${state.pick===c.id?" on":""}" data-id="${c.id}"><span class="av" data-fixed="idle"></span>${c.name}</div>`).join("");
+  tiles.querySelectorAll(".tile").forEach(t => put(t.querySelector(".av"), byId(t.dataset.id)));
+  const sw = document.getElementById("setSw");
+  sw.innerHTML = PALETTE.map(([n,h]) => `<button title="${n}" data-c="${h}" style="background:${h}" class="${state.colors[state.pick]===h?"on":""}"></button>`).join("");
+  // favicons
+  const ic = document.getElementById("icons");
+  ic.innerHTML = [64,32,16].map(s => `<div><span style="width:${s}px;height:${s}px;border-radius:${s*0.26}px;background:#fff;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.15)"><span class="av still" data-fixed="idle" style="width:${s*0.9}px;margin-top:${s*0.08}px"></span></span>${s}px</div>`).join("");
+  ic.querySelectorAll(".av").forEach(a => put(a, p));
+}
+document.getElementById("tiles").addEventListener("click", e => { const t = e.target.closest(".tile"); if (t){ state.pick = t.dataset.id; renderAll(); } });
+document.getElementById("setSw").addEventListener("click", e => { const b = e.target.closest("button"); if (b){ state.colors[state.pick] = b.dataset.c; renderAll(); } });
+
+function setMood(m){ state.mood = m; document.querySelectorAll(".av").forEach(a => a.dataset.mood = a.dataset.fixed || m); }
+function renderAll(){ renderGrid(); renderScenes(); setMood(state.mood); syncFinish.forEach(f => f()); }
+
+let cycleT;
+segment(document.getElementById("moodSeg"),
+  [["idle","Idle"],["listening","Listening"],["thinking","Thinking"],["alert","Alert"],["happy","Happy"],["cycle","Cycle"]],
+  () => state.cycle ? "cycle" : state.mood,
+  v => { clearInterval(cycleT); state.cycle = v === "cycle";
+    if (state.cycle){ let i = 0; setMood(MOODS[0]); cycleT = setInterval(() => setMood(MOODS[++i % MOODS.length]), 2200); }
+    else setMood(v); });
+const finishes = [["flat","Flat"],["glossy","Glossy"],["plush","Plush"]];
+const syncFinish = [
+  segment(document.getElementById("finishSeg"), finishes, () => state.finish, v => { state.finish = v; renderAll(); }),
+  segment(document.getElementById("setFinish"), finishes, () => state.finish, v => { state.finish = v; renderAll(); }),
+];
+segment(document.getElementById("deskSeg"), [["light","Light"],["dark","Dark"],["wall","Wallpaper"]],
+  () => state.desk, v => { state.desk = v; document.getElementById("deskRoot").className = "desk-" + v; });
+
+renderAll();
+</script>
+</body>
+</html>
