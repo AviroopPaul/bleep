@@ -1,6 +1,7 @@
 # Builds "bleep (nightly)" from main every night and publishes it to the rolling "nightly"
 # prerelease in AviroopPaul/bleep-releases. The nightly app updates from latest-nightly.json
 # there, so it never mixes with the stable feed (latest.json on the latest full release).
+# The dmg also goes to a "nightly" prerelease in this repo, tagged at the commit it was built from.
 #
 # Secrets (repository settings > Secrets and variables > Actions):
 #   BLEEP_GOOGLE_CLIENT_ID, BLEEP_GOOGLE_CLIENT_SECRET   bleep's Google app
@@ -21,7 +22,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write # the "nightly" prerelease and tag in this repo
 
 concurrency:
   group: nightly
@@ -137,6 +138,19 @@ jobs:
             bleep-nightly-mac.dmg bleep-nightly-mac.dmg.sha256 bleep-nightly-mac.app.tar.gz
           gh release upload nightly -R "$RELEASES_REPO" --clobber latest-nightly.json
           gh release edit nightly -R "$RELEASES_REPO" --prerelease --title "Nightly $VERSION" --notes "$body"
+
+      - name: Publish to this repo
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        working-directory: app/release
+        run: |
+          body="$(printf 'bleep (nightly) %s, built from %s.\n\nInstall bleep-nightly-mac.dmg once. After that it updates itself every night from [bleep-releases](https://github.com/%s/releases/tag/nightly).\n\n%s\n' "$VERSION" "$GITHUB_SHA" "$RELEASES_REPO" "$(cat notes.md)")"
+          # The tag moves to tonight's commit, so drop the old release and tag first.
+          gh release delete nightly -R "$GITHUB_REPOSITORY" --cleanup-tag -y 2>/dev/null || true
+          gh release create nightly -R "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+            --title "Nightly $VERSION" --notes "$body" bleep-nightly-mac.dmg bleep-nightly-mac.dmg.sha256
 
       - name: Remove signing files
         if: always()
