@@ -33,7 +33,7 @@ APP_REF = {"@type": "SoftwareApplication", "@id": SITE + "/#app", "name": "bleep
 
 FOOTER_LINKS = [
     ("https://github.com/AviroopPaul/bleep", "Source on GitHub"),
-    ("https://github.com/AviroopPaul/bleep-releases/releases", "Releases"),
+    ("https://github.com/AviroopPaul/bleep/releases", "Releases"),
     ("/changelog", "Changelog"),
     ("/alternatives", "Alternatives"),
     ("/vs/grok-bot", "vs Grok Bot"),

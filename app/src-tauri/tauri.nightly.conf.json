@@ -18,7 +18,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/AviroopPaul/bleep-releases/releases/download/nightly/latest-nightly.json"
+        "https://github.com/AviroopPaul/bleep/releases/download/nightly/latest-nightly.json"
       ]
     }
   }

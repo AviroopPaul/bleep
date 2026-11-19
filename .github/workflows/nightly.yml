@@ -1,14 +1,12 @@
 # Builds "bleep (nightly)" from main every night and publishes it to the rolling "nightly"
-# prerelease in AviroopPaul/bleep-releases. The nightly app updates from latest-nightly.json
-# there, so it never mixes with the stable feed (latest.json on the latest full release).
-# The dmg also goes to a "nightly" prerelease in this repo, tagged at the commit it was built from.
+# prerelease in this repo, tagged at the commit it was built from. The nightly app updates from
+# latest-nightly.json there, so it never mixes with the stable feed (latest.json on the latest
+# full release). The nightly release must stay a prerelease, so it never becomes "latest".
 #
 # Secrets (repository settings > Secrets and variables > Actions):
 #   BLEEP_GOOGLE_CLIENT_ID, BLEEP_GOOGLE_CLIENT_SECRET   bleep's Google app
 #   BLEEP_SIGNING_P12_BASE64, BLEEP_SIGNING_P12_PASSWORD  ~/.config/bleep-signing/bleep-signing.p12
 #   TAURI_UPDATER_KEY, TAURI_UPDATER_KEY_PASSWORD         ~/.config/bleep-signing/updater.key
-#   RELEASES_TOKEN                                        fine-grained token: Contents read/write
-#                                                         on AviroopPaul/bleep-releases
 name: Nightly
 
 on:
@@ -28,9 +26,6 @@ concurrency:
   group: nightly
   cancel-in-progress: false
 
-env:
-  RELEASES_REPO: AviroopPaul/bleep-releases
-
 jobs:
   nightly:
     name: Build and publish nightly
@@ -45,9 +40,9 @@ jobs:
       - name: Skip when main has not changed
         id: check
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          last="$(gh release view nightly -R "$RELEASES_REPO" --json body -q .body 2>/dev/null | sed -n 's/^Commit: \([0-9a-f]\{40\}\).*/\1/p' | head -1 || true)"
+          last="$(gh release view nightly -R "$GITHUB_REPOSITORY" --json body -q .body 2>/dev/null | sed -n 's/^Commit: \([0-9a-f]\{40\}\).*/\1/p' | head -1 || true)"
           echo "last=$last" >> "$GITHUB_OUTPUT"
           if [ "$last" = "$GITHUB_SHA" ] && [ "${{ inputs.force }}" != "true" ]; then
             echo "main is still at $last. Nothing to build."
@@ -124,33 +119,18 @@ jobs:
       - name: Publish to the nightly release
         if: steps.check.outputs.skip != 'true'
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-          VERSION: ${{ steps.ver.outputs.version }}
-        working-directory: app/release
-        run: |
-          body="$(printf 'bleep (nightly) %s\n\nCommit: %s\n\nInstall bleep-nightly-mac.dmg once. After that it updates itself from this release every night.\n\n%s\n' "$VERSION" "$GITHUB_SHA" "$(cat notes.md)")"
-          if ! gh release view nightly -R "$RELEASES_REPO" >/dev/null 2>&1; then
-            # A prerelease never becomes "latest", so the stable feed is untouched.
-            gh release create nightly -R "$RELEASES_REPO" --prerelease --title "Nightly" --notes "$body"
-          fi
-          # The tarball goes up before the feed that points at it.
-          gh release upload nightly -R "$RELEASES_REPO" --clobber \
-            bleep-nightly-mac.dmg bleep-nightly-mac.dmg.sha256 bleep-nightly-mac.app.tar.gz
-          gh release upload nightly -R "$RELEASES_REPO" --clobber latest-nightly.json
-          gh release edit nightly -R "$RELEASES_REPO" --prerelease --title "Nightly $VERSION" --notes "$body"
-
-      - name: Publish to this repo
-        if: steps.check.outputs.skip != 'true'
-        env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.ver.outputs.version }}
         working-directory: app/release
         run: |
-          body="$(printf 'bleep (nightly) %s, built from %s.\n\nInstall bleep-nightly-mac.dmg once. After that it updates itself every night from [bleep-releases](https://github.com/%s/releases/tag/nightly).\n\n%s\n' "$VERSION" "$GITHUB_SHA" "$RELEASES_REPO" "$(cat notes.md)")"
+          # The skip check above reads the "Commit:" line.
+          body="$(printf 'bleep (nightly) %s\n\nCommit: %s\n\nInstall bleep-nightly-mac.dmg once. After that it updates itself from this release every night.\n\n%s\n' "$VERSION" "$GITHUB_SHA" "$(cat notes.md)")"
           # The tag moves to tonight's commit, so drop the old release and tag first.
           gh release delete nightly -R "$GITHUB_REPOSITORY" --cleanup-tag -y 2>/dev/null || true
-          gh release create nightly -R "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
-            --title "Nightly $VERSION" --notes "$body" bleep-nightly-mac.dmg bleep-nightly-mac.dmg.sha256
+          # A prerelease never becomes "latest", so the stable feed is untouched.
+          gh release create nightly -R "$GITHUB_REPOSITORY" --prerelease --latest=false --target "$GITHUB_SHA" \
+            --title "Nightly $VERSION" --notes "$body" \
+            bleep-nightly-mac.dmg bleep-nightly-mac.dmg.sha256 bleep-nightly-mac.app.tar.gz latest-nightly.json
 
       - name: Remove signing files
         if: always()
