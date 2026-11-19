@@ -6,7 +6,7 @@
 #
 # FLAVOR=nightly VERSION=0.5.1-nightly.20261119.7 app/scripts/build-release.sh builds "bleep (nightly)"
 # instead (.github/workflows/nightly.yml): release/bleep-nightly-mac.dmg, bleep-nightly-mac.app.tar.gz
-# and latest-nightly.json, for the rolling "nightly" release in AviroopPaul/bleep-releases.
+# and latest-nightly.json, for the rolling "nightly" prerelease in AviroopPaul/bleep.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 SIGN_DIR="${SIGN_DIR:-$HOME/.config/bleep-signing}"
@@ -60,9 +60,9 @@ cp "src-tauri/target/release/bundle/dmg/${NAME}_${VER}_aarch64.dmg" "release/$OU
 # Optional release notes (shown in Settings > Updates): app/release/notes.md.
 cp "$APP.tar.gz" "release/$OUT.app.tar.gz"
 if [ "$FLAVOR" = nightly ]; then
-  URL="https://github.com/AviroopPaul/bleep-releases/releases/download/nightly/$OUT.app.tar.gz"
+  URL="https://github.com/AviroopPaul/bleep/releases/download/nightly/$OUT.app.tar.gz"
 else
-  URL="https://github.com/AviroopPaul/bleep-releases/releases/download/v$VER/$OUT.app.tar.gz"
+  URL="https://github.com/AviroopPaul/bleep/releases/download/v$VER/$OUT.app.tar.gz"
 fi
 NOTES_FILE=release/notes.md VER="$VER" URL="$URL" FEED="release/$FEED" SIG="$(cat "$APP.tar.gz.sig")" node -e '
 const fs = require("fs");
@@ -71,5 +71,5 @@ const url = process.env.URL;
 const feed = { version: process.env.VER, notes, pub_date: new Date().toISOString(),
   platforms: { "darwin-aarch64": { signature: process.env.SIG, url } } };
 fs.writeFileSync(process.env.FEED, JSON.stringify(feed, null, 2) + "\n");'
-echo "Upload to AviroopPaul/bleep-releases:"
+echo "Upload to AviroopPaul/bleep:"
 echo "  release/$OUT.dmg release/$OUT.dmg.sha256 release/$OUT.app.tar.gz release/$FEED"

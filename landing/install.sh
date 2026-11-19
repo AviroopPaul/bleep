@@ -5,7 +5,7 @@
 # quarantine flag so macOS opens it like any other app. Source of this script: the bleep repo.
 set -eu
 
-BASE="https://github.com/AviroopPaul/bleep-releases/releases/latest/download"
+BASE="https://github.com/AviroopPaul/bleep/releases/latest/download"
 fail() { printf 'bleep: %s\n' "$*" >&2; exit 1; }
 
 [ "$(uname -s)" = "Darwin" ] || fail "bleep runs on macOS only."

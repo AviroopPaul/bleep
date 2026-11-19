@@ -16,7 +16,7 @@ A local alternative to Grok Bot and OpenClaw that runs on the Claude plan you al
 [![CI](https://github.com/AviroopPaul/bleep/actions/workflows/ci.yml/badge.svg)](https://github.com/AviroopPaul/bleep/actions/workflows/ci.yml)
 
 [Website](https://bleep-omega.vercel.app) ·
-[Download](https://github.com/AviroopPaul/bleep-releases/releases/latest) ·
+[Download](https://github.com/AviroopPaul/bleep/releases/latest) ·
 [How it compares](#how-bleep-compares) ·
 [Build from source](#build-from-source)
 
@@ -126,7 +126,7 @@ npm run tauri dev
 
 You need Node 22+, a current stable Rust toolchain and Xcode Command Line Tools. Gmail and Calendar need a Google Cloud OAuth client of type Desktop app. See [`app/README.md`](app/README.md) for Google setup, model modes and every setting.
 
-`npm run build:local` builds a separate "bleep (local)" app with its own data folder (`~/.bleep-local`), so you can test changes next to the released app. `npm run dev:local` runs it without bundling. A "bleep (nightly)" build of `main` is published every night to the `nightly` release of [bleep-releases](https://github.com/AviroopPaul/bleep-releases/releases/tag/nightly).
+`npm run build:local` builds a separate "bleep (local)" app with its own data folder (`~/.bleep-local`), so you can test changes next to the released app. `npm run dev:local` runs it without bundling. A "bleep (nightly)" build of `main` is published every night to the `nightly` release of [this repo](https://github.com/AviroopPaul/bleep/releases/tag/nightly).
 
 ### Tests
 

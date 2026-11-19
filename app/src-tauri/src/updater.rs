@@ -1,5 +1,5 @@
-//! Self-update. bleep checks its public release feed (bleep-releases on GitHub) with the Tauri
-//! updater, which checks the minisign signature, swaps the app bundle in place, and leaves the
+//! Self-update. bleep checks its release feed (latest.json on the AviroopPaul/bleep releases)
+//! with the Tauri updater, which checks the minisign signature, swaps the app bundle in place, and leaves the
 //! new version to start at the next restart. The flow below is plain logic over a `Source`, so
 //! tests run it without the network.
 

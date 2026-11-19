@@ -26,4 +26,4 @@ Key facts:
 ## Source
 
 - [GitHub repository](https://github.com/AviroopPaul/bleep): code, README, issues
-- [Releases](https://github.com/AviroopPaul/bleep-releases/releases)
+- [Releases](https://github.com/AviroopPaul/bleep/releases)
