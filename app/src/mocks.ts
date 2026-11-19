@@ -127,6 +127,11 @@ export function installMocks(label: string) {
   // ?offer=linear: the last answer offered a connector that is off.
   const offer = q.get("offer");
   if (offer) history.push({ ...row(3, "user", "what is on my board?"), }, { ...row(4, "assistant", "Linear is off. Turn it on here and ask again."), tool_steps: [{ id: "t1", name: "connector_offer", args: { id: offer }, ok: true, preview: null }] });
+  // ?fresh=1: an empty chat. ?long=1: enough history to scroll.
+  if (q.has("fresh")) history.length = 0;
+  if (q.has("long")) {
+    for (let i = 0; i < 15; i++) history.push(row(next++, "user", `question ${i}`), row(next++, "assistant", `A longer answer number ${i}, with enough words to take a couple of lines in the panel.`));
+  }
   if (q.get("pinged")) history.push({ ...row(history.length + 1, "system", "Design review in 1 hour"), kind: "ping" });
   if (memOn) history.push({ ...row(3, "system", "Compacted 250K into a 3K summary. Facts saved to memory."), kind: "divider" });
   if (memOn) next = 4;
@@ -267,6 +272,12 @@ export function installMocks(label: string) {
           if (a.text === "fail please") throw "bleep could not reach the model: spawn failed";
           next += 2;
           const id = next;
+          if (String(a.text).includes("slow")) {
+            // Streams a little, then hangs until Stop.
+            later(100, () => chatEv(id, { type: "tool_start", id: "t1", name: "calendar_list", args: {} }));
+            later(200, () => chatEv(id, { type: "text_delta", text: "Let me look at your" }));
+            return id;
+          }
           if (String(a.text).includes("markdown")) {
             const md = "**Done.** Here is your day:\n\n- Standup at 10:00\n- Design review at 3:00\n\nI used `calendar_list`. See [the agenda](https://example.com/agenda).\n\n<img src=x onerror=alert(1)>";
             later(100, () => chatEv(id, { type: "text_delta", text: md }));
@@ -615,6 +626,14 @@ export function installMocks(label: string) {
           return null;
         case "voice_stop_speaking":
           return null;
+        case "voice_listen":
+          calls.push(`voice_listen:${a.on}`);
+          if (voiceSt.phase !== "listening") return false;
+          if (a.on) emit("voice://event", { kind: "wake" });
+          return true;
+        case "chat_stop":
+          calls.push("chat_stop");
+          return true;
         case "voice_test_speaker":
           calls.push(`voice_test_speaker:${a.voice}:${a.speaker}`);
           return null;

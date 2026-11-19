@@ -1,0 +1,115 @@
+/* ---------- chat panel: Native Glass ----------
+   Loaded by ChatPanel after theme.css. The window has macOS Popover vibrancy (windows.rs),
+   so the panel only tints it. System font, capsule controls, flat replies, glass cards. */
+:root {
+  --accent: #0a64d6; --ok: #1f9d46; --listen: #1f8a3c;
+  --glass: rgba(255, 255, 255, 0.62); --glass-line: rgba(255, 255, 255, 0.8); --fill: rgba(120, 120, 128, 0.12);
+  --glass-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.3);
+  --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --ok: #30d158; --listen: #30d158; --glass: rgba(255, 255, 255, 0.08); --glass-line: rgba(255, 255, 255, 0.12); --fill: rgba(120, 120, 128, 0.26); --glass-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6); }
+}
+.panel { --sans: var(--sys); --display: var(--sys); font-family: var(--sys); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+.panel-head { border-bottom: 0; padding: 10px 10px 6px 12px; }
+.panel .iconbtn { width: 28px; height: 28px; border-radius: 99px; }
+.panel .iconbtn:hover { background: var(--fill); }
+.panel .iconbtn svg { width: 15px; height: 15px; }
+.panel .views { border-radius: 99px; background: var(--fill); }
+.panel .view-tab { font: 500 12.5px/1 var(--sys); border-radius: 99px; color: var(--ink-2); }
+.panel .view-tab svg { width: 14px; height: 14px; }
+.panel .view-tab[aria-selected="true"] { background: var(--glass); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 0 0 0.5px var(--glass-line); }
+.panel .view-tab[aria-selected="true"] .view-dot { background: var(--accent); }
+.panel .view-count { background: #ff9f0a; color: #1b1f24; }
+@media (prefers-color-scheme: dark) { .panel .view-tab[aria-selected="true"] { background: rgba(255, 255, 255, 0.16); } }
+.panel .btn { border-radius: 99px; font: 500 13px var(--sys); }
+.panel .btn.pri { background: var(--accent); border-color: var(--accent); }
+
+.log-wrap { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.log-wrap[hidden] { display: none; }
+.panel .log { padding: 6px 14px 12px; gap: 12px; }
+.panel .msg { font-size: 13.5px; line-height: 1.5; }
+.panel .msg.me { background: var(--accent); color: #fff; border-radius: 18px; padding: 7px 12px; max-width: 80%; }
+.panel .msg.bot { align-self: stretch; max-width: 100%; background: transparent; border: 0; box-shadow: none; padding: 0; border-radius: 0; }
+.panel .msg.sys { font: 400 12px/1.45 var(--sys); border: 0; padding: 2px 10px; }
+.panel .msg.sched { border: 0; background: var(--fill); border-radius: 14px; }
+.panel .msg.sched .tag { font: 500 11px var(--sys); }
+.panel .note { font: 500 11.5px var(--sys); }
+.panel .divider { font: 500 11.5px/1.4 var(--sys); }
+.panel .divider::before, .panel .divider::after { border-top-style: solid; }
+
+/* A ping looks like a macOS notification. */
+.panel .msg.ping { display: flex; align-items: center; gap: 10px; align-self: stretch; max-width: 100%; border: 0; padding: 9px 12px 9px 9px; border-radius: 14px; color: var(--ink); background: var(--glass); box-shadow: inset 0 0 0 0.5px var(--glass-line), 0 2px 10px -4px rgba(0, 0, 0, 0.15); }
+.ping-ico { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; color: #fff; background: linear-gradient(#ff9f0a, #ff7a00); }
+.ping-ico svg { width: 15px; height: 15px; }
+.ping-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.ping-text { font-weight: 600; }
+.panel .msg.ping .tag { font: 400 11.5px var(--sys); color: var(--muted); margin: 0; }
+
+/* Tool steps: one capsule, open for the list. */
+.steps-box { margin: 0 0 8px; }
+.steps-sum { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; border: 0; border-radius: 99px; padding: 4px 10px 4px 8px; background: var(--fill); color: var(--ink-2); font: 500 12px/1.3 var(--sys); cursor: pointer; }
+.steps-sum > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.steps-box svg { width: 13px; height: 13px; flex: none; }
+.steps-box .ok { color: var(--ok); }
+.steps-box .bad, .steps-bad { color: var(--rust); }
+.steps-sum .chev { color: var(--muted); transition: transform 0.15s; }
+.steps-sum[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.spin-ico { color: var(--accent); animation: spin 1s linear infinite; }
+.panel .trace { margin: 6px 0 0 6px; padding: 0 0 0 10px; border: 0; border-left: 1.5px solid var(--line); gap: 4px; }
+.panel .trace[hidden] { display: none; }
+.panel .trace li { display: flex; align-items: center; gap: 7px; font: 400 12px/1.35 var(--sys); color: var(--ink-2); }
+
+/* Thinking and running steps shimmer. */
+.shimmer { color: transparent; background: linear-gradient(90deg, var(--muted) 0%, var(--muted) 40%, var(--ink) 50%, var(--muted) 60%, var(--muted) 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; animation: shim 1.8s linear infinite; }
+@keyframes shim { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.typing { display: inline-block; padding: 2px 0; font-weight: 500; }
+
+/* Copy, read aloud, ask again: on hover or focus. */
+.msg-acts { display: flex; align-items: center; gap: 2px; margin: -8px 0 0 -6px; opacity: 0; transition: opacity 0.15s; }
+.msg.bot:hover + .msg-acts, .msg-acts:hover, .msg-acts:focus-within { opacity: 1; }
+.msg-acts button { width: 26px; height: 24px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.msg-acts button:hover { background: var(--fill); color: var(--ink); }
+.msg-acts svg { width: 14px; height: 14px; }
+.msg-acts time { margin-left: 4px; font-size: 11px; color: var(--muted); }
+
+/* Approval cards are glass too. */
+.panel .card { background: var(--glass); border: 0; border-radius: 16px; padding: 12px; box-shadow: inset 0 0 0 0.5px var(--glass-line), var(--glass-shadow); }
+.panel .card.pending { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), var(--glass-shadow); }
+.panel .card-h { font: 600 14px/1.3 var(--sys); }
+.panel .card .acts .btn { flex: 1; min-height: 30px; border: 0; background: var(--fill); }
+.panel .card .acts .btn.pri { background: var(--accent); color: #fff; }
+.panel .card-done { font: 500 12px var(--sys); }
+
+/* Empty chat: a greeting and starters from what is connected. */
+.hello { margin: auto 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0; text-align: center; }
+.hello-droid { width: 56px; margin-bottom: 8px; }
+.hello-droid > * { width: 100%; }
+.hello h2 { margin: 0; font: 600 20px/1.2 var(--sys); letter-spacing: -0.01em; }
+.hello p { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+.sugs { width: 100%; display: grid; gap: 6px; }
+.sugs button { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 9px 12px; border: 0; border-radius: 12px; background: var(--glass); box-shadow: inset 0 0 0 0.5px var(--glass-line); color: var(--ink); font: 400 13px var(--sys); text-align: left; cursor: pointer; }
+.sugs button:hover { background: var(--fill); }
+.sugs button:disabled { opacity: 0.5; cursor: default; }
+.sugs button svg { width: 15px; height: 15px; flex: none; color: var(--accent); }
+.sugs button span { flex: 1; }
+.sugs button small { font-size: 11.5px; color: var(--muted); }
+
+.to-latest { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 0; border-radius: 99px; background: var(--raised); color: var(--ink); font: 500 12.5px var(--sys); box-shadow: 0 0 0 0.5px var(--line), 0 6px 18px -6px rgba(0, 0, 0, 0.35); cursor: pointer; }
+.to-latest svg { width: 14px; height: 14px; }
+
+/* The composer is a floating capsule: text, mic, send or stop. */
+.panel .composer { margin: 0 10px 10px; padding: 5px 5px 5px 14px; gap: 4px; border-radius: 22px; background: var(--glass); box-shadow: inset 0 0 0 0.5px var(--glass-line), 0 4px 18px -6px rgba(0, 0, 0, 0.2); }
+.panel .composer:focus-within { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
+.panel .composer.listening { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--listen) 60%, transparent), 0 0 0 3px color-mix(in srgb, var(--listen) 18%, transparent); }
+.panel .composer textarea { min-height: 30px; max-height: 120px; padding: 6px 0; border: 0; border-radius: 0; background: transparent; font: 14px/1.35 var(--sys); }
+.panel .composer textarea:focus { border: 0; box-shadow: none; }
+.panel .composer button { width: 30px; height: 30px; padding: 0; flex: none; border-radius: 99px; display: grid; place-items: center; }
+.panel .composer button svg { width: 16px; height: 16px; }
+.panel .composer .send { background: var(--accent); color: #fff; }
+.panel .composer .send svg { stroke-width: 2.6; }
+.panel .composer .send.stop svg { width: 11px; height: 11px; fill: currentColor; }
+.panel .composer .mic { background: transparent; color: var(--ink-2); }
+.panel .composer .mic:hover { background: var(--fill); }
+.panel .composer .mic.on { color: var(--listen); background: color-mix(in srgb, var(--listen) 18%, transparent); animation: micpulse 1.4s ease-in-out infinite; }
+@keyframes micpulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--listen) 45%, transparent); } 50% { box-shadow: 0 0 0 5px transparent; } }

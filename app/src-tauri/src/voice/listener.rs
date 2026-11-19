@@ -150,6 +150,11 @@ impl Listener {
         }
     }
 
+    /// Awake without the phrase: the chat's mic button. The next utterance is the request.
+    pub fn wake_now(&mut self, at: u64) {
+        self.state = State::Awake { since: at, talking: false };
+    }
+
     /// Back to waiting for the phrase (bleep started talking, or the mic changed).
     pub fn reset(&mut self) {
         self.state = State::Idle;
@@ -216,6 +221,18 @@ mod tests {
         assert_eq!(l.tick(16_000 + WAIT + 1), None, "no timeout once the user talks");
         assert_eq!(l.on_event(end(2.0, 60_000), &mut s), vec![Action::Heard("What's on my calendar today?".into())]);
         assert!(!l.awake());
+    }
+
+    #[test]
+    fn mic_button_wakes_without_the_phrase() {
+        let mut l = l();
+        let mut s = Script(vec!["What's on my calendar today?"], vec![]);
+        l.wake_now(1_000);
+        assert!(l.awake());
+        assert_eq!(l.on_event(end(2.0, 40_000), &mut s), vec![Action::Heard("What's on my calendar today?".into())]);
+        assert!(!l.awake());
+        l.wake_now(50_000);
+        assert_eq!(l.tick(50_000 + WAIT + 1), Some(Action::GaveUp), "gives up when nothing is said");
     }
 
     #[test]

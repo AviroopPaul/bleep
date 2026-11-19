@@ -15,7 +15,7 @@ use crate::AppState;
 use listener::{Action, Listener};
 use serde::Serialize;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
@@ -55,13 +55,15 @@ pub const NO_SOUND: &str = "No sound from the mic. Allow bleep in System Setting
 pub struct Voice {
     status: Arc<Mutex<Status>>,
     running: Arc<AtomicBool>,
+    /// Set by the chat's mic button: WAKE_NOW or CANCEL. Read by the listening loop.
+    request: Arc<AtomicU8>,
     pub speaker: tts::Speaker,
     models_root: PathBuf,
 }
 
 impl Voice {
     pub fn new(models_root: PathBuf) -> Self {
-        Self { status: Default::default(), running: Default::default(), speaker: Default::default(), models_root }
+        Self { status: Default::default(), running: Default::default(), request: Default::default(), speaker: Default::default(), models_root }
     }
 
     pub fn status(&self) -> Status {
@@ -77,11 +79,11 @@ impl Voice {
         if !cfg().wake || self.running.swap(true, Ordering::SeqCst) {
             return;
         }
-        let (status, running, speaker, root) = (self.status.clone(), self.running.clone(), self.speaker.clone(), self.models_root.clone());
+        let (status, running, speaker, root, request) = (self.status.clone(), self.running.clone(), self.speaker.clone(), self.models_root.clone(), self.request.clone());
         std::thread::Builder::new()
             .name("bleep-voice".into())
             .spawn(move || loop {
-                match listen(&cfg, &on, &status, &speaker, &root) {
+                match listen(&cfg, &on, &status, &speaker, &root, &request) {
                     Err(e) => {
                         eprintln!("bleep: voice: {e:#}");
                         let mut s = status.lock().unwrap();
@@ -135,7 +137,10 @@ fn load_model(root: &PathBuf, status: &Mutex<Status>) -> anyhow::Result<moonshin
 }
 
 /// The listening loop. Returns when the wake word is turned off.
-fn listen(cfg: &ConfigFn, on: &ActionFn, status: &Mutex<Status>, speaker: &tts::Speaker, root: &PathBuf) -> anyhow::Result<()> {
+const WAKE_NOW: u8 = 1;
+const CANCEL: u8 = 2;
+
+fn listen(cfg: &ConfigFn, on: &ActionFn, status: &Mutex<Status>, speaker: &tts::Speaker, root: &PathBuf, request: &AtomicU8) -> anyhow::Result<()> {
     let mut stt = load_model(root, status)?;
     let mut c = cfg();
     let mut listener = Listener::new(&c.phrase, listener::max_gap(&c.sensitivity));
@@ -171,6 +176,19 @@ fn listen(cfg: &ConfigFn, on: &ActionFn, status: &Mutex<Status>, speaker: &tts::
                 s.level = s.level * 0.6 + level * 0.4;
                 s.detail = hint.into();
             });
+            match request.swap(0, Ordering::SeqCst) {
+                WAKE_NOW if !listener.awake() => {
+                    speaker.stop();
+                    vad.reset();
+                    listener.wake_now(vad.now());
+                    set(status, |s| s.phase = Phase::Awake);
+                }
+                CANCEL if listener.awake() => {
+                    listener.reset();
+                    act(Action::GaveUp, on, status, speaker);
+                }
+                _ => {}
+            }
             if speaker.is_speaking() {
                 // Do not hear bleep's own voice as a request.
                 vad.reset();
@@ -305,14 +323,29 @@ pub async fn voice_set(app: AppHandle, config: VoiceConfig) -> Result<VoiceView,
     Ok(tauri::async_runtime::spawn_blocking(move || view(&app)).await.map_err(|e| e.to_string())?)
 }
 
-/// Reads a reply aloud, if spoken replies are on.
+/// Reads a reply aloud, if spoken replies are on. `force`: the Read aloud button, always.
 #[tauri::command]
-pub fn voice_speak(app: AppHandle, text: String) -> Result<(), String> {
+pub fn voice_speak(app: AppHandle, text: String, force: Option<bool>) -> Result<(), String> {
     let c = app.state::<AppState>().config.lock().unwrap().voice.clone();
-    if !c.speak {
+    if !c.speak && !force.unwrap_or(false) {
         return Ok(());
     }
     app.state::<Arc<Voice>>().speaker.speak(&text, &c.voice, &c.speaker).map_err(|e| e.to_string())
+}
+
+/// The chat's mic button. `on`: listen for a request now, no phrase needed. Off: stop listening.
+/// False when the listener is not running (voice is off in Settings).
+#[tauri::command]
+pub fn voice_listen(app: AppHandle, on: bool) -> bool {
+    let v = app.state::<Arc<Voice>>();
+    if !matches!(v.status().phase, Phase::Listening | Phase::Awake) {
+        return false;
+    }
+    v.request.store(if on { WAKE_NOW } else { CANCEL }, Ordering::SeqCst);
+    if on {
+        let _ = app.emit("voice://event", VoiceEvent::Wake);
+    }
+    true
 }
 
 #[tauri::command]

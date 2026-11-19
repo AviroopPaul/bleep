@@ -440,7 +440,12 @@ export const api = {
   voiceSettings: () => invoke<VoiceView>("voice_settings"),
   voiceStatus: () => invoke<VoiceStatus>("voice_status"),
   voiceSet: (config: VoiceConfig) => invoke<VoiceView>("voice_set", { config }),
-  voiceSpeak: (text: string) => invoke<void>("voice_speak", { text }),
+  /** `force` reads it aloud even when spoken replies are off (the Read aloud button). */
+  voiceSpeak: (text: string, force = false) => invoke<void>("voice_speak", { text, force }),
+  /** The chat's mic button. False when voice is off in Settings. */
+  voiceListen: (on: boolean) => invoke<boolean>("voice_listen", { on }),
+  /** Stops the streaming reply. Resolves once what streamed so far is saved. */
+  chatStop: () => invoke<boolean>("chat_stop"),
   voiceStopSpeaking: () => invoke<void>("voice_stop_speaking"),
   voiceTestSpeaker: (voice: string, speaker: string) => invoke<void>("voice_test_speaker", { voice, speaker }),
   catalogList: () => invoke<CatalogView>("catalog_list"),

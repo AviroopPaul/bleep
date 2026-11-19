@@ -6,7 +6,7 @@ test("a connector the model offered shows in the chat and turns on there", async
   await page.goto("/?mock=1&offer=linear#chat");
   const card = page.locator(".msg.bot").getByRole("group", { name: "Linear" });
   await expect(card).toBeVisible();
-  await expect(page.getByText("Found a connector for this")).toBeVisible();
+  await expect(page.locator(".steps-sum")).toHaveText("Found a connector for this");
   await card.getByRole("switch", { name: "Linear on" }).check();
   await expect.poll(() => calls(page)).toContain("catalog_set:linear:true:");
   await expect(page.getByText("On. Ask again and bleep can use it.")).toBeVisible();

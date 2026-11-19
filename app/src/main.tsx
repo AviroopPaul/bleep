@@ -2,28 +2,43 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "./theme.css";
 
-async function boot() {
-  const view = window.location.hash.replace("#", "").split("/")[0] || "chat";
-  if (new URLSearchParams(window.location.search).has("mock")) {
-    (await import("./mocks")).installMocks(view);
-  }
-  const { Droid } = await import("./droid/Droid");
-  const { ChatPanel } = await import("./chat/ChatPanel");
-  const { MeetingBar } = await import("./bar/MeetingBar");
-  const { Bubble } = await import("./droid/Bubble");
-  const { Settings } = await import("./settings/Settings");
-  const { Setup } = await import("./setup/Setup");
-  const pick = () => {
-    switch (view) {
-      case "droid": return <Droid />;
-      case "bar": return <MeetingBar />;
-      case "bubble": return <Bubble />;
-      case "settings": return <Settings />;
-      case "setup": return <Setup />;
-      default: return <ChatPanel />;
+/** Each window loads only its own view, so small windows (droid, bubble, bar) start fast. */
+async function view(name: string): Promise<React.ReactElement> {
+  switch (name) {
+    case "droid": {
+      const { Droid } = await import("./droid/Droid");
+      return <Droid />;
     }
-  };
-  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<React.StrictMode>{pick()}</React.StrictMode>);
+    case "bar": {
+      const { MeetingBar } = await import("./bar/MeetingBar");
+      return <MeetingBar />;
+    }
+    case "bubble": {
+      const { Bubble } = await import("./droid/Bubble");
+      return <Bubble />;
+    }
+    case "settings": {
+      const { Settings } = await import("./settings/Settings");
+      return <Settings />;
+    }
+    case "setup": {
+      const { Setup } = await import("./setup/Setup");
+      return <Setup />;
+    }
+    default: {
+      const { ChatPanel } = await import("./chat/ChatPanel");
+      return <ChatPanel />;
+    }
+  }
+}
+
+async function boot() {
+  const name = window.location.hash.replace("#", "").split("/")[0] || "chat";
+  if (new URLSearchParams(window.location.search).has("mock")) {
+    (await import("./mocks")).installMocks(name);
+  }
+  const el = await view(name);
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(<React.StrictMode>{el}</React.StrictMode>);
 }
 
 void boot();

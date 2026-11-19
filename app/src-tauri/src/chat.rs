@@ -103,6 +103,8 @@ pub struct ChatService {
     session_instance: AtomicU64,
     busy: Arc<AtomicBool>,
     turn: Mutex<Option<JoinHandle<()>>>,
+    /// Stops the running turn. The turn answers on the inner sender once its reply is saved.
+    stop: std::sync::Mutex<Option<StopTx>>,
     turns: TurnTracker,
     memory: Option<Arc<crate::memory::Memory>>,
     window_sink: Option<WindowSink>,
@@ -129,6 +131,9 @@ impl Drop for CompactEnd {
 /// Told the model's context window whenever a turn reports it.
 pub type WindowSink = Arc<dyn Fn(u64) + Send + Sync>;
 
+type StopTx = tokio::sync::oneshot::Sender<tokio::sync::oneshot::Sender<()>>;
+type StopRx = tokio::sync::oneshot::Receiver<tokio::sync::oneshot::Sender<()>>;
+
 /// Ends the tracked turn when the turn task ends, even if it panics.
 struct TurnEnd(TurnTracker);
 impl Drop for TurnEnd {
@@ -147,7 +152,7 @@ impl Drop for BusyGuard {
 
 impl ChatService {
     pub fn new(store: Arc<Store>, runtime: Arc<dyn AgentRuntime>, mcp: McpEndpoint, emit: Emit, turns: TurnTracker) -> Self {
-        Self { store, runtime, mcp, emit, session: Mutex::new(None), session_instance: Default::default(), busy: Default::default(), turn: Mutex::new(None), turns, memory: None, window_sink: None, memory_config: None, compact_sink: None,
+        Self { store, runtime, mcp, emit, session: Mutex::new(None), session_instance: Default::default(), busy: Default::default(), turn: Mutex::new(None), stop: Default::default(), turns, memory: None, window_sink: None, memory_config: None, compact_sink: None,
             tools_hash: None, me: Default::default() }
     }
 
@@ -415,11 +420,13 @@ impl ChatService {
         }
         let (store, emit, rid, sink) = (self.store.clone(), self.emit.clone(), self.runtime.id(), self.window_sink.clone());
         let me = self.me.get().cloned();
+        let (stop_tx, stop_rx) = tokio::sync::oneshot::channel();
+        *self.stop.lock().unwrap() = Some(stop_tx);
         let task = tokio::spawn(async move {
             let _guard = guard;
             {
                 let _turn_end = turn_end;
-                run_turn(store, emit, rid, session_id, aid, stream, sink).await;
+                run_turn(store, emit, rid, session_id, aid, stream, sink, stop_rx).await;
             }
             // Still busy: no new turn starts while the chat compacts.
             if let Some(me) = me.and_then(|w| w.upgrade()) {
@@ -430,6 +437,17 @@ impl ChatService {
         Ok(aid)
     }
 
+    /// Stops the running reply. What streamed so far is kept, marked interrupted.
+    /// Returns once the reply is saved, or false when no turn is running.
+    pub async fn stop(&self) -> bool {
+        let Some(tx) = self.stop.lock().unwrap().take() else { return false };
+        let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+        if tx.send(ack_tx).is_err() {
+            return false;
+        }
+        tokio::time::timeout(std::time::Duration::from_secs(5), ack_rx).await.is_ok_and(|r| r.is_ok())
+    }
+
     /// Waits for the running turn, if any (tests and shutdown).
     pub async fn wait_idle(&self) {
         if let Some(t) = self.turn.lock().await.take() {
@@ -438,7 +456,8 @@ impl ChatService {
     }
 }
 
-async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i64, aid: i64, mut stream: crate::runtime::EventStream, sink: Option<WindowSink>) {
+#[allow(clippy::too_many_arguments)]
+async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i64, aid: i64, mut stream: crate::runtime::EventStream, sink: Option<WindowSink>, mut stop_rx: StopRx) {
     let mut usage: Option<(i64, i64)> = None;
     let mut text = String::new();
     let mut steps: Vec<Value> = vec![];
@@ -446,7 +465,29 @@ async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i
     let mut errored = false;
     // Stays Error if the stream ends without Done.
     let mut status = MsgStatus::Error;
-    while let Some(ev) = stream.next().await {
+    let mut ack = None;
+    // Closed without a stop (the service dropped its sender): keep reading.
+    let mut stop_open = true;
+    loop {
+        let ev = tokio::select! {
+            biased;
+            r = &mut stop_rx, if stop_open => match r {
+                Ok(a) => {
+                    // Dropping the stream ends the turn in the runtime too.
+                    ack = Some(a);
+                    status = MsgStatus::Interrupted;
+                    break;
+                }
+                Err(_) => {
+                    stop_open = false;
+                    continue;
+                }
+            },
+            ev = stream.next() => match ev {
+                Some(ev) => ev,
+                None => break,
+            },
+        };
         emit(ChatEmit { message_id: aid, event: ev.clone() });
         match ev {
             AgentEvent::TextDelta { text: t } => text.push_str(&t),
@@ -485,7 +526,11 @@ async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i
         }
     }
     let _ = store.log_llm(runtime_id, "main", "chat", usage.map(|u| u.0), usage.map(|u| u.1), status == MsgStatus::Done);
+    drop(stream);
     let _ = store.finish_message(aid, &text, &Value::Array(steps), tokens, status);
+    if let Some(a) = ack {
+        let _ = a.send(());
+    }
 }
 
 #[cfg(test)]
@@ -541,6 +586,22 @@ mod tests {
         assert_eq!(r.store.current_session("claude").unwrap().unwrap().runtime_session_id.as_deref(), Some("s1"));
         assert_eq!(r.emitted.lock().unwrap().len(), 3);
         assert!(r.emitted.lock().unwrap().iter().all(|e| e.message_id == aid));
+    }
+
+    #[tokio::test]
+    async fn stop_keeps_the_partial_reply_as_interrupted() {
+        let r = rig(vec![vec![AgentEvent::TextDelta { text: "Half an ans".into() }]]);
+        r.rt.hang_after_script.store(true, Ordering::SeqCst);
+        let chat = service(&r);
+        assert!(!chat.stop().await, "nothing to stop yet");
+        let aid = chat.send("hello".into()).await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(chat.stop().await);
+        chat.wait_idle().await;
+        let m = r.store.page_messages(None, 50).unwrap().into_iter().find(|m| m.id == aid).unwrap();
+        assert_eq!((m.content.as_str(), m.status), ("Half an ans", MsgStatus::Interrupted));
+        // The next turn runs as normal.
+        assert!(!chat.stop().await);
     }
 
     #[tokio::test]

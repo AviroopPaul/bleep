@@ -27,6 +27,13 @@ describe("chatReducer", () => {
     expect(stepLabel("memory_search")).toBe("Searched your memory");
   });
 
+  it("stop keeps the text, marks it interrupted and frees the input", () => {
+    let s = chatReducer(sent(), { type: "event", messageId: 2, event: { type: "text_delta", text: "Half" } });
+    s = chatReducer(s, { type: "stopped", messageId: 2 });
+    expect(s.messages[1]).toMatchObject({ content: "Half", status: "interrupted" });
+    expect(s.streamingId).toBeNull();
+  });
+
   it("text deltas append to the streaming message", () => {
     let s = sent();
     expect(s.streamingId).toBe(2);

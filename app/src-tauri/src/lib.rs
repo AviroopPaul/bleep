@@ -98,6 +98,12 @@ async fn chat_send(state: tauri::State<'_, AppState>, text: String) -> Result<i6
     state.chat.send(text).await.map_err(|e| e.to_string())
 }
 
+/// Stops the reply that is streaming now. True when one was stopped.
+#[tauri::command]
+async fn chat_stop(state: tauri::State<'_, AppState>) -> Result<bool, String> {
+    Ok(state.chat.stop().await)
+}
+
 #[tauri::command]
 async fn runtime_health(state: tauri::State<'_, AppState>) -> Result<RuntimeHealth, String> {
     Ok(state.chat.runtime().health().await)
@@ -432,6 +438,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             chat_history,
             chat_send,
+            chat_stop,
             runtime_health,
             open_claude_login,
             approval_decide,
@@ -508,6 +515,7 @@ pub fn run() {
             voice::voice_set,
             voice::voice_speak,
             voice::voice_stop_speaking,
+            voice::voice_listen,
             voice::voice_test_speaker,
             usage::usage_summary,
             marketplace::catalog_list,

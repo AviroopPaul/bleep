@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, healthOk, onApproval, onChatEvent, onChatExpanded, onCompacting, onNotice, onPing, onVoice, type ChatContext, type Message, type RuntimeHealth } from "../ipc";
+import {
+  AlarmClock, ArrowDown, ArrowUp, Bell, BellRing, Bot, Calendar, Check, Copy, Mail, Maximize2, MessageCircle, Mic, Minimize2,
+  RefreshCw, Settings, Sparkles, Square, Volume2, X, type LucideIcon,
+} from "lucide-react";
+import {
+  api, healthOk, onApproval, onChatEvent, onChatExpanded, onCompacting, onConnectors, onNotice, onPing, onVoice,
+  type ChatContext, type ConnectorsView, type Message, type RuntimeHealth,
+} from "../ipc";
 import { meterLevel } from "../settings/memoryText";
 import { chatReducer, emptyChat, formatBackAt } from "./chatReducer";
+import { greeting, reachLine, suggestions, type SuggestionIcon } from "./chatText";
 import { ToolSteps } from "./ToolSteps";
 import { ApprovalCard } from "./ApprovalCard";
 import { OfferCard } from "../settings/Catalog";
@@ -11,15 +19,21 @@ import { Avatar, useAvatar } from "../avatar/Avatar";
 import { AgentsView, useAgents } from "../agents/AgentsView";
 import { RemindersView, useReminders } from "../reminders/RemindersView";
 import { NAME, TAG } from "../flavor";
+import "./chat.css";
 
 const PAGE = 50;
-const SUGGESTIONS = ["What time is it in Tokyo?", "What day is it today?"];
+const SUG_ICONS: Record<SuggestionIcon, LucideIcon> = { calendar: Calendar, mail: Mail, reminder: AlarmClock, agents: Bot, help: Sparkles };
 
-function pingTime(at: string): string {
+function clock(at: string): string | null {
   const d = new Date(at);
-  if (!at || Number.isNaN(d.getTime())) return "bleep";
-  return `bleep, ${new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(d)}`;
+  if (!at || Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(d);
 }
+
+const pingTime = (at: string) => {
+  const t = clock(at);
+  return t ? `bleep, ${t}` : "bleep";
+};
 
 /** Connectors the model offered in this turn, once each. */
 function offers(m: Message): string[] {
@@ -27,25 +41,56 @@ function offers(m: Message): string[] {
   return [...new Set(ids.filter((x): x is string => typeof x === "string"))];
 }
 
-function Bubble({ m }: { m: Message }) {
+/** Copy, read aloud and retry under a finished reply. */
+function ReplyActions({ m, onRetry }: { m: Message; onRetry?: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    void navigator.clipboard.writeText(m.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    }).catch(() => {});
+  };
+  const t = clock(m.created_at);
+  return (
+    <div className="msg-acts">
+      <button type="button" aria-label={copied ? "Copied" : "Copy reply"} title="Copy" onClick={copy}>{copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}</button>
+      <button type="button" aria-label="Read aloud" title="Read aloud" onClick={() => void api.voiceSpeak(m.content, true)}><Volume2 aria-hidden="true" /></button>
+      {onRetry && <button type="button" aria-label="Ask again" title="Ask again" onClick={onRetry}><RefreshCw aria-hidden="true" /></button>}
+      {t && <time dateTime={m.created_at}>{t}</time>}
+    </div>
+  );
+}
+
+function Bubble({ m, onRetry }: { m: Message; onRetry?: () => void }) {
   if (m.kind === "divider") return <div className="divider" role="separator" aria-label={m.content}><span>{m.content}</span></div>;
-  if (m.kind === "ping") return <div className="msg ping"><span className="tag">{pingTime(m.created_at)}</span>{m.content}</div>;
+  if (m.kind === "ping") {
+    return (
+      <div className="msg ping">
+        <span className="ping-ico" aria-hidden="true"><BellRing /></span>
+        <span className="ping-body"><span className="ping-text">{m.content}</span><span className="tag">{pingTime(m.created_at)}</span></span>
+      </div>
+    );
+  }
   if (m.role === "system") return <div className="msg sys">{m.content}</div>;
   if (m.role === "user" && m.kind === "scheduled") return <div className="msg sched"><span className="tag">scheduled</span>{m.content}</div>;
   if (m.role === "user") return <div className="msg me">{m.content}</div>;
   const waiting = m.status === "streaming" && !m.content && !m.tool_steps.length;
+  const finished = m.status !== "streaming" && m.content.trim().length > 0;
   return (
-    <div className={`msg bot ${m.status === "error" ? "error" : ""}`}>
-      <ToolSteps steps={m.tool_steps} />
-      {m.approvals?.map((a) => <ApprovalCard key={a.id} a={a} />)}
-      {offers(m).map((id) => <OfferCard key={id} id={id} />)}
-      {waiting ? (
-        <span className="typing" aria-label="bleep is thinking"><i /><i /><i /></span>
-      ) : (
-        <span className="text"><Markdown text={m.content} /></span>
-      )}
-      {m.status === "interrupted" && <span className="note">Interrupted</span>}
-    </div>
+    <>
+      <div className={`msg bot ${m.status === "error" ? "error" : ""}`}>
+        <ToolSteps steps={m.tool_steps} />
+        {m.approvals?.map((a) => <ApprovalCard key={a.id} a={a} />)}
+        {offers(m).map((id) => <OfferCard key={id} id={id} />)}
+        {waiting ? (
+          <span className="typing shimmer" aria-label="bleep is thinking">Thinking...</span>
+        ) : (
+          <span className="text"><Markdown text={m.content} /></span>
+        )}
+        {m.status === "interrupted" && <span className="note">Stopped</span>}
+      </div>
+      {finished && <ReplyActions m={m} onRetry={onRetry} />}
+    </>
   );
 }
 
@@ -61,12 +106,15 @@ export function ChatPanel() {
   const [compacting, setCompacting] = useState(false);
   const [ctx, setCtx] = useState<ChatContext | null>(null);
   const [big, setBig] = useState(false);
+  const [conns, setConns] = useState<ConnectorsView | null>(null);
+  // Scrolled up, away from the newest message: show the jump button.
+  const [away, setAway] = useState(false);
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
   const keepFrom = useRef<number | null>(null);
   const [view, setView] = useState<"chat" | "agents" | "reminders">("chat");
-  // After the wake phrase: listening for the request.
+  // After the wake phrase or the mic button: listening for the request.
   const [listening, setListening] = useState(false);
   // Replies to spoken requests are read aloud when they finish.
   const spoken = useRef(new Set<number>());
@@ -84,6 +132,9 @@ export function ChatPanel() {
       setNoMore(messages.length < PAGE);
     });
     void checkHealth();
+    const loadConns = () => api.connectorsList().then(setConns).catch(() => {});
+    void loadConns();
+    const unConns = onConnectors(() => void loadConns());
     const un = onChatEvent(({ message_id, event }) => dispatch({ type: "event", messageId: message_id, event }));
     const unApproval = onApproval((approval) => dispatch({ type: "approval", approval }));
     const unNotice = onNotice(setNotice);
@@ -108,6 +159,7 @@ export function ChatPanel() {
     window.addEventListener("keydown", onKey);
     return () => {
       void un.then((f) => f());
+      void unConns.then((f) => f());
       void unApproval.then((f) => f());
       void unNotice.then((f) => f());
       void unPing.then((f) => f());
@@ -159,10 +211,19 @@ export function ChatPanel() {
     }
   }, [state.messages]);
 
+  // The box grows with the text, up to its max height.
+  useLayoutEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft]);
+
   const onScroll = () => {
     const el = log.current;
     if (!el) return;
     stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    setAway(!stick.current);
     if (el.scrollTop < 30 && !noMore && state.messages.length) {
       setNoMore(true);
       api.history(state.messages[0].id, PAGE).then((older) => {
@@ -173,8 +234,15 @@ export function ChatPanel() {
     }
   };
 
+  const toLatest = () => {
+    stick.current = true;
+    setAway(false);
+    log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" });
+  };
+
   const ok = healthOk(health);
-  const busy = sending || compacting || state.streamingId !== null;
+  const streaming = state.streamingId !== null;
+  const busy = sending || compacting || streaming;
   const used = state.context?.used ?? ctx?.used ?? null;
   // Near compaction, the gear shows a dot and opens Settings > Usage, where the numbers live.
   const ctxHigh = !!ctx && used != null && meterLevel(used, ctx.threshold) === "high";
@@ -190,6 +258,7 @@ export function ChatPanel() {
     }
     setSending(true);
     stick.current = true;
+    setAway(false);
     void api.voiceStopSpeaking();
     try {
       const assistantId = await api.send(t);
@@ -214,6 +283,36 @@ export function ChatPanel() {
 
   sendRef.current = send;
 
+  const stop = async () => {
+    const id = state.streamingId;
+    if (id === null) return;
+    void api.voiceStopSpeaking();
+    await api.chatStop().catch(() => false);
+    dispatch({ type: "stopped", messageId: id });
+    input.current?.focus();
+  };
+
+  // Listens for a request without the wake phrase. With voice off, Settings explains how to turn it on.
+  const mic = async () => {
+    if (listening) {
+      setListening(false);
+      await api.voiceListen(false).catch(() => false);
+      return;
+    }
+    const on = await api.voiceListen(true).catch(() => false);
+    if (!on) void api.openSettings("voice");
+  };
+
+  // Ask again: the user message right before this reply.
+  const retryFor = (i: number): (() => void) | undefined => {
+    for (let j = i - 1; j >= 0; j--) {
+      const u = state.messages[j];
+      if (u.role === "user" && u.kind === "chat") return () => void send(u.content);
+      if (u.role === "assistant") return undefined;
+    }
+    return undefined;
+  };
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -222,6 +321,11 @@ export function ChatPanel() {
   };
 
   const limited = state.rateLimitedUntil && state.rateLimitedUntil * 1000 > Date.now();
+  const connected = (conns?.builtin ?? []).filter((c) => c.status.state === "connected");
+  const ids = new Set(connected.map((c) => c.id));
+  const reach = [ids.has("calendar") && "Calendar", ids.has("gmail") && "Gmail"].filter((x): x is string => !!x);
+  const sugs = suggestions(ids, agents.view.sessions.length, waiting);
+  const empty = ok && state.messages.length === 0;
 
   return (
     <div className="panel">
@@ -233,12 +337,14 @@ export function ChatPanel() {
         {/* The tabs and buttons need the room, so the buddy's head is the brand mark here. */}
         <h1 className="sr-only">{NAME}</h1>
         <div className="views" role="tablist" aria-label="View">
-          <button role="tab" className="view-tab" aria-selected={view === "chat"} onClick={() => setView("chat")}>Chat</button>
+          <button role="tab" className="view-tab" aria-selected={view === "chat"} onClick={() => setView("chat")}>
+            <MessageCircle aria-hidden="true" />Chat
+          </button>
           <button role="tab" className="view-tab" aria-selected={view === "agents"} aria-label={waiting ? `Agents, ${waiting} need you` : "Agents"} onClick={() => setView("agents")}>
-            Agents{waiting > 0 && <span className="view-count" aria-hidden="true">{waiting}</span>}
+            <Bot aria-hidden="true" />Agents{waiting > 0 && <span className="view-count" aria-hidden="true">{waiting}</span>}
           </button>
           <button role="tab" className="view-tab icon" aria-selected={view === "reminders"} aria-label={due ? `Reminders, ${due} due` : "Reminders"} title="Reminders" onClick={() => setView("reminders")}>
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1 1H3l1-1ZM6.5 14h3" /></svg>
+            <Bell aria-hidden="true" />
             {due > 0 && <span className="view-count" aria-hidden="true">{due}</span>}
           </button>
         </div>
@@ -249,10 +355,7 @@ export function ChatPanel() {
           title="Settings"
           onClick={() => void api.openSettings(ctxHigh ? "usage" : undefined)}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
+          <Settings aria-hidden="true" />
           {ctxHigh && <span className="view-dot" aria-hidden="true" />}
         </button>
         <button
@@ -265,12 +368,10 @@ export function ChatPanel() {
             void api.setChatExpanded(!big);
           }}
         >
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            {big ? <path d="M2.5 9.5h4v4M13.5 6.5h-4v-4M6.5 9.5 2 14M9.5 6.5 14 2" /> : <path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9" />}
-          </svg>
+          {big ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
         </button>
         <button className="iconbtn" aria-label="Close chat" title="Close (Esc)" onClick={() => void api.hideChat()}>
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+          <X aria-hidden="true" />
         </button>
       </header>
 
@@ -289,20 +390,38 @@ export function ChatPanel() {
         </div>
       )}
 
-      <div className="log" ref={log} onScroll={onScroll} aria-live="polite" hidden={view !== "chat"}>
-        {state.messages.map((m) => <Bubble key={m.id} m={m} />)}
-        {state.loose.map((a) => <ApprovalCard key={a.id} a={a} />)}
-        {limited && <div className="msg sys">{formatBackAt(state.rateLimitedUntil!)}</div>}
-        {sendError && <div className="msg sys err" role="alert">{sendError}</div>}
-        {notice && <div className="msg sys" role="status">{notice}</div>}
-        {compacting && <div className="msg sys" role="status">Compacting... Facts go to memory first. Your history stays here.</div>}
-      </div>
-
-      {view === "chat" && ok && state.messages.length === 0 && (
-        <div className="sugs">
-          {SUGGESTIONS.map((s) => <button key={s} onClick={() => void send(s)} disabled={busy}>{s}</button>)}
+      <div className="log-wrap" hidden={view !== "chat"}>
+        <div className="log" ref={log} onScroll={onScroll} aria-live="polite">
+          {empty && (
+            <div className="hello">
+              <span className="hello-droid" aria-hidden="true">{avatar && <Avatar cfg={avatar} still />}</span>
+              <h2>{greeting(new Date())}</h2>
+              <p>{reachLine(reach)}</p>
+              <div className="sugs">
+                {sugs.map((s) => {
+                  const Icon = SUG_ICONS[s.icon];
+                  return (
+                    <button key={s.text} type="button" onClick={() => void send(s.text)} disabled={busy}>
+                      <Icon aria-hidden="true" /><span>{s.text}</span><small>{s.source}</small>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {state.messages.map((m, i) => <Bubble key={m.id} m={m} onRetry={busy ? undefined : retryFor(i)} />)}
+          {state.loose.map((a) => <ApprovalCard key={a.id} a={a} />)}
+          {limited && <div className="msg sys">{formatBackAt(state.rateLimitedUntil!)}</div>}
+          {sendError && <div className="msg sys err" role="alert">{sendError}</div>}
+          {notice && <div className="msg sys" role="status">{notice}</div>}
+          {compacting && <div className="msg sys" role="status">Compacting... Facts go to memory first. Your history stays here.</div>}
         </div>
-      )}
+        {away && (
+          <button type="button" className="to-latest" onClick={toLatest}>
+            <ArrowDown aria-hidden="true" />{streaming ? "New reply" : "Jump to latest"}
+          </button>
+        )}
+      </div>
 
       <form className={`composer ${listening ? "listening" : ""}`} hidden={view !== "chat"} onSubmit={(e) => { e.preventDefault(); void send(draft); }}>
         <label htmlFor="msg" className="sr-only">Message bleep</label>
@@ -320,11 +439,26 @@ export function ChatPanel() {
           onKeyDown={onKeyDown}
           autoFocus
         />
-        <button type="submit" className="send" aria-label="Send" title="Send (Enter)" disabled={!canSend}>
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M10 16V4M4.5 9.5 10 4l5.5 5.5" />
-          </svg>
+        <button
+          type="button"
+          className={`mic ${listening ? "on" : ""}`}
+          aria-label={listening ? "Stop listening" : "Talk to bleep"}
+          aria-pressed={listening}
+          title={listening ? "Stop listening" : "Talk"}
+          disabled={!ok || busy}
+          onClick={() => void mic()}
+        >
+          <Mic aria-hidden="true" />
         </button>
+        {streaming ? (
+          <button type="button" className="send stop" aria-label="Stop" title="Stop" onClick={() => void stop()}>
+            <Square aria-hidden="true" />
+          </button>
+        ) : (
+          <button type="submit" className="send" aria-label="Send" title="Send (Enter)" disabled={!canSend}>
+            <ArrowUp aria-hidden="true" />
+          </button>
+        )}
       </form>
     </div>
   );
