@@ -1,0 +1,143 @@
+# Builds "bleep (nightly)" from main every night and publishes it to the rolling "nightly"
+# prerelease in AviroopPaul/bleep-releases. The nightly app updates from latest-nightly.json
+# there, so it never mixes with the stable feed (latest.json on the latest full release).
+#
+# Secrets (repository settings > Secrets and variables > Actions):
+#   BLEEP_GOOGLE_CLIENT_ID, BLEEP_GOOGLE_CLIENT_SECRET   bleep's Google app
+#   BLEEP_SIGNING_P12_BASE64, BLEEP_SIGNING_P12_PASSWORD  ~/.config/bleep-signing/bleep-signing.p12
+#   TAURI_UPDATER_KEY, TAURI_UPDATER_KEY_PASSWORD         ~/.config/bleep-signing/updater.key
+#   RELEASES_TOKEN                                        fine-grained token: Contents read/write
+#                                                         on AviroopPaul/bleep-releases
+name: Nightly
+
+on:
+  schedule:
+    - cron: "30 20 * * *" # 02:00 IST
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Build even when main has not changed since the last nightly
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  RELEASES_REPO: AviroopPaul/bleep-releases
+
+jobs:
+  nightly:
+    name: Build and publish nightly
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Skip when main has not changed
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          last="$(gh release view nightly -R "$RELEASES_REPO" --json body -q .body 2>/dev/null | sed -n 's/^Commit: \([0-9a-f]\{40\}\).*/\1/p' | head -1 || true)"
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          if [ "$last" = "$GITHUB_SHA" ] && [ "${{ inputs.force }}" != "true" ]; then
+            echo "main is still at $last. Nothing to build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Version
+        if: steps.check.outputs.skip != 'true'
+        id: ver
+        run: |
+          base="$(node -p "const [a,b,c]=require('./app/package.json').version.split('-')[0].split('.').map(Number); [a,b,c+1].join('.')")"
+          v="$base-nightly.$(date -u +%Y%m%d).$GITHUB_RUN_NUMBER"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Nightly $v"
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.check.outputs.skip != 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.check.outputs.skip != 'true'
+        with:
+          workspaces: |
+            app/src-tauri
+            app/bleep-hook
+          key: nightly
+
+      - name: Install
+        if: steps.check.outputs.skip != 'true'
+        working-directory: app
+        run: npm ci
+
+      - name: Signing files
+        if: steps.check.outputs.skip != 'true'
+        env:
+          P12: ${{ secrets.BLEEP_SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.BLEEP_SIGNING_P12_PASSWORD }}
+          UPDATER_KEY: ${{ secrets.TAURI_UPDATER_KEY }}
+          UPDATER_KEY_PASSWORD: ${{ secrets.TAURI_UPDATER_KEY_PASSWORD }}
+        run: |
+          d="$RUNNER_TEMP/bleep-signing"
+          mkdir -p "$d" && chmod 700 "$d"
+          printf '%s' "$P12" | base64 --decode > "$d/bleep-signing.p12"
+          printf '%s' "$P12_PASSWORD" > "$d/p12-password"
+          printf '%s' "$UPDATER_KEY" > "$d/updater.key"
+          printf '%s' "$UPDATER_KEY_PASSWORD" > "$d/updater-key-password"
+          echo "SIGN_DIR=$d" >> "$GITHUB_ENV"
+
+      - name: Notes
+        if: steps.check.outputs.skip != 'true'
+        env:
+          LAST: ${{ steps.check.outputs.last }}
+        run: |
+          mkdir -p app/release
+          range="HEAD~20..HEAD"
+          if [ -n "$LAST" ] && git cat-file -e "$LAST" 2>/dev/null; then range="$LAST..HEAD"; fi
+          git log --no-merges --format='- %s' "$range" | head -30 > app/release/notes.md
+          cat app/release/notes.md
+
+      - name: Build
+        if: steps.check.outputs.skip != 'true'
+        env:
+          CI: "true"
+          FLAVOR: nightly
+          VERSION: ${{ steps.ver.outputs.version }}
+          BLEEP_GOOGLE_CLIENT_ID: ${{ secrets.BLEEP_GOOGLE_CLIENT_ID }}
+          BLEEP_GOOGLE_CLIENT_SECRET: ${{ secrets.BLEEP_GOOGLE_CLIENT_SECRET }}
+        run: app/scripts/build-release.sh
+
+      - name: Publish to the nightly release
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        working-directory: app/release
+        run: |
+          body="$(printf 'bleep (nightly) %s\n\nCommit: %s\n\nInstall bleep-nightly-mac.dmg once. After that it updates itself from this release every night.\n\n%s\n' "$VERSION" "$GITHUB_SHA" "$(cat notes.md)")"
+          if ! gh release view nightly -R "$RELEASES_REPO" >/dev/null 2>&1; then
+            # A prerelease never becomes "latest", so the stable feed is untouched.
+            gh release create nightly -R "$RELEASES_REPO" --prerelease --title "Nightly" --notes "$body"
+          fi
+          # The tarball goes up before the feed that points at it.
+          gh release upload nightly -R "$RELEASES_REPO" --clobber \
+            bleep-nightly-mac.dmg bleep-nightly-mac.dmg.sha256 bleep-nightly-mac.app.tar.gz
+          gh release upload nightly -R "$RELEASES_REPO" --clobber latest-nightly.json
+          gh release edit nightly -R "$RELEASES_REPO" --prerelease --title "Nightly $VERSION" --notes "$body"
+
+      - name: Remove signing files
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/bleep-signing"

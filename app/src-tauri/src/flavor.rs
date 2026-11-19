@@ -1,23 +1,94 @@
-//! Which build this is. A dev build ("bleep (dev)", cargo feature `dev`) installs next to the
-//! production app and must never touch its data, its Keychain items, its login item, its
-//! updates, or the Claude Code and Codex settings the production app manages.
-use std::path::Path;
+//! Which build this is. Three apps can live side by side, each with its own name, bundle id,
+//! data folder, Keychain items and icon:
+//! - **prod** ("bleep"): the release.
+//! - **nightly** ("bleep (nightly)", cargo feature `nightly`): built by CI from `main` every
+//!   night. It does everything prod does, but updates from the nightly feed only.
+//! - **local** ("bleep (local)", cargo feature `local`): built on this Mac from the repo. It
+//!   never updates itself, never sets a login item and starts paused.
+//! The Claude Code hook is shared: one hook entry, and it reaches every running app. Only the
+//! first running app in `ALL` order (prod, nightly, local) answers agents. See `bleep-hook`.
+use std::path::{Path, PathBuf};
 
-pub const DEV: bool = cfg!(feature = "dev");
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Flavor {
+    Prod,
+    Nightly,
+    Local,
+}
+
+impl Flavor {
+    /// Priority order: the first running app answers agents.
+    pub const ALL: [Flavor; 3] = [Flavor::Prod, Flavor::Nightly, Flavor::Local];
+
+    /// Data folder under the home folder. `bleep-hook` has the same list.
+    pub const fn home_dir(self) -> &'static str {
+        match self {
+            Flavor::Prod => ".bleep",
+            Flavor::Nightly => ".bleep-nightly",
+            Flavor::Local => ".bleep-local",
+        }
+    }
+
+    /// The short tag after the name, or "" for prod.
+    pub const fn tag(self) -> &'static str {
+        match self {
+            Flavor::Prod => "",
+            Flavor::Nightly => "nightly",
+            Flavor::Local => "local",
+        }
+    }
+}
+
+pub const FLAVOR: Flavor = if cfg!(feature = "local") {
+    Flavor::Local
+} else if cfg!(feature = "nightly") {
+    Flavor::Nightly
+} else {
+    Flavor::Prod
+};
+
+/// A local build: no updates, no login item, starts paused.
+pub const LOCAL: bool = matches!(FLAVOR, Flavor::Local);
 
 /// The name people see: windows, tray, notifications.
-pub const NAME: &str = if DEV { "bleep (dev)" } else { "bleep" };
+pub const NAME: &str = match FLAVOR {
+    Flavor::Prod => "bleep",
+    Flavor::Nightly => "bleep (nightly)",
+    Flavor::Local => "bleep (local)",
+};
 
 /// Keychain service for Google, remote MCP and API key secrets.
-pub const KEYCHAIN_SERVICE: &str = if DEV { "site.avirooppaul.bleep.dev" } else { "site.avirooppaul.bleep" };
+pub const KEYCHAIN_SERVICE: &str = match FLAVOR {
+    Flavor::Prod => "site.avirooppaul.bleep",
+    Flavor::Nightly => "site.avirooppaul.bleep.nightly",
+    Flavor::Local => "site.avirooppaul.bleep.local",
+};
 
 /// Data folder under the home folder.
-pub const HOME_DIR: &str = if DEV { ".bleep-dev" } else { ".bleep" };
+pub const HOME_DIR: &str = FLAVOR.home_dir();
 
-/// The production data folder, which a dev build reads once to seed itself.
-pub const PROD_HOME_DIR: &str = ".bleep";
+/// The production data folder, which nightly and local builds read once to seed themselves.
+pub const PROD_HOME_DIR: &str = Flavor::Prod.home_dir();
 
-/// A first dev run starts from a copy of the production data, so Usage and the chat have real
+/// The data folder of the old "bleep (dev)" build, which a local build takes over once.
+pub const OLD_DEV_HOME_DIR: &str = ".bleep-dev";
+
+/// The agent-watch socket of each flavor, in priority order.
+pub fn sockets(home: &Path) -> Vec<(Flavor, PathBuf)> {
+    Flavor::ALL.iter().map(|f| (*f, home.join(f.home_dir()).join("run").join("bleep.sock"))).collect()
+}
+
+/// True when no app before this one in priority order is running, so this app answers agents
+/// (Claude Code permissions and replies, Codex approvals).
+pub fn answers_agents(home: &Path) -> bool {
+    first_live(&sockets(home), |p| std::os::unix::net::UnixStream::connect(p).is_ok()).map_or(true, |f| f == FLAVOR)
+}
+
+fn first_live(socks: &[(Flavor, PathBuf)], live: impl Fn(&Path) -> bool) -> Option<Flavor> {
+    socks.iter().find(|(_, p)| live(p)).map(|(f, _)| *f)
+}
+
+/// A first nightly or local run starts from a copy of the production data, so Usage and the chat have real
 /// history to show. Copies the database (a consistent snapshot), config, agent rules and memory.
 /// Does nothing when the dev data already exists or there is no production data. Returns true
 /// when it seeded.
@@ -82,6 +153,17 @@ mod tests {
         std::fs::write(dev.join("memory/USER.md"), "changed in dev").unwrap();
         assert!(!seed_from(&prod, &dev).unwrap(), "a second run must not overwrite dev data");
         assert_eq!(std::fs::read_to_string(dev.join("memory/USER.md")).unwrap(), "changed in dev");
+    }
+
+    #[test]
+    fn first_running_app_answers() {
+        let socks = sockets(Path::new("/h"));
+        assert_eq!(socks[0].1, PathBuf::from("/h/.bleep/run/bleep.sock"));
+        assert_eq!(socks[2].1, PathBuf::from("/h/.bleep-local/run/bleep.sock"));
+        let only = |name: &'static str| move |p: &Path| p.starts_with(format!("/h/{name}/"));
+        assert_eq!(first_live(&socks, only(".bleep-nightly")), Some(Flavor::Nightly));
+        assert_eq!(first_live(&socks, |_| true), Some(Flavor::Prod));
+        assert_eq!(first_live(&socks, |_| false), None);
     }
 
     #[test]

@@ -114,12 +114,21 @@ fn open_claude_login(state: tauri::State<'_, AppState>) -> Result<(), String> {
 
 fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let paths = BleepPaths::from_env();
-    if flavor::DEV && std::env::var("BLEEP_HOME").map_or(true, |v| v.is_empty()) {
+    if flavor::FLAVOR != flavor::Flavor::Prod && std::env::var("BLEEP_HOME").map_or(true, |v| v.is_empty()) {
+        let home = dirs::home_dir().unwrap_or_default();
+        // "bleep (dev)" became "bleep (local)": take over its data folder once.
+        let old = home.join(flavor::OLD_DEV_HOME_DIR);
+        if flavor::LOCAL && !paths.root.exists() && old.is_dir() {
+            match std::fs::rename(&old, &paths.root) {
+                Ok(()) => eprintln!("{}: moved {} to {}", flavor::NAME, old.display(), paths.root.display()),
+                Err(e) => eprintln!("{}: could not move {}: {e}", flavor::NAME, old.display()),
+            }
+        }
         match flavor::seed_from(&BleepPaths::prod_root(), &paths.root) {
             Ok(true) => {
-                eprintln!("bleep (dev): copied the production data to {}", paths.root.display());
-                // Two apps listening for one wake word would both answer. Turn it on in the
-                // dev build's own settings to test voice there.
+                eprintln!("{}: copied the production data to {}", flavor::NAME, paths.root.display());
+                // Two apps listening for one wake word would both answer. Turn it on in this
+                // build's own settings to use voice here.
                 let mut c = Config::load(&paths.config_file)?;
                 if c.voice.wake {
                     c.voice.wake = false;
@@ -127,7 +136,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
                 }
             }
             Ok(false) => {}
-            Err(e) => eprintln!("bleep (dev): could not copy the production data: {e}"),
+            Err(e) => eprintln!("{}: could not copy the production data: {e}", flavor::NAME),
         }
     }
     paths.ensure()?;
@@ -304,14 +313,12 @@ fn start_agent_watch(app: &tauri::App, store: Arc<Store>, runtime: Arc<dyn runti
     let codex = agentwatch::codex::CodexWatch::new(watch.clone(), store);
     app.manage(codex.clone());
     app.manage(watch.clone());
-    // An older install lacks the reply hook and the long permission wait. A dev build never
-    // rewrites the hooks: they belong to the production app.
-    if !flavor::DEV {
-        match agentwatch::install::upgrade_claude(&agentwatch::install::HookFiles::real(&paths)) {
-            Ok(true) => eprintln!("bleep: updated the Claude Code hooks"),
-            Ok(false) => {}
-            Err(e) => eprintln!("bleep: could not update the Claude Code hooks: {e}"),
-        }
+    // An older install lacks the reply hook and the long permission wait. The hook is shared by
+    // every build, so any of them may bring it up to date.
+    match agentwatch::install::upgrade_claude(&agentwatch::install::HookFiles::real(&paths)) {
+        Ok(true) => eprintln!("bleep: updated the Claude Code hooks"),
+        Ok(false) => {}
+        Err(e) => eprintln!("bleep: could not update the Claude Code hooks: {e}"),
     }
     let sock = paths.sock.clone();
     tauri::async_runtime::spawn(async move {
@@ -320,8 +327,9 @@ fn start_agent_watch(app: &tauri::App, store: Arc<Store>, runtime: Arc<dyn runti
         }
     });
     let h = app.handle().clone();
-    // A dev build never answers Codex approvals: the production app does.
-    tauri::async_runtime::spawn(codex.run(agents::codex_home(), Arc::new(move || !flavor::DEV && h.state::<AppState>().config.lock().unwrap().agents.codex_watch)));
+    // Only the first running build (prod, then nightly, then local) answers Codex approvals.
+    let home = dirs::home_dir().unwrap_or_default();
+    tauri::async_runtime::spawn(codex.run(agents::codex_home(), Arc::new(move || h.state::<AppState>().config.lock().unwrap().agents.codex_watch && flavor::answers_agents(&home))));
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -342,9 +350,9 @@ pub fn run() {
             let store = state.store.clone();
             app.manage(state);
             let ui = windows::UiState::default();
-            // A dev build starts paused, so it does not ping or check in twice next to the
+            // A local build starts paused, so it does not ping or check in twice next to the
             // production app. Reminders still fire. Resume from the tray.
-            ui.paused.store(flavor::DEV, std::sync::atomic::Ordering::SeqCst);
+            ui.paused.store(flavor::LOCAL, std::sync::atomic::Ordering::SeqCst);
             let paused = ui.paused.clone();
             app.manage(reminders.clone());
             tauri::async_runtime::spawn(reminders.run());

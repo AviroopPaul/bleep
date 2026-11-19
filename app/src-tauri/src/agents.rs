@@ -94,38 +94,26 @@ pub fn agents_settings(state: tauri::State<'_, AppState>) -> AgentSettings {
     now_settings(&state)
 }
 
-/// The Claude Code hooks and the Codex notify setting belong to the production app.
-fn dev_guard() -> Result<(), String> {
-    if crate::flavor::DEV {
-        return Err("bleep (dev) does not change Claude Code or Codex settings. Use the production app for this.".into());
-    }
-    Ok(())
-}
-
 #[tauri::command]
 pub fn agents_install_claude(state: tauri::State<'_, AppState>) -> Result<AgentSettings, String> {
-    dev_guard()?;
     install::install_claude(&HookFiles::real(&state.paths))?;
     Ok(now_settings(&state))
 }
 
 #[tauri::command]
 pub fn agents_remove_claude(state: tauri::State<'_, AppState>) -> Result<AgentSettings, String> {
-    dev_guard()?;
     install::remove_claude(&HookFiles::real(&state.paths))?;
     Ok(now_settings(&state))
 }
 
 #[tauri::command]
 pub fn agents_install_codex_notify(state: tauri::State<'_, AppState>) -> Result<AgentSettings, String> {
-    dev_guard()?;
     install::install_codex_notify(&HookFiles::real(&state.paths))?;
     Ok(now_settings(&state))
 }
 
 #[tauri::command]
 pub fn agents_remove_codex_notify(state: tauri::State<'_, AppState>) -> Result<AgentSettings, String> {
-    dev_guard()?;
     install::remove_codex_notify(&HookFiles::real(&state.paths))?;
     Ok(now_settings(&state))
 }

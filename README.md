@@ -126,7 +126,7 @@ npm run tauri dev
 
 You need Node 22+, a current stable Rust toolchain and Xcode Command Line Tools. Gmail and Calendar need a Google Cloud OAuth client of type Desktop app. See [`app/README.md`](app/README.md) for Google setup, model modes and every setting.
 
-`npm run build:dev` builds a separate "bleep (dev)" app with its own data folder (`~/.bleep-dev`), so you can test changes next to the released app.
+`npm run build:local` builds a separate "bleep (local)" app with its own data folder (`~/.bleep-local`), so you can test changes next to the released app. `npm run dev:local` runs it without bundling. A "bleep (nightly)" build of `main` is published every night to the `nightly` release of [bleep-releases](https://github.com/AviroopPaul/bleep-releases/releases/tag/nightly).
 
 ### Tests
 

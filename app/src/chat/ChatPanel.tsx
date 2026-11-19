@@ -10,7 +10,7 @@ import { Markdown } from "./Markdown";
 import { Avatar, useAvatar } from "../avatar/Avatar";
 import { AgentsView, useAgents } from "../agents/AgentsView";
 import { RemindersView, useReminders } from "../reminders/RemindersView";
-import { DEV, NAME } from "../flavor";
+import { NAME, TAG } from "../flavor";
 
 const PAGE = 50;
 const SUGGESTIONS = ["What time is it in Tokyo?", "What day is it today?"];
@@ -228,7 +228,7 @@ export function ChatPanel() {
       <header className="panel-head" data-tauri-drag-region>
         <span className="head-mark">
           <span className="head-droid">{avatar && <Avatar cfg={avatar} still />}</span>
-          {DEV && <span className="head-dev" aria-hidden="true">dev</span>}
+          {TAG && <span className="head-dev" aria-hidden="true">{TAG}</span>}
         </span>
         {/* The tabs and buttons need the room, so the buddy's head is the brand mark here. */}
         <h1 className="sr-only">{NAME}</h1>

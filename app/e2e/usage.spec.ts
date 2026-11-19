@@ -36,10 +36,10 @@ test("usage shows API cost when an API key ran", async ({ page }) => {
   await expect(page.locator(".us-v").filter({ hasText: "$0.42" })).toBeVisible();
 });
 
-test("dev build shows (dev) in the header and the header still fits", async ({ page }) => {
-  await page.goto("/?mock=1&dev=1&agents=1&rem=1&ctxhigh=1#chat");
-  await expect(page.getByRole("heading", { name: "bleep (dev)" })).toBeVisible();
-  await expect(page.locator(".head-dev")).toHaveText("dev");
+test("local build shows (local) in the header and the header still fits", async ({ page }) => {
+  await page.goto("/?mock=1&flavor=local&agents=1&rem=1&ctxhigh=1#chat");
+  await expect(page.getByRole("heading", { name: "bleep (local)" })).toBeVisible();
+  await expect(page.locator(".head-dev")).toHaveText("local");
   const fits = await page.locator(".panel-head").evaluate((el) => el.scrollWidth <= el.clientWidth);
   expect(fits).toBe(true);
 });

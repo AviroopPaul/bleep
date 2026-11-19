@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "bleep (local)",
+  "mainBinaryName": "bleep-local",
+  "identifier": "site.avirooppaul.bleep.local",
+  "build": {
+    "beforeBuildCommand": "npm run build:hook && VITE_BLEEP_FLAVOR=local npm run build"
+  },
+  "bundle": {
+    "icon": [
+      "icons-local/32x32.png",
+      "icons-local/128x128.png",
+      "icons-local/128x128@2x.png",
+      "icons-local/icon.icns",
+      "icons-local/icon.ico"
+    ]
+  }
+}

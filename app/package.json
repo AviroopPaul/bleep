@@ -11,7 +11,8 @@
     "build:hook": "cargo build --release --manifest-path bleep-hook/Cargo.toml && mkdir -p src-tauri/binaries && cp bleep-hook/target/release/bleep-hook src-tauri/binaries/bleep-hook-$(rustc -vV | sed -n 's/^host: //p')",
     "test": "vitest run --dir src",
     "e2e": "playwright test",
-    "build:dev": "./scripts/install-dev.sh"
+    "build:local": "./scripts/install-local.sh",
+    "dev:local": "VITE_BLEEP_FLAVOR=local tauri dev --config src-tauri/tauri.local.conf.json --features local"
   },
   "dependencies": {
     "@fontsource/fredoka": "^5",

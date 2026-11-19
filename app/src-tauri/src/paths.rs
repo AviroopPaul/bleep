@@ -25,8 +25,8 @@ impl MemFile {
     }
 }
 
-/// Every place bleep keeps data on disk. Root is `$BLEEP_HOME`, or `~/.bleep` (`~/.bleep-dev`
-/// for a dev build).
+/// Every place bleep keeps data on disk. Root is `$BLEEP_HOME`, or `~/.bleep` (`~/.bleep-nightly`
+/// or `~/.bleep-local` for those builds).
 #[derive(Clone, Debug)]
 pub struct BleepPaths {
     pub root: PathBuf,
@@ -59,15 +59,20 @@ impl BleepPaths {
     pub fn from_env() -> Self {
         let custom = std::env::var("BLEEP_HOME").ok().filter(|s| !s.is_empty());
         let mut p = Self::from_root(resolve_root(custom.clone()));
-        if crate::flavor::DEV && custom.is_none() {
-            // A dev build shares the production app's Claude sign-in, so it needs no second
+        if custom.is_none() {
+            // Every build shares one hook binary, so the Claude Code hook entry is the same
+            // whichever app installed it.
+            p.hook_bin = home().join(crate::flavor::PROD_HOME_DIR).join("bin").join("bleep-hook");
+        }
+        if crate::flavor::LOCAL && custom.is_none() {
+            // A local build shares the production app's Claude sign-in, so it needs no second
             // login. Its chat sessions stay its own: they run in its own working folder.
             p.claude_home = home().join(crate::flavor::PROD_HOME_DIR).join("claude-home");
         }
         p
     }
 
-    /// The production data folder a dev build seeds from.
+    /// The production data folder a nightly or local build seeds from.
     pub fn prod_root() -> PathBuf {
         home().join(crate::flavor::PROD_HOME_DIR)
     }

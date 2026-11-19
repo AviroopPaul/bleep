@@ -7,14 +7,17 @@ edition = "2024"
 
 [lib]
 name = "bleep_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# macOS only: the staticlib and cdylib from the Tauri template are for mobile.
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
 
 [features]
-# "bleep (dev)": its own data folder, Keychain items and bundle id. See src/flavor.rs.
-dev = []
+# "bleep (nightly)" and "bleep (local)": their own data folder, Keychain items and bundle id.
+# See src/flavor.rs.
+nightly = []
+local = []
 
 [dependencies]
 tauri = { version = "2.12", features = ["macos-private-api", "tray-icon"] }
@@ -64,6 +67,14 @@ pdf-extract = "0.12.1"
 
 [dev-dependencies]
 tempfile = "3"
+
+[profile.dev]
+# Line tables keep file:line in backtraces. Full debug info left about 20 GB of .o files.
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+# No debug info for dependencies, so rustc deletes their object files after linking.
+debug = false
 
 [profile.release]
 codegen-units = 1

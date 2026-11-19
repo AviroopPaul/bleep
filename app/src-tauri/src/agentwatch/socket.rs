@@ -68,6 +68,10 @@ async fn one(stream: tokio::net::UnixStream, handler: Arc<dyn HookHandler>, budg
     if BufReader::new(r.take(MAX_LINE)).read_line(&mut line).await.is_err() {
         return;
     }
+    // An empty connection is another bleep build checking whether this one runs.
+    if line.trim().is_empty() {
+        return;
+    }
     let reply = match parse_hook(&line) {
         Ok(msg) => {
             let wait = msg.wait;
