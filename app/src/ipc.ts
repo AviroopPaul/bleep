@@ -167,6 +167,8 @@ export interface AgentSettings {
   auto_approve: boolean;
   screenshot_check: boolean;
   codex_watch: boolean;
+  /** Questions in the desktop app's next-step box: off, shadow (log only) or on. */
+  auto_answer: "off" | "shadow" | "on";
   rules_path: string;
 }
 
@@ -405,8 +407,9 @@ export const api = {
   agentsRemoveClaude: () => invoke<AgentSettings>("agents_remove_claude"),
   agentsInstallCodexNotify: () => invoke<AgentSettings>("agents_install_codex_notify"),
   agentsRemoveCodexNotify: () => invoke<AgentSettings>("agents_remove_codex_notify"),
-  agentsSet: (autoApprove: boolean, screenshotCheck: boolean, codexWatch: boolean) =>
-    invoke<AgentSettings>("agents_set", { autoApprove, screenshotCheck, codexWatch }),
+  agentsSet: (autoApprove: boolean, screenshotCheck: boolean, codexWatch: boolean, autoAnswer: AgentSettings["auto_answer"]) =>
+    invoke<AgentSettings>("agents_set", { autoApprove, screenshotCheck, codexWatch, autoAnswer }),
+  agentsKeep: (askId: number) => invoke<void>("agents_keep", { askId }),
   agentsRevealRules: () => invoke<void>("agents_reveal_rules"),
   connectorsList: () => invoke<ConnectorsView>("connectors_list"),
   remoteAdd: (req: AddServer) => invoke<AddOutcome>("remote_add", { req }),

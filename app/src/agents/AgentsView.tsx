@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, onAgents, type AgentAsk, type AgentChatLine, type AgentSession, type AgentsView as View } from "../ipc";
 import { Markdown } from "../chat/Markdown";
-import { ago, answersFor, askDetail, choicesOf, folder, groupSessions, handledLine, type Choice } from "./agentsText";
+import { ago, answerNote, answersFor, askDetail, choicesOf, folder, groupSessions, handledLine, type Choice } from "./agentsText";
 
 const EMPTY: View = { sessions: [], asks: [], held: [], replyable: [] };
 
@@ -144,6 +144,25 @@ function AnswerCard({ v, s, ask, onDone }: { v: View; s: AgentSession; ask?: Age
   const choices = ask && held ? choicesOf(ask) : null;
   const replyable = s.tool === "claude" && v.replyable.includes(s.id);
   const err = error && <p className="set-err" role="alert">{error}</p>;
+  const note = ask ? answerNote(ask) : null;
+  const auto = note && ask && (
+    <div className="ag-auto" role="status">
+      {note.kind === "pending" && (
+        note.delaySecs > 0 ? (
+          <>
+            <p className="ag-why">bleep will answer "{note.label}" in {note.delaySecs} s.</p>
+            <button className="btn" disabled={busy} onClick={() => void run(() => api.agentsKeep(ask.id))}>Keep for me</button>
+          </>
+        ) : (
+          <p className="ag-why">bleep is answering "{note.label}" for you.</p>
+        )
+      )}
+      {note.kind === "shadow" && (
+        <p className="ag-why">Log only: bleep would answer "{note.label}"{note.wouldSend === false ? ", but the model check said no" : ""}.</p>
+      )}
+      {note.kind === "held" && <p className="ag-why">{note.why}</p>}
+    </div>
+  );
 
   if (ask && choices) {
     return (
@@ -173,6 +192,7 @@ function AnswerCard({ v, s, ask, onDone }: { v: View; s: AgentSession; ask?: Age
     return (
       <section className="ag-card reply" aria-label="Reply">
         {ask?.kind === "question" && <h3 className="ag-card-h">{ask.summary}</h3>}
+        {auto}
         <ReplyForm busy={busy} onSend={(t) => void run(() => api.agentsReply(s.id, t))} />
         {err}
       </section>
@@ -182,6 +202,7 @@ function AnswerCard({ v, s, ask, onDone }: { v: View; s: AgentSession; ask?: Age
     return (
       <section className="ag-card" aria-label="Answer elsewhere">
         {ask && <h3 className="ag-card-h">{ask.summary}</h3>}
+        {auto}
         <p className="ag-why">{s.tool === "claude" ? "Answer this one in the terminal." : "Answer this one in Codex."}</p>
       </section>
     );

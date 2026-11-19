@@ -25,6 +25,10 @@ pub struct AgentRules {
     pub auto: Vec<String>,
     pub ask: Vec<String>,
     pub read_tools: Vec<String>,
+    /// Words that let bleep send the agent's own first button for me.
+    pub answer_auto: Vec<String>,
+    /// Words in a question or its first button that always keep it for me.
+    pub answer_ask: Vec<String>,
 }
 
 pub const DEFAULT_RULES: &str = r#"# What bleep may approve in your coding agents. Anything not under auto asks you.
@@ -42,6 +46,16 @@ ask = ["git push", "--force", "-f", "rm", "rmdir", "unlink", "sudo", "deploy", "
   "~--pre", "~-exec", "~-toolexec", "~--config", "~--output", "~--fix", "~--ext-diff", "~--hostname-bin", "~--search-zip",
   "~.env", "~secret", "~id_rsa", "~id_ed25519", "~id_ecdsa", "~.ssh", "~keychain", "~token", "~.pem", "~.key", "~.p12", "~.pfx",
   "~.npmrc", "~.netrc", "~.pypirc", "~credential", "~password", "~.aws", "~.kube", "~.gnupg", "~.git/", "~service-account"]
+
+# Questions an agent leaves in the Claude desktop app's next-step box. bleep may send the
+# agent's own first button for you when that button has a word from answer_auto, and
+# neither the button nor the question has a word from answer_ask. Whole words, any case.
+answer_auto = ["start", "plan", "write", "native", "run", "build", "rebuild", "fix", "add", "rename", "save", "commit", "push", "open pr",
+  "open a pr", "check", "continue", "carry on", "go on", "merge", "rebase", "next", "approve", "approved", "verify", "update"]
+answer_ask = ["ship", "deploy", "release", "prod", "production", "live", "vercel", "public", "open source", "publish", "delete", "remove",
+  "clear", "reset", "drop", "wipe", "undone", "install", "uninstall", "quit", "stop", "kill", "pay", "buy", "purchase", "send", "email",
+  "post", "force", "secret", "token", "password", "credential", "feel", "feels", "look", "looks", "works", "test first", "try", "tried",
+  "review", "not yet"]
 "#;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -55,13 +69,22 @@ pub enum RuleVerdict {
 pub fn load_rules(path: &Path) -> AgentRules {
     let defaults: AgentRules = toml::from_str(DEFAULT_RULES).unwrap_or_default();
     match std::fs::read_to_string(path) {
-        Ok(text) => match text.parse::<toml::Table>().and_then(|t| Ok((t.contains_key("ask"), toml::from_str::<AgentRules>(&text)?))) {
+        Ok(text) => match text.parse::<toml::Table>().and_then(|t| Ok(((t.contains_key("ask"), t.contains_key("answer_auto"), t.contains_key("answer_ask")), toml::from_str::<AgentRules>(&text)?))) {
             // A file without an ask list keeps the default one: leaving it out must not
-            // turn the safety list off.
-            Ok((has_ask, rules)) => if has_ask { rules } else { AgentRules { ask: defaults.ask, ..rules } },
+            // turn the safety list off. Files from before auto-answer get its lists too.
+            Ok((has, rules)) => {
+                let mut r = if has.0 { rules } else { AgentRules { ask: defaults.ask.clone(), ..rules } };
+                if !has.1 {
+                    r.answer_auto = defaults.answer_auto.clone();
+                }
+                if !has.2 {
+                    r.answer_ask = defaults.answer_ask.clone();
+                }
+                r
+            }
             Err(e) => {
                 eprintln!("bleep: {} does not parse, so every agent ask goes to you: {e}", path.display());
-                AgentRules { auto: vec![], read_tools: vec![], ..defaults }
+                AgentRules { auto: vec![], read_tools: vec![], answer_auto: vec![], ..defaults }
             }
         },
         Err(_) => {
@@ -456,6 +479,19 @@ mod tests {
         assert!(r.auto.is_empty());
         assert!(!matches!(check(&r, &bash("npm test")), RuleVerdict::Allow { .. }));
         assert!(!matches!(check(&r, &tool("Read", &["/Users/me/code/shop/a.ts"])), RuleVerdict::Allow { .. }));
+    }
+
+    #[test]
+    fn old_rules_file_gets_the_answer_lists() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("agent-rules.toml");
+        std::fs::write(&p, "auto = [\"npm test\"]\nask = [\"rm\"]\n").unwrap();
+        let r = load_rules(&p);
+        assert_eq!((r.answer_auto, r.answer_ask), (rules().answer_auto, rules().answer_ask));
+        std::fs::write(&p, "answer_auto = []\n").unwrap();
+        assert!(load_rules(&p).answer_auto.is_empty(), "my own empty list wins");
+        std::fs::write(&p, "auto = [this is not toml").unwrap();
+        assert!(load_rules(&p).answer_auto.is_empty(), "a bad file answers nothing");
     }
 
     #[test]

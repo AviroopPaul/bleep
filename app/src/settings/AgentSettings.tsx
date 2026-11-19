@@ -39,6 +39,13 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
+const ANSWER_MODES: [AgentSettings["auto_answer"], string][] = [["off", "Off"], ["shadow", "Log only"], ["on", "On"]];
+const ANSWER_HELP: Record<AgentSettings["auto_answer"], string> = {
+  off: "bleep never answers for you.",
+  shadow: "bleep decides and logs what it would send, next to what you typed. It sends nothing.",
+  on: "bleep sends the first button right away and tells you what it sent.",
+};
+
 export function AgentSettingsTab({ onChange }: { onChange?: (s: AgentSettings) => void } = {}) {
   const [s, setS] = useState<AgentSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +65,7 @@ export function AgentSettingsTab({ onChange }: { onChange?: (s: AgentSettings) =
   if (!s) return null;
   const set = (patch: Partial<AgentSettings>) => {
     const n = { ...s, ...patch };
-    return run(() => api.agentsSet(n.auto_approve, n.screenshot_check, n.codex_watch));
+    return run(() => api.agentsSet(n.auto_approve, n.screenshot_check, n.codex_watch, n.auto_answer));
   };
   return (
     <div className="mail-set">
@@ -89,6 +96,21 @@ export function AgentSettingsTab({ onChange }: { onChange?: (s: AgentSettings) =
         <Toggle label="Approve safe asks by my rules" checked={s.auto_approve} onChange={(v) => void set({ auto_approve: v })} />
         <Toggle label="Check screenshots with a small model" checked={s.screenshot_check} onChange={(v) => void set({ screenshot_check: v })} />
         <button className="btn" onClick={() => void api.agentsRevealRules()}>Show rules file</button>
+      </section>
+      <section aria-labelledby="ag-answer-h">
+        <h3 id="ag-answer-h" className="mail-h">Answers</h3>
+        <p className="set-lead">When Claude ends a turn with a question and buttons, bleep can send its first button for you. Only go-aheads on your rules' answer list qualify, never ship, release, delete or taste calls. A small model can still say no.</p>
+        <div className="choice" role="radiogroup" aria-label="Auto-answer">
+          {ANSWER_MODES.map(([mode, label]) => (
+            <label key={mode} className={`choice-opt ${s.auto_answer === mode ? "on" : ""}`}>
+              <input type="radio" name="auto-answer" aria-label={label} checked={s.auto_answer === mode} onChange={() => void set({ auto_answer: mode })} />
+              <span>
+                <b>{label}</b>
+                <small>{ANSWER_HELP[mode]}</small>
+              </span>
+            </label>
+          ))}
+        </div>
       </section>
       {error && <p className="set-err" role="alert">{error}</p>}
     </div>

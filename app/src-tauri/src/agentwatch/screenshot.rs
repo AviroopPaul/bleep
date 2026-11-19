@@ -91,7 +91,7 @@ mod tests {
     }
 
     fn tail(q: &str, image: bool) -> Tail {
-        Tail { original_ask: Some("Make the button blue".into()), last_question: Some(q.into()), image: image.then(img) }
+        Tail { original_ask: Some("Make the button blue".into()), last_question: Some(q.into()), image: image.then(img), next_step: None }
     }
 
     fn v(matches: bool, confidence: &str) -> LookVerdict {

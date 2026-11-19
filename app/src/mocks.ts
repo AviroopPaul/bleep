@@ -113,7 +113,7 @@ export function installMocks(label: string) {
       { role: "tool", text: "Bash: git push --force origin main" },
     ];
   }
-  let agentSet: AgentSettings = { claude_hooks: false, codex_notify: false, codex_running: true, auto_approve: false, screenshot_check: true, codex_watch: false, rules_path: "/Users/me/.bleep/agent-rules.toml" };
+  let agentSet: AgentSettings = { claude_hooks: false, codex_notify: false, codex_running: true, auto_approve: false, screenshot_check: true, codex_watch: false, auto_answer: "shadow", rules_path: "/Users/me/.bleep/agent-rules.toml" };
   // ?memory=1: facts, suggestions, a compaction divider and a nearly full chat.
   const memOn = q.has("memory");
   // ?update=new: a newer release is out. Otherwise bleep is up to date.
@@ -371,6 +371,11 @@ export function installMocks(label: string) {
           later(20, () => void emit("agents://changed", {}));
           return null;
         }
+        case "agents_keep":
+          calls.push(`agents_keep:${a.askId}`);
+          asks = asks.map((x) => (x.id === a.askId ? { ...x, payload: { ...x.payload, kept: true } } : x));
+          later(20, () => void emit("agents://changed", {}));
+          return null;
         case "agents_decide": {
           calls.push(`agents_decide:${a.askId}:${a.approve}`);
           const ask = asks.find((x) => x.id === a.askId);
@@ -394,8 +399,8 @@ export function installMocks(label: string) {
           return agentSet;
         }
         case "agents_set":
-          calls.push(`agents_set:${a.autoApprove}:${a.screenshotCheck}:${a.codexWatch}`);
-          agentSet = { ...agentSet, auto_approve: !!a.autoApprove, screenshot_check: !!a.screenshotCheck, codex_watch: !!a.codexWatch };
+          calls.push(`agents_set:${a.autoApprove}:${a.screenshotCheck}:${a.codexWatch}:${a.autoAnswer}`);
+          agentSet = { ...agentSet, auto_approve: !!a.autoApprove, screenshot_check: !!a.screenshotCheck, codex_watch: !!a.codexWatch, auto_answer: (a.autoAnswer as AgentSettings["auto_answer"]) ?? agentSet.auto_answer };
           return agentSet;
         case "agents_reveal_rules":
           calls.push(cmd);

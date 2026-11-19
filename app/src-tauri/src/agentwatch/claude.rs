@@ -92,6 +92,12 @@ pub fn reply_output(text: &str) -> Value {
     json!({"rewake": format!("The user replied from bleep:\n\n{}", text.trim())})
 }
 
+/// bleep's auto-answer: the agent's own first suggested reply, with a fixed note. No model
+/// text goes in.
+pub fn auto_reply_output(label: &str) -> Value {
+    json!({"rewake": format!("bleep answered for the user with your first suggested reply, as their auto-answer rules allow:\n\n{}", label.trim())})
+}
+
 /// The question texts of an AskUserQuestion input.
 pub fn question_texts(questions: &Value) -> Vec<String> {
     questions.as_array().into_iter().flatten().filter_map(|q| q.get("question").and_then(Value::as_str)).map(str::to_string).collect()
@@ -173,6 +179,8 @@ mod tests {
         assert_eq!(question_texts(&qs), vec!["Which DB?".to_string()]);
         assert_eq!(deny_output()["hookSpecificOutput"]["decision"]["behavior"], "deny");
         assert_eq!(reply_output("  Yes, go.\n"), json!({"rewake": "The user replied from bleep:\n\nYes, go."}));
+        let auto = auto_reply_output(" Merge it ");
+        assert!(auto["rewake"].as_str().unwrap().ends_with("\n\nMerge it") && !auto.to_string().contains('\u{2014}'));
     }
 
     #[test]

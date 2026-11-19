@@ -164,7 +164,11 @@ test("agents tab toggles call agents_set", async ({ page }) => {
   await expect(page.getByRole("switch", { name: "Check screenshots with a small model" })).toBeChecked();
   await auto.click();
   await expect(auto).toBeChecked();
-  expect(await calls(page)).toContain("agents_set:true:true:false");
+  expect(await calls(page)).toContain("agents_set:true:true:false:shadow");
+  const answers = page.getByRole("radiogroup", { name: "Auto-answer" });
+  await expect(answers.getByRole("radio", { name: "Log only", exact: true })).toBeChecked();
+  await answers.getByRole("radio", { name: "On", exact: true }).check();
+  expect(await calls(page)).toContain("agents_set:true:true:false:on");
   await page.getByRole("button", { name: "Show rules file" }).click();
   expect(await calls(page)).toContain("agents_reveal_rules");
 });
