@@ -309,7 +309,8 @@ fn start_agent_watch(app: &tauri::App, store: Arc<Store>, runtime: Arc<dyn runti
         rules: Arc::new(move || agentwatch::rules::load_rules(&rules_file)),
         cfg: Arc::new(move || h1.state::<AppState>().config.lock().unwrap().agents.clone()),
         paused,
-        checker: agentwatch::screenshot::ModelChecker::new(runtime, store.clone()),
+        checker: agentwatch::screenshot::ModelChecker::new(runtime.clone(), store.clone()),
+        vetter: agentwatch::answer::ModelVetter::new(runtime, store.clone()),
         ping: notifier,
         emit: Arc::new(move || {
             let _ = h2.emit("agents://changed", ());
@@ -473,6 +474,7 @@ pub fn run() {
             agents::agents_decide,
             agents::agents_choose,
             agents::agents_reply,
+            agents::agents_keep,
             agents::agents_chat,
             agents::agents_settings,
             agents::agents_install_claude,

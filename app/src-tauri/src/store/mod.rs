@@ -842,6 +842,31 @@ impl Store {
         Ok(self.db().prepare(&sql)?.query_map(params![limit as i64], row_to_ask)?.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Adds or replaces top-level keys in an ask's payload.
+    pub fn merge_ask_payload(&self, id: i64, patch: &serde_json::Value) -> Result<()> {
+        let db = self.db();
+        let cur: Option<String> = db.query_row("SELECT payload FROM agent_asks WHERE id = ?1", params![id], |r| r.get(0)).optional()?;
+        let Some(cur) = cur else { return Ok(()) };
+        let mut v: serde_json::Value = serde_json::from_str(&cur).unwrap_or_else(|_| serde_json::json!({}));
+        if let (Some(o), Some(p)) = (v.as_object_mut(), patch.as_object()) {
+            for (k, val) in p {
+                o.insert(k.clone(), val.clone());
+            }
+        }
+        db.execute("UPDATE agent_asks SET payload = ?2 WHERE id = ?1", params![id, v.to_string()])?;
+        Ok(())
+    }
+
+    /// How many asks of a session since `t` have this summary.
+    pub fn asks_like_since(&self, session_id: &str, summary: &str, t: DateTime<Utc>) -> Result<usize> {
+        let n: i64 = self.db().query_row(
+            "SELECT COUNT(*) FROM agent_asks WHERE session_id = ?1 AND summary = ?2 AND created_at >= ?3",
+            params![session_id, summary, ts(t)],
+            |r| r.get(0),
+        )?;
+        Ok(n as usize)
+    }
+
     /// Notes one screenshot "go on" for a session.
     pub fn push_go_on(&self, session_id: &str, t: DateTime<Utc>) -> Result<()> {
         let db = self.db();

@@ -12,6 +12,52 @@ pub struct Tail {
     pub last_question: Option<String>,
     /// The newest image since my last prompt (a screenshot).
     pub image: Option<ImageIn>,
+    /// The desktop app's next-step box of this turn: its question and buttons.
+    pub next_step: Option<NextStep>,
+}
+
+/// The question an agent put in the Claude desktop app's next-step box, and the replies
+/// its buttons send, first one first (the agent's own pick). Untrusted agent text.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
+pub struct NextStep {
+    pub ask: String,
+    pub labels: Vec<String>,
+}
+
+/// The desktop app's tool that draws the next-step box.
+pub const WRAP_UP_TOOL: &str = "mcp__ccd_turn__wrap_up";
+
+/// The words an app-action button stands for. Actions with no plain meaning are left out.
+fn action_words(action: &str) -> Option<&'static str> {
+    Some(match action {
+        "commit" => "Commit",
+        "create_pr" => "Open a PR",
+        "merge" => "Merge",
+        "verify" => "Verify",
+        _ => return None,
+    })
+}
+
+fn next_step(input: &Value) -> Option<NextStep> {
+    let ask = input.get("ask").and_then(Value::as_str).map(str::trim).filter(|a| !a.is_empty())?.to_string();
+    let labels = input
+        .get("actions")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|a| match a.get("action").and_then(Value::as_str) {
+            Some(act) => action_words(act).map(str::to_string),
+            None => a.get("label").and_then(Value::as_str).map(str::trim).filter(|l| !l.is_empty()).map(str::to_string),
+        })
+        .collect();
+    Some(NextStep { ask, labels })
+}
+
+/// The agent's words as a question: the text ends with "?", allowing for closing
+/// markdown such as "**" or "`".
+pub fn as_question(said: &str) -> Option<String> {
+    let said = said.trim();
+    said.trim_end_matches(['*', '_', '`', ' ']).ends_with('?').then(|| said.to_string())
 }
 
 pub const TAIL_BYTES: u64 = 512 * 1024;
@@ -56,9 +102,17 @@ pub fn read_tail(path: &Path, max_bytes: u64) -> Tail {
             }
             Some("assistant") => {
                 for b in content.and_then(Value::as_array).into_iter().flatten() {
-                    if b.get("type").and_then(Value::as_str) == Some("text") {
-                        let said = b.get("text").and_then(Value::as_str).unwrap_or("").trim();
-                        t.last_question = said.ends_with('?').then(|| said.to_string());
+                    match b.get("type").and_then(Value::as_str) {
+                        Some("text") => {
+                            let said = b.get("text").and_then(Value::as_str).unwrap_or("").trim();
+                            if !said.is_empty() {
+                                t.last_question = as_question(said);
+                            }
+                        }
+                        Some("tool_use") if b.get("name").and_then(Value::as_str) == Some(WRAP_UP_TOOL) => {
+                            t.next_step = b.get("input").and_then(next_step);
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -229,6 +283,37 @@ mod tests {
         let c = read_chat(&p, CHAT_BYTES, CHAT_LINES);
         let got: Vec<(&str, &str)> = c.iter().map(|l| (l.role, l.text.as_str())).collect();
         assert_eq!(got, vec![("user", "Add a DB"), ("tool", "Edit: cart.ts"), ("tool", "AskUserQuestion: Which DB?")]);
+    }
+
+    fn write_rows(rows: &[Value]) -> (tempfile::TempDir, std::path::PathBuf) {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("t.jsonl");
+        std::fs::write(&p, rows.iter().map(|r| r.to_string()).collect::<Vec<_>>().join("\n")).unwrap();
+        (d, p)
+    }
+
+    #[test]
+    fn tail_reads_the_next_step_box() {
+        use serde_json::json;
+        let wrap = |ask: &str| json!({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": WRAP_UP_TOOL, "input": {"recap": "r", "ask": ask, "actions": [{"label": "Merge it"}, {"action": "commit"}, {"action": "archive"}]}}]}});
+        let (_d, p) = write_rows(&[
+            json!({"type": "user", "message": {"content": "Open the PR"}}),
+            wrap("Merge PR 19 once CI is green?"),
+            json!({"type": "user", "message": {"content": [{"type": "tool_result", "content": "Shown."}]}}),
+            json!({"type": "assistant", "message": {"content": [{"type": "text", "text": "PR 19 is open. CI runs now."}]}}),
+        ]);
+        let t = read_tail(&p, TAIL_BYTES);
+        assert_eq!(t.next_step, Some(NextStep { ask: "Merge PR 19 once CI is green?".into(), labels: vec!["Merge it".into(), "Commit".into()] }));
+        assert_eq!(t.last_question, None, "the closing words are not a question");
+        // A new prompt starts a new turn: the old box is gone.
+        let (_d2, p2) = write_rows(&[wrap("Merge PR 19?"), json!({"type": "user", "message": {"content": "Merge it"}})]);
+        assert_eq!(read_tail(&p2, TAIL_BYTES).next_step, None);
+    }
+
+    #[test]
+    fn question_allows_closing_markdown() {
+        assert_eq!(as_question("Should I ship it?**").as_deref(), Some("Should I ship it?**"));
+        assert_eq!(as_question("Done. `npm test` passes."), None);
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! Agent watch (build plan 8.11): see my own Claude Code and Codex sessions that wait on
 //! me, approve the safe asks my rules allow, and list the rest.
+pub mod answer;
 pub mod claude;
 pub mod codex;
 pub mod hub;

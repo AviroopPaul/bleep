@@ -59,11 +59,15 @@ pub struct AgentsConfig {
     pub auto_approve: bool,
     pub screenshot_check: bool,
     pub codex_watch: bool,
+    /// Questions in the desktop app's next-step box: off, shadow (log only) or on.
+    pub auto_answer: crate::agentwatch::answer::AnswerMode,
+    /// Seconds bleep waits before it auto-answers, so I can stop it. 0: right away.
+    pub answer_delay_secs: u64,
 }
 
 impl Default for AgentsConfig {
     fn default() -> Self {
-        Self { auto_approve: false, screenshot_check: true, codex_watch: false }
+        Self { auto_approve: false, screenshot_check: true, codex_watch: false, auto_answer: Default::default(), answer_delay_secs: 0 }
     }
 }
 
@@ -404,7 +408,7 @@ mod tests {
     #[test]
     fn config_agents_defaults_off() {
         let c: Config = toml::from_str("").unwrap();
-        assert_eq!(c.agents, AgentsConfig { auto_approve: false, screenshot_check: true, codex_watch: false });
+        assert_eq!(c.agents, AgentsConfig { auto_approve: false, screenshot_check: true, codex_watch: false, auto_answer: crate::agentwatch::answer::AnswerMode::Shadow, answer_delay_secs: 0 });
         let c: Config = toml::from_str("[agents]\nauto_approve = true").unwrap();
         assert!(c.agents.auto_approve && c.agents.screenshot_check);
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ago, answersFor, askDetail, choicesOf, folder, groupSessions, handledLine } from "./agentsText";
+import { ago, answerNote, answersFor, askDetail, choicesOf, folder, groupSessions, handledLine } from "./agentsText";
 import type { AgentAsk, AgentSession } from "../ipc";
 
 const s = (id: string, state: AgentSession["state"]): AgentSession => ({
@@ -7,6 +7,23 @@ const s = (id: string, state: AgentSession["state"]): AgentSession => ({
 });
 const ask = (decision: AgentAsk["decision"], rule: string | null = null): AgentAsk => ({
   id: 1, session_id: "claude:a", kind: "permission", summary: "wants to run npm test", payload: {}, checks: [], decision, rule, rpc_id: null, created_at: "", decided_at: null,
+});
+
+describe("auto-answer notes", () => {
+  const q = (payload: Record<string, unknown>, decision: AgentAsk["decision"] = "queued") => ({ payload, decision });
+  it("says what bleep will do or did not do", () => {
+    expect(answerNote(q({ answer: { mode: "on", label: "Merge it" } }))).toEqual({ kind: "pending", label: "Merge it", delaySecs: 0 });
+    expect(answerNote(q({ answer: { mode: "on", label: "Merge it", delay_secs: 30 } }))).toEqual({ kind: "pending", label: "Merge it", delaySecs: 30 });
+    expect(answerNote(q({ answer: { mode: "on", label: "Merge it" }, kept: true }))).toEqual({ kind: "held", why: "You kept this one." });
+    expect(answerNote(q({ answer: { mode: "on", label: "Merge it" }, not_sent: "the session takes no reply" }))).toEqual({ kind: "held", why: "bleep did not answer: the session takes no reply." });
+    expect(answerNote(q({ answer: { mode: "shadow", label: "Merge it" }, vet_ok: true }))).toEqual({ kind: "shadow", label: "Merge it", wouldSend: true });
+    expect(answerNote(q({ answer: { mode: "keep", why: "matches \"ship\"" } }))).toEqual({ kind: "held", why: "Waits for you: matches \"ship\"." });
+    expect(answerNote(q({ answer: { mode: "on", label: "Merge it" } }, "expired"))).toBeNull();
+    expect(answerNote(q({}))).toBeNull();
+  });
+  it("names an auto-answer apart from a rule approval", () => {
+    expect(handledLine({ decision: "auto", rule: "answer: merge" })).toBe("Answered by bleep with the agent's first option");
+  });
 });
 
 describe("agents text", () => {
