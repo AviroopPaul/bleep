@@ -1141,6 +1141,25 @@ section{padding:120px 0 0}
 .sfoot a{color:var(--ink-2); text-decoration:none}
 .sfoot p{margin:0}
 .sfoot p a{color:inherit; text-decoration:underline}
+/* ---- stack diagram (#stack) ---- */
+.stk-stage{position:relative; max-width:900px; margin:0 auto}
+.stk-stage svg{display:block; width:100%; height:auto; overflow:visible}
+.stk-labels{position:absolute; inset:0; pointer-events:none}
+.stk-lab{position:absolute; right:0; transform:translateY(-15px); pointer-events:auto; transition:opacity .3s ease}
+.stk-lab b{display:flex; align-items:baseline; gap:10px; font:600 19px/1.25 var(--sans); letter-spacing:-.02em; color:var(--ink)}
+.stk-n{font:500 11px var(--mono); color:var(--muted); letter-spacing:.02em}
+.stk-lab p{margin:5px 0 0; font-size:14.5px; line-height:1.5; color:var(--ink-2); max-width:310px}
+.stk-layer{transition:opacity .3s ease}
+.stk-lift{transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.stk-focus .stk-layer:not(.on){opacity:.35}
+.stk-layer.on .stk-lift{transform:translateY(-12px)}
+.stk-focus .stk-lab:not(.on){opacity:.45}
+@media (max-width:760px){
+  .stk-labels{position:static; margin-top:12px}
+  .stk-lab{position:static !important; transform:none; margin-top:20px}
+  .stk-lab p{max-width:none}
+  .stk-leader{display:none}
+}
 </style>
 </head>
 <body>
@@ -1473,6 +1492,14 @@ section{padding:120px 0 0}
       </div>
       <div class="bud ocenter" data-bud="full"></div>
     </div>
+  </div>
+</section>
+
+<!-- ============ STACK ============ -->
+<section id="stack">
+  <div class="wrap">
+    <div class="sec-head rv"><div><span class="stencil">How bleep fits together</span><h2>Your stack, with a buddy on top.</h2><p>Every layer is yours: your model, your tools, your Mac. bleep is the part you talk to.</p></div></div>
+    <div class="stk-stage rv"></div>
   </div>
 </section>
 
@@ -2902,6 +2929,235 @@ function hideToast() { $('#toast').classList.remove('show'); }
   addEventListener('scroll', onScroll, { passive: true });
 })();
 $('#toastX').onclick = hideToast;
+</script>
+<script>
+// Layered stack diagram (#stack)
+(() => {
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const ANG = 25 * Math.PI / 180, C = Math.cos(ANG), S = Math.sin(ANG);
+const P = (x, y, z) => [(x - y) * C, (x + y) * S - z];
+const pts = a => a.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+const TOP = o => `matrix(${C},${S},${-C},${S},${o[0]},${o[1]})`;   // draw on a horizontal face
+const FRONT = o => `matrix(${C},${S},0,1,${o[0]},${o[1]})`;         // draw on a front-left vertical face
+const mix = (hex, amt) => { // amt = share of white
+  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  const f = c => Math.round(c + (255 - c) * amt);
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+};
+const G = 150, T = 12; // gap between layers, slab thickness
+
+const txt = (g, x, y, s, o = {}) => { const e = el('text', { x, y, 'font-size': o.size || 9, 'font-family': 'Geist Mono, monospace', fill: o.fill || '#525252', 'text-anchor': o.anchor || 'start', 'letter-spacing': o.ls || 0 }, g); e.textContent = s; return e; };
+const poly = (g, a, fill, stroke, dash) => el('polygon', Object.assign({ points: pts(a), fill, stroke, 'stroke-width': 1, 'stroke-linejoin': 'round' }, dash ? { 'stroke-dasharray': '3 3' } : {}), g);
+const R = (g, x, y, w, h, fill, rx = 3) => el('rect', { x, y, width: w, height: h, rx, fill }, g);
+const LN = (g, p, stroke, w = 1.2) => el('polyline', { points: p.map(q => q.join(',')).join(' '), fill: 'none', stroke, 'stroke-width': w, 'stroke-linejoin': 'round' }, g);
+const ARW = (g, x, y, fill, dir = 'u') => el('polygon', { points: dir === 'u' ? `${x - 5},${y - 3} ${x},${y} ${x - 5},${y + 3}` : `${x - 3},${y - 5} ${x},${y} ${x + 3},${y - 5}`, fill }, g);
+
+// Per-layer drawing kit. Everything is in face coords: u along width, v along depth (v = d is the front-left edge).
+function kit(g, L, t) {
+  const sg = el('g', {}, g), bg = el('g', {}, g), lg = el('g', {}, g);
+  const X = u => L.x0 + u, Y = v => L.y0 + v, q = [];
+  function drawBox(u, v, w, d, h, o) {
+    const b = L.zs + (o.base || 0), x = X(u), y = Y(v), c = t.comp(L, o.kind || 'plain');
+    const gg = el('g', {}, bg);
+    poly(gg, [P(x + w, y, b), P(x + w, y + d, b), P(x + w, y + d, b + h), P(x + w, y, b + h)], c.right, c.stroke, c.dash);
+    poly(gg, [P(x, y + d, b), P(x + w, y + d, b), P(x + w, y + d, b + h), P(x, y + d, b + h)], c.left, c.stroke, c.dash);
+    poly(gg, [P(x, y, b + h), P(x + w, y, b + h), P(x + w, y + d, b + h), P(x, y + d, b + h)], c.top, c.stroke, c.dash);
+    if (o.top || o.onTop) {
+      const tg = el('g', { transform: TOP(P(x, y, b + h)) }, gg);
+      if (o.onTop) o.onTop(tg, w, d, c);
+      if (o.top) { const lines = [].concat(o.top), fs = o.fs || 9; lines.forEach((s, j) => txt(tg, w / 2, d / 2 + fs * .35 + (j - (lines.length - 1) / 2) * fs * 1.15, s, { anchor: 'middle', size: fs, fill: c.text })); }
+    }
+    if (o.front || o.onFront) {
+      const fg = el('g', { transform: FRONT(P(x, y + d, b + h)) }, gg);
+      if (o.onFront) o.onFront(fg, w, h, c);
+      if (o.front) txt(fg, w / 2, h / 2 + 3, o.front, { anchor: 'middle', size: o.ffs || 8.5, fill: c.ftext || c.text });
+    }
+  }
+  return {
+    surf: () => el('g', { transform: TOP(P(X(0), Y(0), L.zs)) }, sg),
+    box: (u, v, w, d, h, o = {}) => q.push({ key: u + w / 2 + v + d / 2 + (o.base || 0) * 2, f: () => drawBox(u, v, w, d, h, o) }),
+    link(u, v, h) { // dashed riser up to the slab above
+      const a = P(X(u), Y(v), L.zs + h), b = P(X(u), Y(v), L.z + G);
+      el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: t.link, 'stroke-dasharray': '2 4', 'stroke-width': 1.3 }, lg);
+      el('circle', { cx: a[0], cy: a[1], r: 2.4, fill: t.link }, lg);
+    },
+    flush: () => q.sort((a, b) => a.key - b.key).forEach(x => x.f()),
+  };
+}
+
+const DRAW = {
+  droid(k, t) { // chat window, approval card, the droid, the ⌥⌥ key
+    k.box(14, 14, 192, 120, 4, { onTop: (g) => {
+      [0, 1, 2].forEach(j => el('circle', { cx: 12 + j * 9, cy: 10, r: 2.4, fill: t.wire }, g));
+      R(g, 12, 22, 104, 12, t.bubble, 6); R(g, 76, 40, 104, 12, t.bubble2, 6); R(g, 12, 58, 84, 12, t.bubble, 6);
+    } });
+    k.box(98, 84, 100, 42, 6, { base: 4, onTop: (g, w, d, c) => {
+      txt(g, 8, 13, 'Run npm test?', { size: 8.5, fill: c.text });
+      R(g, 8, 21, 34, 13, t.okFill, 4); txt(g, 25, 30.5, 'Yes', { size: 8, anchor: 'middle', fill: t.okText });
+      R(g, 48, 21, 34, 13, t.bubble, 4); txt(g, 65, 30.5, 'No', { size: 8, anchor: 'middle', fill: c.text });
+    } });
+    k.box(224, 30, 50, 46, 40, { kind: 'accent', onFront: (g, w, h) => {
+      el('ellipse', { cx: w * .32, cy: h * .42, rx: 4.5, ry: 6, fill: t.eye }, g);
+      el('ellipse', { cx: w * .68, cy: h * .42, rx: 4.5, ry: 6, fill: t.eye }, g);
+    } });
+    k.box(228, 104, 42, 30, 9, { top: '⌥ ⌥', fs: 11 });
+  },
+  triage(k, t) { // many pings in, three filters, two out
+    const s = k.surf();
+    for (let j = 0; j < 16; j++) k.box(10 + (j % 4) * 12 + ((j * 7) % 5), 34 + Math.floor(j / 4) * 20 + ((j * 3) % 7), 5, 5, 4, { kind: j % 5 === 0 ? 'accent' : 'plain' });
+    LN(s, [[66, 80], [82, 80]], t.wire); ARW(s, 82, 80, t.wire);
+    LN(s, [[124, 80], [144, 80]], t.wire); ARW(s, 144, 80, t.wire);
+    LN(s, [[180, 80], [200, 80]], t.wire); ARW(s, 200, 80, t.wire);
+    txt(s, 12, 124, '38 in', { fill: t.faceText });
+    txt(s, 130, 112, '6', { fill: t.faceText });
+    txt(s, 200, 110, '2 out', { fill: t.faceText });
+    k.box(82, 58, 42, 44, 16, { front: 'rules' });
+    k.box(144, 64, 36, 32, 13, { front: 'small' });
+    k.box(200, 68, 30, 24, 11, { kind: 'accent', front: 'main', ffs: 8 });
+    k.link(215, 80, 11);
+  },
+  gate(k, t) { // belt, gate arch, approved cards, a tray of asks that wait
+    const s = k.surf();
+    k.box(10, 56, 232, 26, 3, { onTop: (g, w, d) => { for (let x = 8; x < w; x += 12) el('line', { x1: x, y1: 4, x2: x, y2: d - 4, stroke: t.grid }, g); } });
+    k.box(28, 60, 26, 18, 5, { base: 3, top: '?', fs: 10 });
+    k.box(64, 60, 26, 18, 5, { base: 3, top: '?', fs: 10 });
+    k.box(118, 44, 9, 9, 32, { kind: 'accent' });
+    k.box(118, 85, 9, 9, 32, { kind: 'accent' });
+    k.box(118, 44, 9, 50, 6, { base: 32, kind: 'accent' });
+    k.box(156, 60, 30, 18, 5, { base: 3, kind: 'ok', top: '✓', fs: 10 });
+    k.box(200, 60, 30, 18, 5, { base: 3, kind: 'ok', top: '✓', fs: 10 });
+    LN(s, [[134, 82], [134, 104], [146, 104]], t.wire); ARW(s, 148, 104, t.wire);
+    k.box(148, 94, 86, 32, 10, { kind: 'wait', front: 'waits for you', ffs: 7.5 });
+    k.box(160, 98, 52, 20, 4, { base: 10, kind: 'wait', top: 'git push', fs: 8 });
+    txt(s, 168, 36, 'approved · logged', { size: 8.5, fill: t.faceText });
+    k.link(122, 69, 38);
+  },
+  model(k, t) { // swappable chips on a board
+    const s = k.surf();
+    const chips = [[18, 30, 86, 72, 'accent', ['CLAUDE', 'CODE'], 10, 11], [118, 36, 52, 30, 'plain', 'Codex', 8.5, 7], [184, 36, 52, 30, 'plain', 'API key', 8.5, 7], [118, 82, 52, 30, 'plain', 'Ollama', 8.5, 7], [184, 82, 52, 30, 'plain', 'LM Studio', 8, 7]];
+    chips.forEach(([u, v, w, d, kind, label, fs, h]) => {
+      for (let x = 6; x < w - 2; x += 8) { LN(s, [[u + x, v - 5], [u + x, v]], t.wire, 1); LN(s, [[u + x, v + d], [u + x, v + d + 5]], t.wire, 1); }
+      for (let y = 6; y < d - 2; y += 8) { LN(s, [[u - 5, v + y], [u, v + y]], t.wire, 1); LN(s, [[u + w, v + y], [u + w + 5, v + y]], t.wire, 1); }
+      k.box(u, v, w, d, h, { kind, top: label, fs });
+    });
+    txt(s, 20, 126, 'default', { size: 8.5, fill: t.faceText });
+    k.link(94, 40, 11);
+  },
+  tools(k, t) { // MCP hub wired to every connector
+    const s = k.surf();
+    const front = [['Gmail', 14, 46], ['Calendar', 68, 56], ['Drive', 132, 42], ['Files', 182, 42]];
+    const side = [['Claude Code', 14], ['Codex', 46], ['+ any MCP', 78]];
+    front.forEach(([, u, w]) => LN(s, [[128, 94], [128, 105], [u + w / 2, 105], [u + w / 2, 116]], t.wire));
+    side.forEach(([, v]) => LN(s, [[160, 69], [194, 69], [194, v + 11], [218, v + 11]], t.wire));
+    k.box(96, 44, 64, 50, 20, { kind: 'accent', front: 'MCP', top: '127.0.0.1', fs: 8, ffs: 9 });
+    front.forEach(([n, u, w]) => k.box(u, 116, w, 22, 8, { top: n, fs: 8.5 }));
+    side.forEach(([n, v], j) => k.box(218, v, 64, 22, 8, { top: n, fs: 8.5, kind: j === 2 ? 'ghost' : 'plain' }));
+    k.link(152, 52, 20);
+  },
+  mac(k, t, w, d) { // folder, database, keychain, memory notes
+    const s = k.surf();
+    for (let x = 20; x < w; x += 20) el('line', { x1: x, y1: 6, x2: x, y2: d - 6, stroke: t.grid }, s);
+    for (let y = 20; y < d; y += 20) el('line', { x1: 6, y1: y, x2: w - 6, y2: y, stroke: t.grid }, s);
+    k.box(26, 84, 84, 56, 16, { front: '~/.bleep', ffs: 9 });
+    k.box(26, 84, 32, 14, 3, { base: 16 });
+    [0, 8, 16].forEach((b, j) => k.box(132, 90, 48, 46, 5, { base: b, top: j === 2 ? 'SQLite' : null }));
+    k.box(206, 94, 44, 40, 22, { kind: 'accent', front: 'Keychain', ffs: 8 });
+    k.box(219, 106, 18, 14, 7, { base: 22, kind: 'accent' });
+    [0, 4, 8].forEach((b, j) => k.box(264 + j * 2, 90 - j * 2, 40, 48, 2, { base: b, top: j === 2 ? 'memory.md' : null, fs: 8 }));
+    txt(s, 14, 162, 'macOS 15+ · Apple silicon · no bleep server', { size: 8.5, fill: t.faceText });
+    k.link(68, 112, 19);
+  },
+};
+
+const LAYERS = [ // top to bottom
+  { k: 'droid',  tag: 'DESKTOP',       title: 'bleep, the droid',    text: 'Floats on every Space. Double-tap ⌥ to talk. One chat that never resets.', w: 290, d: 150, hue: '#2563EB' },
+  { k: 'triage', tag: 'TRIAGE',        title: 'Speaks first',        text: 'Rules first, a small model next, your main model last. Most pings cost nothing.', w: 250, d: 130, hue: '#A797F2' },
+  { k: 'gate',   tag: 'APPROVAL GATE', title: 'Asks before it acts', text: 'Your rules approve safe asks from Claude Code and Codex. Risky ones wait for your tap.', w: 250, d: 130, hue: '#5F7A5A' },
+  { k: 'model',  tag: 'MODEL',         title: 'Your model',          text: 'The Claude Code plan you already pay for. Or Codex, any API key, or a local model.', w: 250, d: 130, hue: '#E8A93B' },
+  { k: 'tools',  tag: 'MCP HUB',       title: 'Your tools',          text: 'Gmail, Calendar, Drive, files and your coding agents. Add any app with a remote MCP server.', w: 290, d: 150, hue: '#67B7E6' },
+  { k: 'mac',    tag: 'YOUR MAC',      title: 'Your Mac',            text: 'Data stays in ~/.bleep. Secrets in the Keychain. There is no bleep server.', w: 320, d: 170, hue: '#C9B98E' },
+];
+
+const ST = 'rgba(0,0,0,.08)';
+const THEMES = {
+  color: {
+    top: L => mix(L.hue, .93), left: L => mix(L.hue, .5), right: L => mix(L.hue, .22), edge: 'rgba(0,0,0,.06)',
+    comp: (L, k) => ({
+      plain:  { top: '#fff', left: mix(L.hue, .62), right: mix(L.hue, .42), stroke: ST, text: '#525252' },
+      accent: { top: mix(L.hue, .8), left: mix(L.hue, .2), right: L.hue, stroke: ST, text: '#242424', ftext: 'rgba(0,0,0,.72)' },
+      ok:     { top: '#F1F7EF', left: '#C3D6BE', right: '#9DBB97', stroke: ST, text: '#3F6B3A' },
+      wait:   { top: '#FDF4E4', left: '#F2D49F', right: '#E5B566', stroke: ST, text: '#8A5A1E', ftext: '#6B4512' },
+      ghost:  { top: 'rgba(255,255,255,.6)', left: 'none', right: 'none', stroke: mix(L.hue, .2), dash: true, text: '#8A8A8A' },
+    })[k],
+    bubble: '#EEF1F6', bubble2: '#D6E2FC', okFill: '#E3F0E0', okText: '#3F6B3A', eye: '#fff',
+    wire: 'rgba(0,0,0,.24)', faceText: 'rgba(0,0,0,.45)', sideText: (L, i) => i === 0 ? '#fff' : 'rgba(0,0,0,.5)',
+    grid: 'rgba(0,0,0,.07)', link: '#8FA9EA', dot: L => L.hue, lead: '#D5D9E2', guide: '#D9DEE8', mode: 'color',
+  },
+};
+
+function build(stage) {
+  const t = THEMES.color;
+  const n = LAYERS.length;
+  const svg = el('svg', { role: 'img', 'aria-label': 'bleep stack: droid, triage, approval gate, model, tools, your Mac' }, stage);
+  const guides = el('g', {}, svg);
+  const stack = el('g', {}, svg);
+  const leads = el('g', { class: 'stk-leader' }, svg);
+  const labels = document.createElement('div'); labels.className = 'stk-labels'; stage.appendChild(labels);
+  const dots = [], groups = [];
+
+  for (let i = n - 1; i >= 0; i--) { // bottom first, so upper slabs cover lower ones
+    const L = LAYERS[i], { w, d } = L, z = (n - 1 - i) * G;
+    const x0 = -w / 2, y0 = -d / 2;
+    Object.assign(L, { x0, y0, z, zs: z + T });
+    const layer = el('g', { class: 'stk-layer' }, stack);
+    const ex = el('g', { class: 'stk-ex' }, layer);
+    const g = el('g', { class: 'stk-lift' }, ex);
+    const sw = t.mode === 'line' ? 1.2 : 1;
+    poly(g, [P(x0 + w, y0, z), P(x0 + w, y0 + d, z), P(x0 + w, y0 + d, z + T), P(x0 + w, y0, z + T)], t.right(L, i), t.edge).setAttribute('stroke-width', sw);
+    poly(g, [P(x0, y0 + d, z), P(x0 + w, y0 + d, z), P(x0 + w, y0 + d, z + T), P(x0, y0 + d, z + T)], t.left(L, i), t.edge).setAttribute('stroke-width', sw);
+    poly(g, [P(x0, y0, z + T), P(x0 + w, y0, z + T), P(x0 + w, y0 + d, z + T), P(x0, y0 + d, z + T)], t.top(L, i), t.edge).setAttribute('stroke-width', sw);
+    txt(el('g', { transform: FRONT(P(x0, y0 + d, z + T)) }, g), 10, T / 2 + 3, L.tag, { size: 7.5, ls: '.12em', fill: t.sideText(L, i) });
+    const k = kit(g, L, t);
+    DRAW[L.k](k, t, w, d);
+    k.flush();
+    const dp = P(x0 + w, y0, z + T / 2);
+    el('circle', { cx: dp[0], cy: dp[1], r: 4, fill: t.dot(L), stroke: t.mode === 'line' ? 'none' : '#fff', 'stroke-width': 2 }, g);
+    dots[i] = dp; groups[i] = { layer, ex };
+  }
+
+  const top = LAYERS[0], zt = (n - 1) * G;
+  [[-(top.w + top.d) / 2 * C, (top.d - top.w) / 2 * S], [(top.w + top.d) / 2 * C, (top.w - top.d) / 2 * S]].forEach(([x, y]) => {
+    el('line', { x1: x, y1: y - zt, x2: x, y2: y + T, stroke: t.guide, 'stroke-dasharray': '4 5' }, guides);
+  });
+
+  const b = stack.getBBox();
+  const labelX = b.x + b.width + 70, labelW = 320;
+  const vbWide = [b.x - 10, b.y - 10, labelX + labelW - (b.x - 10), b.height + 30];
+  const vbNarrow = [b.x - 10, b.y - 10, b.width + 20, b.height + 30];
+
+  LAYERS.forEach((L, i) => {
+    const [x, y] = dots[i];
+    el('line', { x1: x + 10, y1: y, x2: labelX - 16, y2: y, stroke: t.lead, 'stroke-width': 1 }, leads);
+    el('circle', { cx: labelX - 16, cy: y, r: 2.5, fill: t.lead }, leads);
+    const lab = document.createElement('div'); lab.className = 'stk-lab';
+    lab.innerHTML = `<b><span class="stk-n">0${i + 1}</span>${L.title}</b><p>${L.text}</p>`;
+    lab.style.left = ((labelX - vbWide[0]) / vbWide[2] * 100) + '%';
+    lab.style.top = ((y - vbWide[1]) / vbWide[3] * 100) + '%';
+    labels.appendChild(lab);
+    lab.addEventListener('mouseenter', () => { stage.classList.add('stk-focus'); lab.classList.add('on'); groups[i].layer.classList.add('on'); });
+    lab.addEventListener('mouseleave', () => { stage.classList.remove('stk-focus'); lab.classList.remove('on'); groups[i].layer.classList.remove('on'); });
+  });
+
+  const mq = matchMedia('(max-width:760px)');
+  const setVB = () => svg.setAttribute('viewBox', (mq.matches ? vbNarrow : vbWide).join(' '));
+  setVB(); mq.addEventListener('change', setVB);
+
+}
+
+document.querySelectorAll('.stk-stage').forEach(build);
+
+})();
 </script>
 </body>
 </html>
