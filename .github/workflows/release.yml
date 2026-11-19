@@ -1,0 +1,158 @@
+# Builds a stable release when a version tag is pushed, and publishes it everywhere:
+#   1. AviroopPaul/bleep-releases  vX.Y.Z: dmg, sha256, app tarball and latest.json (the in-app update feed)
+#   2. AviroopPaul/bleep           vX.Y.Z: dmg and sha256
+#   3. AviroopPaul/homebrew-tap    Casks/bleep.rb: version and sha256 (only with the TAP_TOKEN secret)
+#
+# To release: merge the "Release X.Y.Z" PR (it bumps the versions and adds app/release-notes/X.Y.Z.md),
+# then tag that merge commit and push the tag:
+#   git tag vX.Y.Z <merge commit> && git push origin vX.Y.Z
+# Afterwards, run `python3 scripts/seo/pages.py` so the site's changelog shows the new release.
+#
+# Secrets: the same as nightly.yml, plus optional TAP_TOKEN (fine-grained token: Contents read/write
+# on AviroopPaul/homebrew-tap). Without it the cask step is skipped and the cask is bumped by hand.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and publish again, for example v0.5.1
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  RELEASES_REPO: AviroopPaul/bleep-releases
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    name: Build and publish the release
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Version
+        id: ver
+        run: |
+          v="$(node -p "require('./app/src-tauri/tauri.conf.json').version")"
+          if [ "v$v" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match the app version $v in tauri.conf.json."
+            exit 1
+          fi
+          test -f "app/release-notes/$v.md" || { echo "::error::Missing app/release-notes/$v.md."; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            app/src-tauri
+            app/bleep-hook
+          key: release
+
+      - name: Install
+        working-directory: app
+        run: npm ci
+
+      - name: Signing files
+        env:
+          P12: ${{ secrets.BLEEP_SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.BLEEP_SIGNING_P12_PASSWORD }}
+          UPDATER_KEY: ${{ secrets.TAURI_UPDATER_KEY }}
+          UPDATER_KEY_PASSWORD: ${{ secrets.TAURI_UPDATER_KEY_PASSWORD }}
+        run: |
+          d="$RUNNER_TEMP/bleep-signing"
+          mkdir -p "$d" && chmod 700 "$d"
+          printf '%s' "$P12" | base64 --decode > "$d/bleep-signing.p12"
+          printf '%s' "$P12_PASSWORD" > "$d/p12-password"
+          printf '%s' "$UPDATER_KEY" > "$d/updater.key"
+          printf '%s' "$UPDATER_KEY_PASSWORD" > "$d/updater-key-password"
+          echo "SIGN_DIR=$d" >> "$GITHUB_ENV"
+
+      - name: Notes
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir -p app/release
+          src="app/release-notes/$VERSION.md"
+          # Settings > Updates shows plain text.
+          sed 's/\*\*//g' "$src" > app/release/notes.md
+          {
+            printf '**Install or update** (pick one, in Terminal)\n\n'
+            printf '```sh\nbrew upgrade --cask bleep   # first time: brew install --cask AviroopPaul/tap/bleep\n```\n\n'
+            printf '```sh\ncurl -fsSL https://bleep-omega.vercel.app/install.sh | sh\n```\n\n'
+            printf 'Both check the download against its SHA-256 and put bleep in Applications. If you have 0.3.1 or later, bleep updates itself (Settings > Updates).\n\n'
+            printf '**New in %s**\n' "$VERSION"
+            cat "$src"
+          } > "$RUNNER_TEMP/body.md"
+          cat "$RUNNER_TEMP/body.md"
+
+      - name: Build
+        env:
+          CI: "true"
+          FLAVOR: prod
+          BLEEP_GOOGLE_CLIENT_ID: ${{ secrets.BLEEP_GOOGLE_CLIENT_ID }}
+          BLEEP_GOOGLE_CLIENT_SECRET: ${{ secrets.BLEEP_GOOGLE_CLIENT_SECRET }}
+        run: app/scripts/build-release.sh
+
+      - name: Publish to bleep-releases
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        working-directory: app/release
+        run: |
+          if ! gh release view "$TAG" -R "$RELEASES_REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" -R "$RELEASES_REPO" --title "bleep $VERSION" --notes-file "$RUNNER_TEMP/body.md" --latest
+          fi
+          # The tarball goes up before the feed that points at it.
+          gh release upload "$TAG" -R "$RELEASES_REPO" --clobber bleep-mac.dmg bleep-mac.dmg.sha256 bleep-mac.app.tar.gz
+          gh release upload "$TAG" -R "$RELEASES_REPO" --clobber latest.json
+
+      - name: Publish to bleep
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        working-directory: app/release
+        run: |
+          if ! gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "bleep $VERSION" --notes-file "$RUNNER_TEMP/body.md" --verify-tag --latest
+          fi
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" --clobber bleep-mac.dmg bleep-mac.dmg.sha256
+
+      - name: Bump the Homebrew cask
+        env:
+          GH_TOKEN: ${{ secrets.TAP_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::No TAP_TOKEN secret. Bump Casks/bleep.rb in AviroopPaul/homebrew-tap by hand."
+            exit 0
+          fi
+          sum="$(cut -d' ' -f1 app/release/bleep-mac.dmg.sha256)"
+          gh api repos/AviroopPaul/homebrew-tap/contents/Casks/bleep.rb > "$RUNNER_TEMP/cask.json"
+          blob="$(node -p "require('$RUNNER_TEMP/cask.json').sha")"
+          node -p "Buffer.from(require('$RUNNER_TEMP/cask.json').content, 'base64').toString()" \
+            | sed -E "s/^  version \".*\"/  version \"$VERSION\"/; s/^  sha256 \".*\"/  sha256 \"$sum\"/" > "$RUNNER_TEMP/bleep.rb"
+          gh api -X PUT repos/AviroopPaul/homebrew-tap/contents/Casks/bleep.rb \
+            -f message="bleep $VERSION" -f sha="$blob" -f content="$(base64 < "$RUNNER_TEMP/bleep.rb" | tr -d '\n')" >/dev/null
+          echo "Cask bumped to $VERSION ($sum)."
+
+      - name: Remove signing files
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/bleep-signing"
