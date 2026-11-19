@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Avatar, useAvatar } from "../avatar/Avatar";
 import { api, onChatEvent, onDroidMood, onVoice } from "../ipc";
-import { DEV, NAME } from "../flavor";
+import { NAME, TAG } from "../flavor";
 
 import type { Mood } from "../avatar/avatars";
 const DRAG_PX = 4;
@@ -83,7 +83,7 @@ export function Droid() {
       onPointerUp={onPointerUp}
     >
       {avatar && <Avatar cfg={avatar} mood={mood} />}
-      {DEV && <span className="droid-dev" aria-hidden="true">dev</span>}
+      {TAG && <span className="droid-dev" aria-hidden="true">{TAG}</span>}
     </button>
   );
 }

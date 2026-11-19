@@ -35,7 +35,8 @@ pub fn parse_hook(line: &str) -> Result<HookMsg, String> {
 }
 
 /// Copies the `bleep-hook` that ships next to bleep's own binary to `~/.bleep/bin`, where
-/// the installed hooks point. Returns true when it wrote a new copy.
+/// the installed hooks point. Every build (prod, nightly, local) uses this one copy.
+/// Returns true when it wrote a new copy.
 pub fn install_hook_binary(paths: &BleepPaths) -> std::io::Result<bool> {
     let src = std::env::current_exe()?.with_file_name("bleep-hook");
     install_hook_binary_from(&src, paths)
@@ -46,6 +47,9 @@ pub fn install_hook_binary_from(src: &Path, paths: &BleepPaths) -> std::io::Resu
     let new = std::fs::read(src)?;
     if std::fs::read(&paths.hook_bin).is_ok_and(|old| old == new) {
         return Ok(false);
+    }
+    if let Some(dir) = paths.hook_bin.parent() {
+        std::fs::create_dir_all(dir)?;
     }
     // Write next to it and rename, so a hook running right now never sees half a file.
     let tmp = paths.hook_bin.with_extension("new");

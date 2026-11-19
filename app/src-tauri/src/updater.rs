@@ -199,8 +199,9 @@ pub fn start(app: &tauri::AppHandle) {
         now: Arc::new(Utc::now),
     });
     app.manage(up.clone());
-    // A dev build must never update itself to the production release.
-    if cfg!(debug_assertions) || crate::flavor::DEV {
+    // A local build must never update itself. Nightly and prod each read their own feed
+    // (plugins.updater.endpoints in tauri.nightly.conf.json and tauri.conf.json).
+    if cfg!(debug_assertions) || crate::flavor::LOCAL {
         return;
     }
     tauri::async_runtime::spawn(async move {
@@ -219,21 +220,21 @@ pub fn update_state(up: Up<'_>) -> UpdateView {
     up.view()
 }
 
-/// Why the dev build has no updates.
-pub const DEV_NOTE: &str = "bleep (dev) does not update itself. Build and install a new dev build from the repo.";
+/// Why the local build has no updates.
+pub const LOCAL_NOTE: &str = "bleep (local) does not update itself. Build and install a new local build from the repo.";
 
 #[tauri::command]
 pub async fn update_check(up: Up<'_>) -> Result<UpdateView, String> {
-    if crate::flavor::DEV {
-        return Err(DEV_NOTE.into());
+    if crate::flavor::LOCAL {
+        return Err(LOCAL_NOTE.into());
     }
     Ok(up.inner().clone().check().await)
 }
 
 #[tauri::command]
 pub async fn update_install(up: Up<'_>) -> Result<UpdateView, String> {
-    if crate::flavor::DEV {
-        return Err(DEV_NOTE.into());
+    if crate::flavor::LOCAL {
+        return Err(LOCAL_NOTE.into());
     }
     Ok(up.inner().clone().install().await)
 }

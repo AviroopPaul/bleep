@@ -464,8 +464,8 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         use tauri_plugin_autostart::ManagerExt;
         app.autolaunch().is_enabled().unwrap_or(false)
     };
-    // A dev build must never register itself at login, so the item is greyed out there.
-    let login = CheckMenuItem::with_id(app, "login", "Launch at login", crate::startup::IS_RELEASE && !crate::flavor::DEV, login_on, None::<&str>)?;
+    // A local build must never register itself at login, so the item is greyed out there.
+    let login = CheckMenuItem::with_id(app, "login", "Launch at login", crate::startup::IS_RELEASE && !crate::flavor::LOCAL, login_on, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
     let setup = MenuItem::with_id(app, "setup", format!("Set up {}…", crate::flavor::NAME), true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", format!("Quit {}", crate::flavor::NAME), true, None::<&str>)?;
@@ -478,8 +478,9 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(true)
         .icon(crate::avatar::tray_icon(&crate::avatar::current(app).kind))
         .icon_as_template(true);
-    // The dev build's menu bar icon reads "dev" next to the droid head.
-    let tray = if crate::flavor::DEV { tray.title("dev") } else { tray };
+    // The nightly and local builds' menu bar icon reads their tag next to the droid head.
+    let tag = crate::flavor::FLAVOR.tag();
+    let tray = if tag.is_empty() { tray } else { tray.title(tag) };
     tray.on_menu_event(move |app, ev| match ev.id().as_ref() {
         "toggle_droid" => {
             if let Some(d) = app.get_webview_window("droid") {

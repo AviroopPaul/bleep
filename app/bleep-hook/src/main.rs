@@ -1,7 +1,12 @@
 //! bleep-hook: the tiny program that Claude Code hooks and Codex `notify` run.
 //!
-//! It forwards the hook JSON to bleep's socket (`$BLEEP_HOME/run/bleep.sock`, default
-//! `~/.bleep/run/bleep.sock`) and, for the events that wait, prints bleep's reply.
+//! It forwards the hook JSON to bleep's socket and, for the events that wait, prints bleep's
+//! reply. Up to three bleep builds can run side by side (prod `~/.bleep`, nightly
+//! `~/.bleep-nightly`, local `~/.bleep-local`), and they share this one hook:
+//! - the first running build in that order gets every event and is the one that answers;
+//! - the others get a copy of the activity events (`OBSERVED_EVENTS`), so they show the same
+//!   sessions, but never a permission ask or a reply wait.
+//! With `$BLEEP_HOME` set, only `$BLEEP_HOME/run/bleep.sock` is used.
 //! It must never block or break a coding agent: on any problem it prints nothing and
 //! exits 0, so the agent shows its normal prompt.
 //!
@@ -23,6 +28,11 @@ const LONG_TIMEOUT_MS: u64 = 3_590_000;
 const NOTIFY_WAIT: Duration = Duration::from_secs(5);
 /// The Claude Code events whose answer changes what the agent does.
 const WAITING_EVENTS: &[&str] = &["PermissionRequest", "Stop"];
+/// The Claude Code events every running build gets. They only change what a session shows.
+const OBSERVED_EVENTS: &[&str] = &["SessionStart", "UserPromptSubmit", "PostToolUse", "SessionEnd"];
+/// Data folders of the bleep builds, in the order that decides which one answers.
+/// Same list as `Flavor::ALL` in the app.
+const HOME_DIRS: &[&str] = &[".bleep", ".bleep-nightly", ".bleep-local"];
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -138,12 +148,25 @@ fn json_type(s: &str) -> Option<String> {
     v.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_').then(|| v.to_string())
 }
 
-fn sock_path() -> Option<PathBuf> {
-    let root = match std::env::var("BLEEP_HOME").ok().filter(|s| !s.is_empty()) {
-        Some(p) => PathBuf::from(p),
-        None => PathBuf::from(std::env::var("HOME").ok()?).join(".bleep"),
+/// The sockets to try, in order.
+fn sock_paths() -> Vec<PathBuf> {
+    let roots: Vec<PathBuf> = match std::env::var("BLEEP_HOME").ok().filter(|s| !s.is_empty()) {
+        Some(p) => vec![PathBuf::from(p)],
+        None => match std::env::var("HOME") {
+            Ok(h) => HOME_DIRS.iter().map(|d| PathBuf::from(&h).join(d)).collect(),
+            Err(_) => vec![],
+        },
     };
-    Some(root.join("run").join("bleep.sock"))
+    roots.into_iter().map(|r| r.join("run").join("bleep.sock")).collect()
+}
+
+/// The first build that answers, and the rest of the list after it.
+fn connect_first(paths: &[PathBuf]) -> Option<(UnixStream, &[PathBuf])> {
+    paths.iter().enumerate().find_map(|(i, p)| UnixStream::connect(p).ok().map(|s| (s, &paths[i + 1..])))
+}
+
+fn wire_line(source: &str, event: &str, wait: bool, payload: &str) -> String {
+    format!("{{\"v\":1,\"source\":\"{source}\",\"event\":\"{event}\",\"wait\":{wait},\"payload\":{payload}}}\n")
 }
 
 fn timeout(long: bool) -> Duration {
@@ -159,9 +182,19 @@ fn send(source: &str, event: &str, wait: bool, payload: &str, budget: Duration) 
         return None;
     }
     let payload = payload.replace(['\n', '\r'], " ");
-    let line = format!("{{\"v\":1,\"source\":\"{source}\",\"event\":\"{event}\",\"wait\":{wait},\"payload\":{payload}}}\n");
+    let line = wire_line(source, event, wait, &payload);
     let t0 = Instant::now();
-    let mut s = UnixStream::connect(sock_path()?).ok()?;
+    let paths = sock_paths();
+    let (mut s, rest) = connect_first(&paths)?;
+    if source == "claude" && OBSERVED_EVENTS.contains(&event) {
+        let copy = wire_line(source, event, false, &payload);
+        for p in rest {
+            if let Ok(mut o) = UnixStream::connect(p) {
+                let _ = o.set_write_timeout(Some(Duration::from_millis(500)));
+                let _ = o.write_all(copy.as_bytes());
+            }
+        }
+    }
     s.set_write_timeout(Some(budget)).ok()?;
     s.write_all(line.as_bytes()).ok()?;
     if !wait {
@@ -173,4 +206,50 @@ fn send(source: &str, event: &str, wait: bool, payload: &str, budget: Duration) 
     BufReader::new(s).read_line(&mut reply).ok()?;
     let reply = reply.trim();
     (!reply.is_empty() && reply.starts_with('{')).then(|| reply.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::net::UnixListener;
+
+    /// Collects the one line each connection sends.
+    fn listen(path: &std::path::Path) -> std::sync::mpsc::Receiver<String> {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let l = UnixListener::bind(path).unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for s in l.incoming().flatten() {
+                let mut line = String::new();
+                let _ = BufReader::new(s).read_line(&mut line);
+                let _ = tx.send(line);
+            }
+        });
+        rx
+    }
+
+    #[test]
+    fn first_running_build_answers_and_the_rest_observe() {
+        let home = std::env::temp_dir().join(format!("bleep-hook-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        // Prod is not running. Nightly is first, so it gets everything; local only observes.
+        let nightly = listen(&home.join(".bleep-nightly/run/bleep.sock"));
+        let local = listen(&home.join(".bleep-local/run/bleep.sock"));
+        unsafe {
+            std::env::remove_var("BLEEP_HOME");
+            std::env::set_var("HOME", &home);
+        }
+        let t = Duration::from_secs(2);
+        let wait = Duration::from_millis(500);
+
+        send("claude", "SessionStart", false, r#"{"session_id":"s"}"#, t);
+        assert!(nightly.recv_timeout(wait).unwrap().contains(r#""event":"SessionStart","wait":false"#));
+        assert!(local.recv_timeout(wait).unwrap().contains(r#""event":"SessionStart","wait":false"#));
+
+        send("claude", "Notification", false, r#"{"session_id":"s"}"#, t);
+        assert!(nightly.recv_timeout(wait).unwrap().contains("Notification"));
+        assert!(local.recv_timeout(wait).is_err(), "only the answering build gets asks and notices");
+
+        let _ = std::fs::remove_dir_all(&home);
+    }
 }

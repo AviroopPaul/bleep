@@ -13,7 +13,10 @@ Floating macOS assistant. Plan and decisions: `docs/build-plan.md`. App: `app/` 
 
 `source ~/.config/zsh/secrets.zsh && npm run tauri build` in `app/`. The secrets file gives `BLEEP_GOOGLE_CLIENT_ID` and `BLEEP_GOOGLE_CLIENT_SECRET`, compiled in as bleep's Google app. Never print their values.
 
-**Dev build:** `npm run build:dev` in `app/` builds "bleep (dev)" (cargo feature `dev`, `src-tauri/tauri.dev.conf.json`) and installs it to `/Applications/bleep (dev).app`, next to production. It has its own data (`~/.bleep-dev`), Keychain item and bundle id, never updates itself, and never touches the Claude Code hooks. See `src-tauri/src/flavor.rs`. Use it to test unreleased work.
+**Three apps side by side** (`src-tauri/src/flavor.rs`). Each has its own name, bundle id, data folder, Keychain item and icon. They share one Claude Code hook: the first running app (prod, then nightly, then local) answers, the others only see session activity.
+- **Prod** ("bleep", `~/.bleep`): the release.
+- **Nightly** ("bleep (nightly)", `~/.bleep-nightly`, feature `nightly`): `.github/workflows/nightly.yml` builds it from `main` every night and publishes it to the rolling `nightly` prerelease in `AviroopPaul/bleep-releases`. It updates from `latest-nightly.json` only.
+- **Local** ("bleep (local)", `~/.bleep-local`, feature `local`): `npm run build:local` in `app/` builds and installs `/Applications/bleep (local).app`. `npm run dev:local` runs it without bundling (hot reload). It never updates itself and never sets a login item. Use it to test unreleased work.
 
 ## Copy
 
