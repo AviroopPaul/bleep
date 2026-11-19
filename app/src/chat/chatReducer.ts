@@ -15,7 +15,9 @@ export type ChatAction =
   | { type: "sent"; user: Message; assistantId: number }
   | { type: "event"; messageId: number; event: AgentEvent }
   | { type: "approval"; approval: Approval }
-  | { type: "ping"; message: Message };
+  | { type: "ping"; message: Message }
+  /** The user pressed Stop: the core saved what streamed so far. */
+  | { type: "stopped"; messageId: number };
 
 export const emptyChat: ChatState = { messages: [], streamingId: null, rateLimitedUntil: null, loose: [], context: null };
 
@@ -121,6 +123,10 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     }
     case "ping":
       return { ...state, messages: byId([...state.messages, action.message]) };
+    case "stopped": {
+      const messages = state.messages.map((m) => (m.id === action.messageId && m.status === "streaming" ? { ...m, status: "interrupted" as const } : m));
+      return { ...state, messages, streamingId: state.streamingId === action.messageId ? null : state.streamingId };
+    }
     case "approval": {
       const a = action.approval;
       const loose = state.loose.filter((x) => x.id !== a.id);

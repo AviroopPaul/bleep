@@ -57,7 +57,7 @@ test("dark mode: settings text is readable", async ({ page }) => {
 test("dark mode: chat Send button and card text are readable", async ({ page }) => {
   await page.goto("/?mock=1#chat");
   await page.getByLabel("Message bleep").fill("hi");
-  expect(await contrast(page, ".composer button"), "Send").toBeGreaterThanOrEqual(4.5);
+  expect(await contrast(page, ".composer .send"), "Send").toBeGreaterThanOrEqual(4.5);
   await page.getByLabel("Message bleep").fill("add a reminder to pay rent at 6 PM");
   await page.getByLabel("Message bleep").press("Enter");
   await expect(page.getByRole("region", { name: "Add to your calendar?" })).toBeVisible();
