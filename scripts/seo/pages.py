@@ -19,9 +19,9 @@ import subprocess
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "landing")
 SITE = "https://bleep-omega.vercel.app"
-UPDATED = "2026-11-18"
-UPDATED_TEXT = "18 Nov 2026"
-VERSION = "0.5.0"
+UPDATED = "2026-11-19"
+UPDATED_TEXT = "19 Nov 2026"
+VERSION = "0.5.1"
 BREW = "brew install --cask AviroopPaul/tap/bleep"
 CURL = f"curl -fsSL {SITE}/install.sh | sh"
 
