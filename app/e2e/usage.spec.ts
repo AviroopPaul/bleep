@@ -44,6 +44,22 @@ test("local build shows (local) in the header and the header still fits", async 
   expect(fits).toBe(true);
 });
 
+test("nightly build shows no tag on the avatars or Settings title, only in the version line", async ({ page }) => {
+  await page.goto("/?mock=1&flavor=nightly#droid");
+  await expect(page.getByLabel(/^bleep \(nightly\)\./)).toBeVisible();
+  await expect(page.locator(".droid-dev")).toHaveCount(0);
+  await page.goto("/?mock=1&flavor=nightly#chat");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "bleep (nightly)" })).toBeAttached();
+  await expect(page.locator(".head-dev")).toHaveCount(0);
+  await page.goto("/?mock=1&flavor=nightly#settings");
+  await page.reload();
+  await expect(page.locator(".dev-tag")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Updates", exact: true }).click();
+  // The real nightly version reads "0.5.2-nightly.YYYYMMDD.N", so the tag shows here.
+  await expect(page.getByRole("heading", { name: "bleep 0.2.0" })).toBeVisible();
+});
+
 test("chat has no Usage tab; the gear opens Settings", async ({ page }) => {
   await page.goto("/?mock=1#chat");
   await expect(page.getByRole("tab", { name: "Usage", exact: true })).toHaveCount(0);

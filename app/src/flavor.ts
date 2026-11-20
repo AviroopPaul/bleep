@@ -9,6 +9,8 @@ export type Flavor = "prod" | "nightly" | "local";
 export const FLAVOR: Flavor = raw === "nightly" || raw === "local" ? raw : "prod";
 /** The short tag after the name, or "" for prod. */
 export const TAG = FLAVOR === "prod" ? "" : FLAVOR;
+/** The tag shown on the avatar and the Settings title. Only local shows one; nightly shows its name in the version line only. */
+export const BADGE = FLAVOR === "local" ? TAG : "";
 /** A local build never updates itself. */
 export const LOCAL = FLAVOR === "local";
 export const NAME = TAG ? `bleep (${TAG})` : "bleep";
