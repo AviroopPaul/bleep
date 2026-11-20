@@ -18,7 +18,7 @@ import { Markdown } from "./Markdown";
 import { Avatar, useAvatar } from "../avatar/Avatar";
 import { AgentsView, useAgents } from "../agents/AgentsView";
 import { RemindersView, useReminders } from "../reminders/RemindersView";
-import { NAME, TAG } from "../flavor";
+import { BADGE, NAME } from "../flavor";
 import "./chat.css";
 
 const PAGE = 50;
@@ -332,7 +332,7 @@ export function ChatPanel() {
       <header className="panel-head" data-tauri-drag-region>
         <span className="head-mark">
           <span className="head-droid">{avatar && <Avatar cfg={avatar} still />}</span>
-          {TAG && <span className="head-dev" aria-hidden="true">{TAG}</span>}
+          {BADGE && <span className="head-dev" aria-hidden="true">{BADGE}</span>}
         </span>
         {/* The tabs and buttons need the room, so the buddy's head is the brand mark here. */}
         <h1 className="sr-only">{NAME}</h1>

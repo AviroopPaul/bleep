@@ -1,4 +1,4 @@
-import { TAG } from "../flavor";
+import { BADGE } from "../flavor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MailSettings } from "./MailSettings";
 import { Activity } from "./Activity";
@@ -235,7 +235,7 @@ export function Settings() {
       <div className="set-side">
         <div className="set-brand">
           <span className="set-bud">{avatar && <Avatar cfg={avatar} still />}</span>
-          <h1>Settings{TAG && <span className="dev-tag">({TAG})</span>}</h1>
+          <h1>Settings{BADGE && <span className="dev-tag">({BADGE})</span>}</h1>
         </div>
         <div className="tabs" role="tablist" aria-label="Settings" aria-orientation="vertical">
           {GROUPS.map((g) => (
