@@ -4,7 +4,7 @@ use crate::store::{ApprovalStatus, Kind, Message, MsgStatus, Role};
 use serde_json::json;
 
 fn m(id: i64, role: Role, kind: Kind, content: &str) -> Message {
-    Message { id, role, kind, content: content.into(), tool_steps: json!([]), tokens: None, status: MsgStatus::Done, session_id: Some(1), created_at: String::new(), approvals: vec![] }
+    Message { id, role, kind, content: content.into(), tool_steps: json!([]), tokens: None, status: MsgStatus::Done, session_id: Some(1), created_at: String::new(), approvals: vec![], error: None }
 }
 
 fn cfg(compact_at: u64, window: u64) -> MemoryConfig {

@@ -25,6 +25,30 @@ pub trait AgentRuntime: Send + Sync {
     async fn start_session(&self, cfg: SessionConfig) -> Result<SessionHandle>;
     async fn send(&self, s: &SessionHandle, msg: UserMessage) -> Result<EventStream>;
     async fn one_shot(&self, req: OneShot) -> Result<Value>;
+    /// A one-shot plus the exact tokens the backend reported for it. Backends that report
+    /// none give `None`.
+    async fn one_shot_with_usage(&self, req: OneShot) -> Result<(Value, Option<ShotUsage>)> {
+        Ok((self.one_shot(req).await?, None))
+    }
+}
+
+/// Tokens of one call as the provider counted them. `input` includes cache reads and writes.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ShotUsage {
+    pub input: u64,
+    pub output: u64,
+}
+
+/// Runs a background one-shot and logs it with the exact tokens the backend reported.
+pub async fn logged_one_shot(rt: &dyn AgentRuntime, store: &crate::store::Store, purpose: &str, req: OneShot) -> Result<Value> {
+    let tier = match req.tier {
+        Tier::Main => "main",
+        Tier::Small => "small",
+    };
+    let r = rt.one_shot_with_usage(req).await;
+    let u = r.as_ref().ok().and_then(|(_, u)| *u);
+    let _ = store.log_llm(rt.id(), tier, purpose, u.map(|u| u.input as i64), u.map(|u| u.output as i64), r.is_ok());
+    r.map(|(v, _)| v)
 }
 
 pub type EventStream = Pin<Box<dyn Stream<Item = AgentEvent> + Send>>;

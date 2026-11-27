@@ -2,6 +2,10 @@
 
 Floating macOS assistant. Plan and decisions: `docs/build-plan.md`. App: `app/` (Tauri 2, Rust core in `app/src-tauri`, React views in `app/src`). Landing page: `landing/` (Vercel). Its text pages (vs, alternatives, Claude Code, changelog, privacy) and `sitemap.xml` come from `scripts/seo/pages.py`: edit copy there and rerun it after each release. SEO/GEO plan: `docs/seo-audit.md`.
 
+## Model backends
+
+Every backend (API key, Claude Code, Codex, Antigravity, any later one) is only the LLM. bleep runs the agent loop, runs every tool and keeps the one chat thread in SQLite. A backend is a `ModelAdapter` under `src-tauri/src/runtime/api/agent.rs` and answers one step at a time. Never use a CLI's own sessions (`--resume`, thread ids), loop, MCP or tools for the chat. Build plan D13.
+
 ## Tests
 
 - **Locally, run only the tests for what you changed.** Rust: `cd app/src-tauri && cargo test --lib <module>`. Web: `cd app && npx vitest run <file>`, `npx playwright test <spec>`.

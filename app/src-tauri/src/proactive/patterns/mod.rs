@@ -104,8 +104,7 @@ impl PatternJob {
             return Some(0);
         }
         let schema = json!({"type": "object", "properties": {"patterns": {"type": "array", "items": {"type": "string"}, "maxItems": MAX_PATTERNS}}, "required": ["patterns"]});
-        let res = d.runtime.one_shot(OneShot { prompt: format!("{PATTERNS_PROMPT}{day}"), schema, tier: Tier::Small, images: vec![] }).await;
-        let _ = d.store.log_llm(d.runtime.id(), "small", "patterns", None, None, res.is_ok());
+        let res = crate::runtime::logged_one_shot(d.runtime.as_ref(), &d.store, "patterns", OneShot { prompt: format!("{PATTERNS_PROMPT}{day}"), schema, tier: Tier::Small, images: vec![] }).await;
         // Done for today either way: a failing call must not repeat every tick.
         let _ = d.store.record_ping(RUN_KIND, &key);
         let v = match res {

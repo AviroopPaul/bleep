@@ -85,6 +85,8 @@ pub enum ModelEvent {
     TextDelta(String),
     ToolCall { id: String, name: String, args: Value },
     Usage(Tokens),
+    /// The model's context window, when the backend reports it with the reply (Claude Code).
+    Window(u64),
     Stop(StopReason),
 }
 

@@ -53,8 +53,8 @@ function ReplyActions({ m, onRetry }: { m: Message; onRetry?: () => void }) {
   const t = clock(m.created_at);
   return (
     <div className="msg-acts">
-      <button type="button" aria-label={copied ? "Copied" : "Copy reply"} title="Copy" onClick={copy}>{copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}</button>
-      <button type="button" aria-label="Read aloud" title="Read aloud" onClick={() => void api.voiceSpeak(m.content, true)}><Volume2 aria-hidden="true" /></button>
+      {m.content && <button type="button" aria-label={copied ? "Copied" : "Copy reply"} title="Copy" onClick={copy}>{copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}</button>}
+      {m.content && <button type="button" aria-label="Read aloud" title="Read aloud" onClick={() => void api.voiceSpeak(m.content, true)}><Volume2 aria-hidden="true" /></button>}
       {onRetry && <button type="button" aria-label="Ask again" title="Ask again" onClick={onRetry}><RefreshCw aria-hidden="true" /></button>}
       {t && <time dateTime={m.created_at}>{t}</time>}
     </div>
@@ -75,7 +75,7 @@ function Bubble({ m, onRetry }: { m: Message; onRetry?: () => void }) {
   if (m.role === "user" && m.kind === "scheduled") return <div className="msg sched"><span className="tag">scheduled</span>{m.content}</div>;
   if (m.role === "user") return <div className="msg me">{m.content}</div>;
   const waiting = m.status === "streaming" && !m.content && !m.tool_steps.length;
-  const finished = m.status !== "streaming" && m.content.trim().length > 0;
+  const finished = m.status !== "streaming" && (m.content.trim().length > 0 || !!m.error);
   return (
     <>
       <div className={`msg bot ${m.status === "error" ? "error" : ""}`}>
@@ -85,8 +85,9 @@ function Bubble({ m, onRetry }: { m: Message; onRetry?: () => void }) {
         {waiting ? (
           <span className="typing shimmer" aria-label="bleep is thinking">Thinking...</span>
         ) : (
-          <span className="text"><Markdown text={m.content} /></span>
+          m.content && <span className="text"><Markdown text={m.content} /></span>
         )}
+        {m.error && <span className="msg-err" role="alert">{m.error}</span>}
         {m.status === "interrupted" && <span className="note">Stopped</span>}
       </div>
       {finished && <ReplyActions m={m} onRetry={onRetry} />}
@@ -271,9 +272,12 @@ export function ChatPanel() {
     } catch (e) {
       const msg = String(e);
       if (msg !== "busy") {
-        setSendError(msg);
-        // The core may have saved the turn with an error status; show what it stored.
-        api.history(null, PAGE).then((messages) => dispatch({ type: "history", messages, mode: "replace" })).catch(() => {});
+        // The core may have saved the turn with its error; then that row shows it, once.
+        api.history(null, PAGE).then((messages) => {
+          dispatch({ type: "history", messages, mode: "replace" });
+          const last = messages[messages.length - 1];
+          if (!(last?.role === "assistant" && last.status === "error")) setSendError(msg);
+        }).catch(() => setSendError(msg));
       }
     } finally {
       setSending(false);

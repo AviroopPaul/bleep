@@ -119,8 +119,7 @@ impl AnswerVetter for ModelVetter {
             return None;
         }
         let req = OneShot { prompt: prompt(original_ask, question, label), schema: schema(), tier: Tier::Small, images: vec![] };
-        let reply = self.runtime.one_shot(req).await;
-        let _ = self.store.log_llm(self.runtime.id(), "small", "answer", None, None, reply.is_ok());
+        let reply = crate::runtime::logged_one_shot(self.runtime.as_ref(), &self.store, "answer", req).await;
         let v = reply.ok()?;
         Some(Vet {
             ok: v.get("ok")?.as_bool()?,

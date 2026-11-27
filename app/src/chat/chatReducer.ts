@@ -82,7 +82,7 @@ function applyEvent(m: Message, ev: AgentEvent): Message {
     case "usage":
       return { ...m, tokens: ev.input + ev.output };
     case "error":
-      return { ...m, content: m.content ? `${m.content}\n${ev.message}` : ev.message, status: "error" };
+      return { ...m, error: ev.message, status: "error" };
     case "done":
       return { ...m, status: m.status === "error" ? "error" : "done" };
     case "rate_limited":

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, onAgents, type AgentAsk, type AgentChatLine, type AgentSession, type AgentsView as View } from "../ipc";
+import { ArrowUp } from "lucide-react";
 import { Markdown } from "../chat/Markdown";
 import { ago, answerNote, answersFor, askDetail, choicesOf, folder, groupSessions, handledLine, type Choice } from "./agentsText";
 
@@ -119,7 +120,7 @@ function ReplyForm({ busy, onSend }: { busy: boolean; onSend: (text: string) => 
           }
         }}
       />
-      <button type="submit" disabled={busy || !text.trim()}>Send</button>
+      <button type="submit" className="send" aria-label="Send" title="Send" disabled={busy || !text.trim()}><ArrowUp aria-hidden="true" /></button>
     </form>
   );
 }

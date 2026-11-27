@@ -106,6 +106,10 @@ export function installMocks(label: string) {
       { role: "tool", text: "Bash: cargo test" },
       { role: "assistant", text: "Renamed the flag in all 4 files and the tests pass. Should I also update the README?" },
     ];
+    // ?long=1: a long reply with lists, code and a table, as a real Claude Code turn ends.
+    if (q.has("long")) {
+      chats["claude:f"].push({ role: "assistant", text: "## What I fixed\n\n- **The context window was lost in the rebuild.** The old Claude runtime reported the model's window (1M for Sonnet). My new adapter did not, so a fresh install would fall back to 200K and compact at 160K. Your `config.toml` files already have 1M saved.\n  - The adapter now reads the window from each Claude Code reply and passes it to compaction. A new test covers this.\n- **Two stale comments:** one was left over from the tool-change code. The other said compaction prompts go as a command-line argument, but they now go on stdin.\n\n| Part | API mode | Claude Code mode |\n|---|---|---|\n| **Loop** | Ours ([agent.rs](app/src-tauri/src/runtime/api/agent.rs)) | Ours, with a very_long_identifier_that_does_not_wrap_at_all_in_the_cell |\n\n```bash\ncd app/src-tauri && cargo test --lib runtime::claude::adapter::tests::live_step_calls_a_tool -- --ignored --nocapture\n```\n\nThe runtime, chat, compaction and config tests pass. Should I ship the branch now (commit, PR, merge), or hold it?" });
+    }
     chats["claude:a"] = [
       { role: "user", text: "Rebase my branch on main and push it." },
       { role: "tool", text: "Bash: git rebase origin/main" },
@@ -269,9 +273,15 @@ export function installMocks(label: string) {
           calls.push(cmd);
           return null;
         case "chat_send": {
-          if (a.text === "fail please") throw "bleep could not reach the model: spawn failed";
+          if (a.text === "fail please") throw "bleep could not start the reply. Send again to continue.";
           next += 2;
           const id = next;
+          if (String(a.text).includes("break")) {
+            later(100, () => chatEv(id, { type: "text_delta", text: "Here is half" }));
+            later(150, () => chatEv(id, { type: "error", message: "Claude Code stopped responding. Send again to continue.", retryable: true }));
+            later(200, () => chatEv(id, { type: "done", runtime_session_id: null }));
+            return id;
+          }
           if (String(a.text).includes("slow")) {
             // Streams a little, then hangs until Stop.
             later(100, () => chatEv(id, { type: "tool_start", id: "t1", name: "calendar_list", args: {} }));

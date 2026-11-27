@@ -194,6 +194,8 @@ export interface Message {
   session_id: number | null;
   created_at: string;
   approvals?: Approval[];
+  /** Why the reply failed, in plain words. Never part of `content`. */
+  error?: string | null;
 }
 
 export type AgentEvent =

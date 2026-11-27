@@ -73,6 +73,7 @@ Prior work: `~/Documents/code/valet/docs/architecture.html` (9 Nov). It has the 
 | D9 | **Own compaction** at a set token count | Each CLI's built-in compact | Same behaviour under every runtime. Facts saved to memory first, and a visible marker in the chat. |
 | D10 | **Rules first, small model second, main model last** | One big model for everything | Protects my plan. Most events are noise and cost nothing. |
 | D11 | **Watch coding agents through their own hooks and protocols:** Claude Code hooks, the Codex app-server | Reading the screen, typing into terminals | Both tools expose "waiting on you" as data. Approvals go back through the same channel the tool already trusts. No screen automation (non-goal). |
+| D13 | **Every backend is only the model.** bleep runs the agent loop, runs every tool, and keeps the one chat thread in SQLite. A backend (API key, Claude Code, Codex, Antigravity, any later one) answers one model step at a time, with no session of its own (27 Nov 2026) | Letting a CLI run its own loop, call the tools over MCP and keep the history (`--resume`, thread ids) | One thread under every backend. A CLI's session file can be missing (a copied database gave "No conversation found" errors), and its loop and limits differ per vendor. A backend is a `ModelAdapter` under `runtime/api/agent.rs`. |
 | D12 | **Agent approvals are decided by rules in code.** The model may only make a call stricter | Letting the model decide | The ask text comes from an agent that may have read untrusted pages. A model can be talked into "yes". A rule cannot. |
 
 Considered and dropped on 12 Nov 2026: using Google's official Gmail and Calendar MCP servers through my claude.ai connectors. They work in headless Claude Code today, but only Claude can reach them, so they fail G5.
@@ -166,19 +167,18 @@ pub trait AgentRuntime: Send + Sync {
 - **Plan limits:** a `RateLimited` event shows in the chat ("Limit reached, back at 4:10 PM") and pauses proactive model work until the reset. Rules-only reminders keep working.
 - **Switching:** settings has a runtime picker. Switching starts a fresh session seeded with the latest compaction summary plus the last 10 turns (the same path as compaction, section 8.6). The visible chat history does not change.
 
-#### Claude Code backend (Phase 1)
+#### Claude Code backend (Phase 1, reworked 27 Nov 2026 under D13)
 
-- **Chat:** spawn `claude` with `--print --input-format stream-json --output-format stream-json --verbose`, plus:
-  - `--model sonnet` (from the `main` tier),
-  - `--mcp-config <temp json>` that points at bleep's MCP server, and `--strict-mcp-config` so none of my other MCP servers or claude.ai connectors load,
-  - `--tools ""` so Bash, Edit, WebFetch and every other built-in tool are off, and `--allowedTools mcp__bleep` (server-level allow; confirmed on 12 Nov 2026: no permission denials, and the session sees only `mcp__bleep__*` tools) so bleep's tools run without CLI prompts, because bleep's own gate decides,
-  - `--setting-sources ""` so my hooks, plugins and global CLAUDE.md never load,
-  - `--append-system-prompt-file <file>` with the system prompt,
-  - `--resume <session-id>` when a session exists.
+- **Only the model:** bleep's own loop (`runtime/api/agent.rs`) calls `ClaudeCodeAdapter` (`runtime/claude/adapter.rs`) once per model step. Each step is one stateless `claude -p` with `--input-format stream-json --output-format stream-json --verbose --include-partial-messages`, plus:
+  - `--model` from the tier,
+  - `--tools ""`, `--strict-mcp-config` (and no `--mcp-config`), `--setting-sources ""` and `--disable-slash-commands`: Claude Code runs no tool and loads nothing of mine,
+  - `--system-prompt-file <file>`: bleep's prompt replaces Claude Code's, with the protocol and bleep's tool list after it,
+  - `--no-session-persistence`, and never `--resume`,
+  - `--json-schema` with `{text, tool_calls}` when tools are on. The reply streams as `input_json_delta`, so bleep reads the `text` field as it arrives.
+- **History:** the whole conversation goes in one user message as JSON lines (user, assistant with tool_calls, tool_result), from bleep's `api_messages` table. Prompt caching still hits, because each step only adds lines at the end.
 - **Env:** `CLAUDE_CONFIG_DIR=~/.bleep/claude-home`. Working dir: an empty folder. I sign in once with `CLAUDE_CONFIG_DIR=~/.bleep/claude-home claude auth login`; settings has a button that opens this in Terminal.
-- **Keep it warm:** one child process stays alive for the main chat. Each new message is one JSON line on stdin. If the child dies, restart it with `--resume`.
-- **One-shots:** a separate `claude -p --output-format json --json-schema ... --model haiku --tools "" --no-session-persistence`. About 2.6 s per call (measured in the Valet doc).
-- **Tested on 12 Nov 2026:** `--strict-mcp-config` with `--setting-sources ""` runs fine headless and loads no other servers.
+- **One-shots:** the same adapter with the forced tool's schema as `--json-schema`; images go in the user message.
+- **Learned on 27 Nov 2026 (Claude Code 2.1.325):** a `--json-schema` call is one model call (`num_turns` 2 counts the StructuredOutput tool). Haiku needs to be told that bleep's tools are real and reached through `tool_calls`, or it says the tool "isn't available". A step takes 3 to 4 s on Haiku.
 - **Learned in Phase 9:** OpenRouter reserves credit for `max_tokens` before a call and answers `402` when the balance is short, so a low balance fails a large `max_tokens` even for a tiny reply. Gemini's OpenAI-compatible endpoint takes tools and `tool_choice`, gives ids like `function-call-<n>`, lists models without context windows, and counts thinking against `max_tokens` (a tool call came back with `finish_reason: length` at 100 tokens). OpenAI-format usage counts cached tokens inside `prompt_tokens`; Anthropic counts them apart. A forced tool call (`answer` with the JSON schema) gives structured one-shots on both formats. Tested live on 15 Nov 2026 with OpenRouter (`google/gemini-2.5-flash`) and Gemini direct.
 - **Learned in Phase 7:** rmcp 3.9 has the whole MCP client OAuth flow (`AuthorizationManager`, `AuthorizationSession`, `AuthClient`), on reqwest 0.13, so bleep carries reqwest 0.12 and 0.13 side by side. rmcp refreshes a token 30 s before it expires, and it erases error types on the way out, so "auth required" is known by its text. It has no token revocation; bleep calls the `revocation_endpoint` itself. Real servers vary: Linear answers `401` with `resource_metadata` and offers registration, S256 and revocation; DeepWiki needs no auth, answers as SSE, keeps no session, and sends no tool annotations, so every DeepWiki tool asks first until I set it to run at once.
 - **Learned in Phase 5:** Claude Code 2.1.325 fixes the system prompt when a session is created: `--resume` keeps the first `--append-system-prompt-file` and ignores a new one. The `result` line's `usage` adds up every model call in a turn, so the context size is the last `assistant` message's usage; `result.modelUsage.<model>.contextWindow` gives the window (1M for Sonnet on my plan, so the 250K default holds). `DISABLE_AUTO_COMPACT=1` turns off both auto-compact and idle compaction. One-shot prompts travel as a command-line argument, so the compaction transcript is capped at 150 KB.
@@ -188,14 +188,13 @@ pub trait AgentRuntime: Send + Sync {
 - **Learned in Phase 2:** Claude Code 2.1.319 aborts an MCP tool call that sends nothing for 300 s, and `MCP_TOOL_TIMEOUT` does not lift that. A per-server `"timeout": 660000` in the MCP config does: a live probe held a write call on an approval card for 371 s and the answer reached the model.
 - **Learned in Phase 1:** a stale `--resume` id fails within about 0.5 s with no input, so `start_session` waits up to 1.5 s when resuming. `ANTHROPIC_API_KEY` and the `CLAUDECODE` markers are removed from the child's env so it always uses the subscription. bleep's MCP server runs stateless with plain JSON replies, and Claude Code accepts that.
 
-#### Codex backend (Phase 6)
+#### Codex backend (later, under D13)
 
-- **Chat:** Codex's `app-server` mode, a long-lived JSON-RPC process over stdio (the same API the Codex IDE extensions use). Start a thread, send turns, read streamed events, resume a thread by id.
-- **Tools:** add bleep's MCP server as a streamable HTTP server with a bearer token (Codex config supports `url` plus `bearer_token_env_var`), passed through `-c` config overrides so I do not touch my own `~/.codex/config.toml`.
-- **Env:** `CODEX_HOME=~/.bleep/codex-home`, signed in once with my ChatGPT account. Working dir: an empty folder.
-- **Built-in tools:** Codex has its own shell and patch tools. The source (as of March 2026) has a `shell_tool` feature flag and an `include_apply_patch_tool` setting, so pass overrides that turn both off (exact keys to confirm on the installed version). Belt and braces: read-only sandbox, no network, empty working dir.
-- **One-shots:** `codex exec --json --output-schema <file>` (flag confirmed in the source).
-- **Source to read:** the Codex repo is cloned at `~/Documents/code/codex` (`codex-rs/app-server-protocol`, `codex-rs/exec`). The app-server protocol crate is Rust and may be usable directly.
+- **Only the model:** a `ModelAdapter` like Claude Code's. Each step is one stateless `codex exec --json --output-schema <file>` call with bleep's prompt, the conversation as JSON lines and the `{text, tool_calls}` schema. No `app-server` thread, no resume, no MCP.
+- **Built-in tools off:** Codex has its own shell and patch tools. Turn them off with config overrides (`shell_tool`, `include_apply_patch_tool`; confirm the keys on the installed version), with a read-only sandbox, no network and an empty working dir as a second guard.
+- **Env:** `CODEX_HOME=~/.bleep/codex-home`, signed in once with my ChatGPT account.
+- **Source to read:** the Codex repo is cloned at `~/Documents/code/codex` (`codex-rs/exec`).
+- **Antigravity:** the same pattern, tracked in issue #51.
 
 #### API backend, bring your own key (Phase 9)
 
@@ -283,7 +282,7 @@ Where proactive output shows up:
 ### 8.6 One chat and compaction
 
 - **What I see:** every message ever, loaded from SQLite in pages as I scroll up. Compaction never removes anything from view.
-- **What the model sees:** one runtime session, resumed across restarts.
+- **What the model sees:** bleep's own record of the current session (`api_messages`), sent in full each step, under every backend. Nothing depends on a CLI's session files.
 - **Trigger:** when the session's input tokens pass the threshold (default 250K, setting allows 200K to 300K):
   1. A `small` one-shot extracts durable facts. They go to today's daily note and become proposals for `MEMORY.md`.
   2. A `main` one-shot writes a summary of the session (target about 3K tokens): open loops, decisions, people, pending approvals.

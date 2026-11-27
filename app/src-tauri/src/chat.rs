@@ -58,11 +58,10 @@ pub fn prep_prompt(ev: &crate::connectors::calendar::CalEvent) -> String {
     )
 }
 
-pub const FRESH_SESSION_NOTE: &str = "Started a fresh Claude session. Your history is still here.";
-pub const TOOLS_CHANGED_NOTE: &str = "Tools changed. Started a fresh session.";
-
-/// The hash of the tool set the model would see now (`ToolHost::tools_hash`).
-pub type ToolsHashFn = Arc<dyn Fn() -> String + Send + Sync>;
+/// Shown when a reply could not start. The detail goes to the log, never to the chat.
+pub const START_FAILED: &str = "bleep could not start the reply. Send again to continue.";
+/// Shown when a reply ended without finishing and the model gave no reason.
+pub const CUT_OFF: &str = "The reply stopped early. Send again to continue.";
 
 #[derive(Serialize, Clone, Debug)]
 pub struct ChatEmit {
@@ -110,7 +109,6 @@ pub struct ChatService {
     window_sink: Option<WindowSink>,
     memory_config: Option<MemoryConfigFn>,
     compact_sink: Option<CompactSink>,
-    tools_hash: Option<ToolsHashFn>,
     /// Set by `into_arc`, so a turn can compact the chat when it ends.
     me: std::sync::OnceLock<std::sync::Weak<ChatService>>,
 }
@@ -153,7 +151,7 @@ impl Drop for BusyGuard {
 impl ChatService {
     pub fn new(store: Arc<Store>, runtime: Arc<dyn AgentRuntime>, mcp: McpEndpoint, emit: Emit, turns: TurnTracker) -> Self {
         Self { store, runtime, mcp, emit, session: Mutex::new(None), session_instance: Default::default(), busy: Default::default(), turn: Mutex::new(None), stop: Default::default(), turns, memory: None, window_sink: None, memory_config: None, compact_sink: None,
-            tools_hash: None, me: Default::default() }
+            me: Default::default() }
     }
 
     /// A turn bleep starts itself (for example "Prep me"): the chat shows `label`,
@@ -223,8 +221,7 @@ impl ChatService {
         let trans = c::transcript(old.seed.as_deref(), &msgs);
 
         // 1. Facts (optional): suggestions for MEMORY.md and lines in today's note.
-        let facts = self.runtime.one_shot(OneShot { prompt: format!("{}{trans}", c::FACTS_PROMPT), schema: c::facts_schema(), tier: Tier::Small, images: vec![] }).await;
-        let _ = self.store.log_llm(rid, "small", "compaction", None, None, facts.is_ok());
+        let facts = crate::runtime::logged_one_shot(self.runtime.as_ref(), &self.store, "compaction", OneShot { prompt: format!("{}{trans}", c::FACTS_PROMPT), schema: c::facts_schema(), tier: Tier::Small, images: vec![] }).await;
         match facts {
             Ok(v) => {
                 let list = v.get("facts").and_then(Value::as_array).cloned().unwrap_or_default();
@@ -243,8 +240,7 @@ impl ChatService {
         }
 
         // 2. Summary. Without one, only a hard stop goes on.
-        let summary = self.runtime.one_shot(OneShot { prompt: format!("{}{trans}", c::SUMMARY_PROMPT), schema: c::summary_schema(), tier: Tier::Main, images: vec![] }).await;
-        let _ = self.store.log_llm(rid, "main", "compaction", None, None, summary.is_ok());
+        let summary = crate::runtime::logged_one_shot(self.runtime.as_ref(), &self.store, "compaction", OneShot { prompt: format!("{}{trans}", c::SUMMARY_PROMPT), schema: c::summary_schema(), tier: Tier::Main, images: vec![] }).await;
         let summary = match summary {
             Ok(v) => v.get("summary").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(String::from),
             Err(e) => {
@@ -270,24 +266,6 @@ impl ChatService {
         self.store.rollover_session(old.id, &kept, used as i64, rid, &seed, &divider)?;
         *self.session.lock().await = None;
         self.ensure_session().await
-    }
-
-    /// A session started with another tool set ends at the next send; a fresh one carries on.
-    pub fn with_tools_hash(mut self, f: ToolsHashFn) -> Self {
-        self.tools_hash = Some(f);
-        self
-    }
-
-    /// Ends `old` and starts a session whose seed (made in code, no model call) holds the old
-    /// seed, the open approvals and the last turns. Claude Code reads tools only at start.
-    fn tools_rollover(&self, old: &Session, hash: &str) -> anyhow::Result<Session> {
-        let rid = self.runtime.id();
-        let msgs = self.store.session_messages(old.id)?;
-        let pending = self.store.pending_approvals()?;
-        let seed = crate::compaction::seed(old.seed.as_deref(), &pending, &msgs);
-        let id = self.store.rollover_session(old.id, "", old.context_used.unwrap_or(0), rid, &seed, TOOLS_CHANGED_NOTE)?;
-        self.store.set_session_tools_hash(id, hash)?;
-        self.store.current_session(rid)?.ok_or_else(|| anyhow::anyhow!("no session after the tool change"))
     }
 
     pub fn with_window_sink(mut self, sink: WindowSink) -> Self {
@@ -320,13 +298,14 @@ impl ChatService {
         SessionConfig { system_prompt: system_prompt(&mem, session.seed.as_deref()), mcp: self.mcp.clone(), tier: Tier::Main, resume_id }
     }
 
-    /// Resume the current session, or start one. A stale resume id starts fresh, once.
+    /// Resume the current session, or start one. bleep keeps the history, so a session the
+    /// runtime cannot find (a chat from before bleep ran the loop, or a copied database)
+    /// starts again quietly from the chat's own record.
     pub async fn ensure_session(&self) -> anyhow::Result<()> {
         let mut slot = self.session.lock().await;
-        let hash = self.tools_hash.as_ref().map(|f| f());
         if let Some((s, _)) = slot.as_ref() {
-            // A runtime switch in Settings, or new tools, needs another session.
-            if s.runtime == self.runtime.id() && self.session_instance.load(Ordering::SeqCst) == self.runtime.instance() && (hash.is_none() || s.tools_hash == hash) {
+            // A runtime switch in Settings needs another session.
+            if s.runtime == self.runtime.id() && self.session_instance.load(Ordering::SeqCst) == self.runtime.instance() {
                 return Ok(());
             }
             *slot = None;
@@ -336,37 +315,22 @@ impl ChatService {
             Some(s) => s,
             None => self.store.create_session(rid)?,
         };
-        if let Some(h) = &hash {
-            match session.tools_hash.as_deref() {
-                Some(old) if old == h => {}
-                // The runtime saw the old tools: start fresh so it lists the new ones.
-                Some(_) if session.runtime_session_id.is_some() => session = self.tools_rollover(&session, h)?,
-                // No hash yet (older session) or nothing sent yet: just record it.
-                _ => {
-                    self.store.set_session_tools_hash(session.id, h)?;
-                    session.tools_hash = Some(h.clone());
-                }
-            }
-        }
         let cfg = self.cfg(&mut session, true);
         let handle = match self.runtime.start_session(cfg).await {
             Ok(h) => (session, h),
             Err(e) if session.runtime_session_id.is_some() && e.downcast_ref::<StaleResume>().is_some() => {
-                eprintln!("bleep: resume failed, starting fresh: {e}");
+                eprintln!("bleep: no saved history for this session, carrying the chat over: {e}");
+                let msgs = self.store.session_messages(session.id)?;
+                let pending = self.store.pending_approvals()?;
+                let seed = crate::compaction::seed(session.seed.as_deref(), &pending, &msgs);
                 self.store.end_session(session.id)?;
                 let mut fresh = self.store.create_session(rid)?;
-                if let Some(h) = &hash {
-                    self.store.set_session_tools_hash(fresh.id, h)?;
-                    fresh.tools_hash = Some(h.clone());
-                }
-                // The seed carries over: it is still the context this chat needs.
-                if let Some(seed) = &session.seed {
-                    self.store.set_session_seed(fresh.id, seed)?;
-                    fresh.seed = Some(seed.clone());
+                if !seed.trim().is_empty() {
+                    self.store.set_session_seed(fresh.id, &seed)?;
+                    fresh.seed = Some(seed);
                 }
                 let cfg = self.cfg(&mut fresh, false);
                 let h = self.runtime.start_session(cfg).await?;
-                self.store.insert_message(NewMessage { role: Role::System, kind: Kind::System, content: FRESH_SESSION_NOTE.into(), status: MsgStatus::Done, session_id: Some(fresh.id) })?;
                 (fresh, h)
             }
             Err(e) => return Err(e),
@@ -387,7 +351,10 @@ impl ChatService {
             return Err(ChatError::Busy);
         }
         let guard = BusyGuard(self.busy.clone());
-        self.ensure_session().await?;
+        if let Err(e) = self.ensure_session().await {
+            eprintln!("bleep: chat session: {e:#}");
+            return Err(ChatError::Other(START_FAILED.into()));
+        }
         let (session_id, handle, new_memory) = {
             let slot = self.session.lock().await;
             let (s, h) = slot.as_ref().expect("session ensured");
@@ -407,9 +374,10 @@ impl ChatService {
         let stream = match self.runtime.send(&handle, UserMessage { text: sent }).await {
             Ok(s) => s,
             Err(e) => {
-                let msg = format!("bleep could not reach the model: {e}");
-                self.store.finish_message(aid, &msg, &Value::Array(vec![]), None, MsgStatus::Error)?;
-                return Err(ChatError::Other(msg));
+                eprintln!("bleep: chat send: {e:#}");
+                self.store.finish_message(aid, "", &Value::Array(vec![]), None, MsgStatus::Error)?;
+                self.store.set_message_error(aid, START_FAILED)?;
+                return Err(ChatError::Other(START_FAILED.into()));
             }
         };
         if let Some(mem) = new_memory {
@@ -462,7 +430,7 @@ async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i
     let mut text = String::new();
     let mut steps: Vec<Value> = vec![];
     let mut tokens = None;
-    let mut errored = false;
+    let mut error: Option<String> = None;
     // Stays Error if the stream ends without Done.
     let mut status = MsgStatus::Error;
     let mut ack = None;
@@ -509,15 +477,10 @@ async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i
                 }
             }
             AgentEvent::RateLimited { .. } => {}
-            AgentEvent::Error { message, .. } => {
-                if !text.is_empty() {
-                    text.push('\n');
-                }
-                text.push_str(&message);
-                errored = true;
-            }
+            // Kept apart from the reply text: the model never sees it as something it said.
+            AgentEvent::Error { message, .. } => error = Some(message),
             AgentEvent::Done { runtime_session_id } => {
-                status = if errored { MsgStatus::Error } else { MsgStatus::Done };
+                status = if error.is_some() { MsgStatus::Error } else { MsgStatus::Done };
                 if let Some(id) = runtime_session_id {
                     let _ = store.set_runtime_session_id(session_id, &id);
                 }
@@ -528,6 +491,9 @@ async fn run_turn(store: Arc<Store>, emit: Emit, runtime_id: &str, session_id: i
     let _ = store.log_llm(runtime_id, "main", "chat", usage.map(|u| u.0), usage.map(|u| u.1), status == MsgStatus::Done);
     drop(stream);
     let _ = store.finish_message(aid, &text, &Value::Array(steps), tokens, status);
+    if status == MsgStatus::Error {
+        let _ = store.set_message_error(aid, error.as_deref().unwrap_or(CUT_OFF));
+    }
     if let Some(a) = ack {
         let _ = a.send(());
     }
@@ -665,10 +631,23 @@ mod tests {
         chat.ensure_session().await.unwrap();
         let cur = r.store.current_session("claude").unwrap().unwrap();
         assert_ne!(cur.id, old.id, "old session ended, new one made");
-        assert_eq!(r.rt.started.lock().unwrap().last().unwrap().resume_id, None);
-        let h = r.store.page_messages(None, 50).unwrap();
-        assert_eq!(h.last().unwrap().content, FRESH_SESSION_NOTE);
-        assert_eq!(h.last().unwrap().role, Role::System);
+        let started = r.rt.started.lock().unwrap().clone();
+        assert_eq!(started.last().unwrap().resume_id, None);
+        assert!(r.store.page_messages(None, 50).unwrap().is_empty(), "no note: the history is bleep's, nothing was lost");
+    }
+
+    #[tokio::test]
+    async fn stale_resume_carries_the_chat_over() {
+        let r = rig(vec![vec![AgentEvent::TextDelta { text: "Hi.".into() }, done("s1")]]);
+        let chat = service(&r);
+        chat.send("hello".into()).await.unwrap();
+        chat.wait_idle().await;
+        drop(chat);
+        r.rt.fail_start_with_resume.store(true, Ordering::SeqCst);
+        let chat = service(&r);
+        chat.ensure_session().await.unwrap();
+        let started = r.rt.started.lock().unwrap().clone();
+        assert!(started.last().unwrap().system_prompt.contains("user: hello"), "the last turns go in the new prompt");
     }
 
     #[tokio::test]
@@ -791,7 +770,7 @@ mod tests {
         chat.send("x".into()).await.unwrap();
         chat.wait_idle().await;
         let m = r.store.page_messages(None, 1).unwrap().remove(0);
-        assert_eq!((m.content.as_str(), m.status), ("half\nlost", MsgStatus::Error));
+        assert_eq!((m.content.as_str(), m.status, m.error.as_deref()), ("half", MsgStatus::Error, Some("lost")), "the error is kept apart from the reply");
         assert!(chat.send("again".into()).await.is_ok(), "not busy after an error");
     }
 
@@ -802,8 +781,8 @@ mod tests {
         let chat = service(&r);
         assert!(chat.send("x".into()).await.is_err());
         let m = r.store.page_messages(None, 1).unwrap().remove(0);
-        assert_eq!((m.role, m.status), (Role::Assistant, MsgStatus::Error));
-        assert!(!m.content.is_empty());
+        assert_eq!((m.role, m.status, m.error.as_deref()), (Role::Assistant, MsgStatus::Error, Some(START_FAILED)));
+        assert!(m.content.is_empty(), "no raw error in the reply");
         r.rt.fail_send.store(false, Ordering::SeqCst);
         assert!(chat.send("y".into()).await.is_ok(), "not left busy");
     }
@@ -931,63 +910,6 @@ mod tests {
 
     fn dividers(r: &Rig) -> Vec<String> {
         r.store.page_messages(None, 100).unwrap().into_iter().filter(|m| m.kind == Kind::Divider).map(|m| m.content).collect()
-    }
-
-    fn hashed(r: &Rig, h: &Arc<StdMutex<String>>) -> ChatService {
-        let h = h.clone();
-        service(r).with_tools_hash(Arc::new(move || h.lock().unwrap().clone()))
-    }
-
-    #[tokio::test]
-    async fn changed_tools_start_a_fresh_session_with_a_seed() {
-        let r = rig(vec![vec![AgentEvent::TextDelta { text: "Hi.".into() }, done("s1")], vec![done("s2")]]);
-        let h = Arc::new(StdMutex::new("a".to_string()));
-        let chat = hashed(&r, &h);
-        chat.send("hello".into()).await.unwrap();
-        chat.wait_idle().await;
-        let first = r.store.current_session("claude").unwrap().unwrap();
-        assert_eq!(first.tools_hash.as_deref(), Some("a"));
-        r.store.insert_approval("dayblocks_move_task", &serde_json::json!({"tool": "move_task"}), None).unwrap();
-        *h.lock().unwrap() = "b".into();
-        chat.send("again".into()).await.unwrap();
-        chat.wait_idle().await;
-        let cur = r.store.current_session("claude").unwrap().unwrap();
-        assert_ne!(cur.id, first.id);
-        assert_eq!(cur.tools_hash.as_deref(), Some("b"));
-        let seed = cur.seed.unwrap_or_default();
-        assert!(seed.contains("user: hello") && seed.contains("dayblocks_move_task"), "{seed}");
-        assert_eq!(dividers(&r), [TOOLS_CHANGED_NOTE]);
-        let started = r.rt.started.lock().unwrap().clone();
-        assert_eq!(started.len(), 2);
-        assert!(started[1].resume_id.is_none() && started[1].system_prompt.contains("user: hello"));
-        assert_eq!(r.rt.sent.lock().unwrap().last().map(String::as_str), Some("again"));
-    }
-
-    #[tokio::test]
-    async fn the_same_tools_keep_the_session() {
-        let r = rig(vec![vec![done("s1")], vec![done("s1")]]);
-        let h = Arc::new(StdMutex::new("a".to_string()));
-        let chat = hashed(&r, &h);
-        chat.send("one".into()).await.unwrap();
-        chat.wait_idle().await;
-        chat.send("two".into()).await.unwrap();
-        chat.wait_idle().await;
-        assert_eq!(r.rt.started.lock().unwrap().len(), 1);
-        assert!(dividers(&r).is_empty());
-    }
-
-    #[tokio::test]
-    async fn an_older_session_without_a_hash_only_records_it() {
-        let r = rig(vec![vec![done("s1")]]);
-        let old = r.store.create_session("claude").unwrap();
-        r.store.set_runtime_session_id(old.id, "s1").unwrap();
-        let h = Arc::new(StdMutex::new("a".to_string()));
-        let chat = hashed(&r, &h);
-        chat.send("hi".into()).await.unwrap();
-        chat.wait_idle().await;
-        let cur = r.store.current_session("claude").unwrap().unwrap();
-        assert_eq!((cur.id, cur.tools_hash.as_deref()), (old.id, Some("a")));
-        assert_eq!(r.rt.started.lock().unwrap()[0].resume_id.as_deref(), Some("s1"));
     }
 
     #[test]
