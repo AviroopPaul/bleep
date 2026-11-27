@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 /// The last 10 turns: 10 user and 10 assistant rows.
 pub const LAST_ROWS: usize = 20;
 pub const TURN_CHARS: usize = 2_000;
-/// The transcript goes to the one-shot as a command-line argument, so it stays well under ARG_MAX.
+/// Caps the transcript a compaction one-shot reads, so the call stays small.
 pub const TRANSCRIPT_BYTES: usize = 150_000;
 /// About 3K tokens.
 pub const SUMMARY_CHARS: usize = 12_000;

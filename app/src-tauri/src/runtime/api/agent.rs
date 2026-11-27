@@ -4,7 +4,7 @@
 use super::adapter::ModelAdapter;
 use super::types::*;
 use crate::remote::client::client_info;
-use crate::runtime::{preview, AgentEvent, AgentRuntime, EventStream, OneShot, RuntimeHealth, SessionConfig, SessionHandle, StaleResume, Tier, UserMessage};
+use crate::runtime::{preview, AgentEvent, AgentRuntime, EventStream, OneShot, RuntimeHealth, SessionConfig, SessionHandle, ShotUsage, StaleResume, Tier, UserMessage};
 use crate::store::api::ApiUsage;
 use crate::store::Store;
 use async_trait::async_trait;
@@ -27,6 +27,7 @@ const ONE_SHOT_TIMEOUT: Duration = Duration::from_secs(120);
 /// A tool call can wait on an approval card, so it gets a long time.
 const TOOL_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const ANSWER_TOOL: &str = "answer";
+pub const CONTEXT_FULL: &str = "The chat got too long for the model, so bleep is making room. Send again to continue.";
 pub const KEY_REJECTED: &str = "The API key was rejected. Open Settings, then Model, to fix it.";
 
 type Live = RunningService<RoleClient, ClientConfig>;
@@ -51,11 +52,19 @@ pub struct Core {
     mcp: tokio::sync::Mutex<Option<(String, Arc<Live>)>>,
     key_rejected: AtomicBool,
     retry_wait: Duration,
+    /// A local agent CLI (Claude Code, Codex): no API spend to log, and its sign-in errors
+    /// already say what to do.
+    local_agent: bool,
 }
 
 impl Core {
     pub fn new(choice: ApiChoice, adapter: Arc<dyn ModelAdapter>, store: Arc<Store>) -> Self {
-        Self { choice, adapter, store, models: Default::default(), cfg: Mutex::new(None), mcp: Default::default(), key_rejected: AtomicBool::new(false), retry_wait: Duration::from_secs(2) }
+        Self { choice, adapter, store, models: Default::default(), cfg: Mutex::new(None), mcp: Default::default(), key_rejected: AtomicBool::new(false), retry_wait: Duration::from_secs(2), local_agent: false }
+    }
+
+    pub fn local_agent(mut self) -> Self {
+        self.local_agent = true;
+        self
     }
 
     pub fn with_retry_wait(mut self, d: Duration) -> Self {
@@ -92,7 +101,15 @@ impl Core {
         self.models.read().unwrap().get(model).and_then(|m| m.window)
     }
 
+    fn learn_window(&self, model: &str, window: u64) {
+        let mut m = self.models.write().unwrap();
+        m.entry(model.to_string()).or_insert_with(|| ModelInfo { id: model.into(), name: None, window: None, price: None }).window = Some(window);
+    }
+
     fn record(&self, model: &str, purpose: &str, t: &Tokens) {
+        if self.local_agent {
+            return;
+        }
         let day = chrono::Local::now().date_naive().to_string();
         let cost = self.price(model).map(|p| p.cost(t));
         let _ = self.store.log_api_usage(&ApiUsage { day: &day, provider: &self.choice.provider, model, purpose, tokens_in: t.input, cache_read: t.cache_read, cache_write: t.cache_write, tokens_out: t.output, cost });
@@ -239,6 +256,7 @@ impl Core {
                         total.output += t.output;
                         last_input = t.all_input();
                     }
+                    Ok(ModelEvent::Window(w)) => self.learn_window(&model, w),
                     Ok(ModelEvent::Stop(_)) => {}
                     Err(e) => {
                         failed = Some(e);
@@ -303,15 +321,28 @@ impl Core {
         let (message, retryable) = match &e {
             ApiError::RateLimited { until } => {
                 out(AgentEvent::RateLimited { until: *until }).await;
-                let at = chrono::DateTime::from_timestamp(*until, 0).map(|t| t.with_timezone(&chrono::Local).format("%H:%M").to_string()).unwrap_or_default();
-                (format!("The provider's rate limit was hit. Try again after {at}."), true)
+                (limit_message(&self.choice.label, *until), true)
             }
+            ApiError::Auth(d) if self.local_agent => (d.clone(), false),
             ApiError::Auth(d) => (format!("{KEY_REJECTED} {d}"), false),
             ApiError::Retryable(d) => (d.clone(), true),
             ApiError::Fatal(d) => (d.clone(), false),
+            ApiError::ContextFull(d) => {
+                eprintln!("bleep: context full: {d}");
+                out(AgentEvent::ContextFull).await;
+                (CONTEXT_FULL.into(), true)
+            }
         };
         out(AgentEvent::Error { message, retryable }).await;
         out(AgentEvent::Done { runtime_session_id: Some(conv.to_string()) }).await;
+    }
+}
+
+/// The usage-limit line. `until` 0 means the reset time is not known.
+pub fn limit_message(label: &str, until: i64) -> String {
+    match chrono::DateTime::from_timestamp(until, 0).filter(|_| until > 0) {
+        Some(t) => format!("{label} hit its usage limit. Try again after {}.", t.with_timezone(&chrono::Local).format("%H:%M")),
+        None => format!("{label} hit its usage limit. Try again later."),
     }
 }
 
@@ -405,7 +436,13 @@ impl AgentRuntime for ApiRuntime {
         let conv = match &cfg.resume_id {
             Some(id) if self.store.api_conv_exists(id)? => id.clone(),
             Some(id) => return Err(StaleResume(format!("No saved conversation {id}.")).into()),
-            None => new_conv(),
+            None => {
+                let conv = new_conv();
+                if let Some(seed) = cfg.seed.as_deref().filter(|s| !s.trim().is_empty()) {
+                    self.save(&conv, &Msg::user_text(seed));
+                }
+                conv
+            }
         };
         *self.cfg.lock().unwrap() = Some(cfg);
         Ok(SessionHandle { resume_id: Some(conv) })
@@ -420,6 +457,10 @@ impl AgentRuntime for ApiRuntime {
     }
 
     async fn one_shot(&self, req: OneShot) -> anyhow::Result<Value> {
+        Ok(self.one_shot_with_usage(req).await?.0)
+    }
+
+    async fn one_shot_with_usage(&self, req: OneShot) -> anyhow::Result<(Value, Option<ShotUsage>)> {
         let model = self.model(req.tier).to_string();
         let mut parts = vec![Part::Text { text: req.prompt }];
         parts.extend(req.images.into_iter().map(|i| Part::Image { media_type: i.media_type, data_b64: i.data_b64 }));
@@ -434,20 +475,25 @@ impl AgentRuntime for ApiRuntime {
         };
         let run = async {
             let mut stream = self.open(&mreq).await?;
-            let (mut text, mut answer) = (String::new(), None);
+            let (mut text, mut answer, mut used) = (String::new(), None, None::<ShotUsage>);
             while let Some(ev) = stream.next().await {
                 match ev? {
                     ModelEvent::TextDelta(t) => text.push_str(&t),
                     ModelEvent::ToolCall { name, args, .. } if name == ANSWER_TOOL && answer.is_none() => answer = Some(args),
-                    ModelEvent::Usage(t) => self.record(&model, "one_shot", &t),
+                    ModelEvent::Usage(t) => {
+                        self.record(&model, "one_shot", &t);
+                        let u = used.get_or_insert_with(ShotUsage::default);
+                        u.input += t.all_input();
+                        u.output += t.output;
+                    }
                     _ => {}
                 }
             }
-            Ok::<_, ApiError>(answer.or_else(|| serde_json::from_str(text.trim().trim_start_matches("```json").trim_matches('`').trim()).ok()))
+            Ok::<_, ApiError>((answer.or_else(|| serde_json::from_str(text.trim().trim_start_matches("```json").trim_matches('`').trim()).ok()), used))
         };
         match tokio::time::timeout(ONE_SHOT_TIMEOUT, run).await {
-            Ok(Ok(Some(v))) => Ok(v),
-            Ok(Ok(None)) => Err(anyhow::anyhow!("The model gave no answer in the expected shape.")),
+            Ok(Ok((Some(v), used))) => Ok((v, used)),
+            Ok(Ok((None, _))) => Err(anyhow::anyhow!("The model gave no answer in the expected shape.")),
             Ok(Err(e)) => Err(anyhow::anyhow!("{e}")),
             Err(_) => Err(anyhow::anyhow!("The model did not answer within 2 minutes.")),
         }

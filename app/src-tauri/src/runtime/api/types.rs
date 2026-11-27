@@ -85,6 +85,8 @@ pub enum ModelEvent {
     TextDelta(String),
     ToolCall { id: String, name: String, args: Value },
     Usage(Tokens),
+    /// The model's context window, when the backend reports it with the reply (Claude Code).
+    Window(u64),
     Stop(StopReason),
 }
 
@@ -97,13 +99,21 @@ pub enum ApiError {
     /// Network, timeout, 5xx or overload.
     Retryable(String),
     Fatal(String),
+    /// The conversation is longer than the model's context window.
+    ContextFull(String),
+}
+
+/// Whether a provider or CLI error says the prompt did not fit the context window.
+pub fn is_context_full(text: &str) -> bool {
+    let t = text.to_lowercase();
+    ["prompt is too long", "context_length_exceeded", "maximum context length", "context length", "context window", "too many tokens", "input is too long"].iter().any(|p| t.contains(p))
 }
 
 impl std::fmt::Display for ApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ApiError::RateLimited { .. } => write!(f, "The provider's rate limit was hit."),
-            ApiError::Auth(m) | ApiError::Retryable(m) | ApiError::Fatal(m) => write!(f, "{m}"),
+            ApiError::Auth(m) | ApiError::Retryable(m) | ApiError::Fatal(m) | ApiError::ContextFull(m) => write!(f, "{m}"),
         }
     }
 }

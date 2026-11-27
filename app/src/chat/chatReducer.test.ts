@@ -58,12 +58,13 @@ describe("chatReducer", () => {
     expect(s.messages[1].status).toBe("done");
   });
 
-  it("error keeps partial text and marks error", () => {
+  it("error keeps partial text and holds the error apart", () => {
     let s = sent();
     s = chatReducer(s, { type: "event", messageId: 2, event: { type: "text_delta", text: "half" } });
     s = chatReducer(s, { type: "event", messageId: 2, event: { type: "error", message: "lost", retryable: true } });
     s = chatReducer(s, { type: "event", messageId: 2, event: { type: "done", runtime_session_id: null } });
-    expect(s.messages[1].content).toBe("half\nlost");
+    expect(s.messages[1].content).toBe("half");
+    expect(s.messages[1].error).toBe("lost");
     expect(s.messages[1].status).toBe("error");
     expect(s.streamingId).toBeNull();
   });

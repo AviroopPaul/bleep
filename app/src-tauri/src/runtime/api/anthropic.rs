@@ -173,6 +173,7 @@ impl WireParser for Parser {
                     Some("overloaded_error" | "api_error") => ApiError::Retryable(msg),
                     Some("rate_limit_error") => ApiError::RateLimited { until: chrono::Utc::now().timestamp() + 60 },
                     Some("authentication_error" | "permission_error") => ApiError::Auth(msg),
+                    _ if is_context_full(&msg) => ApiError::ContextFull(msg),
                     _ => ApiError::Fatal(msg),
                 });
             }

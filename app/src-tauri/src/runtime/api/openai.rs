@@ -158,6 +158,7 @@ impl WireParser for Parser {
             return Err(match code {
                 429 => ApiError::RateLimited { until: chrono::Utc::now().timestamp() + 60 },
                 401 | 403 => ApiError::Auth(msg),
+                _ if is_context_full(&msg) => ApiError::ContextFull(msg),
                 0 | 408 | 500..=599 => ApiError::Retryable(msg),
                 _ => ApiError::Fatal(msg),
             });

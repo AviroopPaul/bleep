@@ -42,9 +42,22 @@ test("a failed send is shown and the text is kept", async ({ page }) => {
   await expect(page.locator(".msg.me")).toHaveText(["hello"]);
   await box.fill("fail please");
   await box.press("Enter");
-  await expect(page.locator(".msg.sys.err")).toContainText("could not reach the model");
+  await expect(page.locator(".msg.sys.err")).toHaveText("bleep could not start the reply. Send again to continue.");
   await expect(box).toBeEnabled();
   await expect(box).toHaveValue("fail please");
+});
+
+test("an error mid-reply shows once, apart from the reply", async ({ page }) => {
+  await page.goto("/?mock=1#chat");
+  const box = page.getByLabel("Message bleep");
+  await box.fill("break it");
+  await box.press("Enter");
+  const bot = page.locator(".msg.bot").last();
+  await expect(bot.locator(".msg-err")).toHaveText("Claude Code stopped responding. Send again to continue.");
+  await expect(bot.locator(".text")).toHaveText("Here is half");
+  await expect(page.locator(".msg-err")).toHaveCount(1);
+  await expect(page.locator(".msg.sys.err")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Ask again" }).last()).toBeVisible();
 });
 
 test("a droid bubble shows in the chat after it is gone", async ({ page }) => {

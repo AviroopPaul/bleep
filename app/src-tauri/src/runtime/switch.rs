@@ -47,6 +47,9 @@ impl AgentRuntime for SwitchRuntime {
     async fn one_shot(&self, req: OneShot) -> Result<Value> {
         self.current().one_shot(req).await
     }
+    async fn one_shot_with_usage(&self, req: OneShot) -> Result<(Value, Option<ShotUsage>)> {
+        self.current().one_shot_with_usage(req).await
+    }
 }
 
 pub const CAP_REACHED: &str = "Today's API spend cap is reached, so proactive work is paused until tomorrow.";
@@ -108,10 +111,13 @@ impl AgentRuntime for CappedRuntime {
         self.inner.send(s, msg).await
     }
     async fn one_shot(&self, req: OneShot) -> Result<Value> {
+        Ok(self.one_shot_with_usage(req).await?.0)
+    }
+    async fn one_shot_with_usage(&self, req: OneShot) -> Result<(Value, Option<ShotUsage>)> {
         if self.budget.over() {
             anyhow::bail!(CAP_REACHED);
         }
-        self.inner.one_shot(req).await
+        self.inner.one_shot_with_usage(req).await
     }
 }
 

@@ -70,8 +70,7 @@ impl ScreenshotChecker for ModelChecker {
             return None;
         }
         let req = OneShot { prompt: prompt(original_ask, question), schema: schema(), tier: Tier::Small, images: vec![image.clone()] };
-        let reply = self.runtime.one_shot(req).await;
-        let _ = self.store.log_llm(self.runtime.id(), "small", "screenshot", None, None, reply.is_ok());
+        let reply = crate::runtime::logged_one_shot(self.runtime.as_ref(), &self.store, "screenshot", req).await;
         let v = reply.ok()?;
         Some(LookVerdict {
             matches: v.get("matches")?.as_bool()?,

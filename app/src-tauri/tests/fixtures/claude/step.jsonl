@@ -1,0 +1,7 @@
+{"type":"system","subtype":"init","session_id":"ignored"}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","name":"StructuredOutput"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"text\""}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":": \"Let me ch"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"eck.\\nOne"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":" sec.\", \"tool_calls\": [{\"name\": \"bleep_now\", \"args\": {}}]}"}}}
+{"type":"result","subtype":"success","is_error":false,"stop_reason":"tool_use","usage":{"input_tokens":2,"cache_creation_input_tokens":100,"cache_read_input_tokens":3000,"output_tokens":40},"modelUsage":{"claude-sonnet-5-5":{"contextWindow":1000000}},"structured_output":{"text":"Let me check.\nOne sec.","tool_calls":[{"name":"bleep_now","args":{}}]}}

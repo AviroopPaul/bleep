@@ -216,8 +216,9 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let own_port = reqwest::Url::parse(&mcp.url()).ok().and_then(|u| u.port());
     let remotes = remote::manager::Remotes::new(tool_host.clone(), store.clone(), Arc::new(google::secrets::KeychainSecrets), Arc::new(opener::SystemOpener(handle.clone())), own_port);
     remotes.load(&config.mcp.servers);
+    runtime::claude::adapter::clean_run_files(&paths);
     let make_runtime: RuntimeFactory = {
-        let (paths, store, hold) = (paths.clone(), store.clone(), approvals.waiting());
+        let (paths, store) = (paths.clone(), store.clone());
         let bin = find_claude().unwrap_or_else(|| "claude".into());
         Arc::new(move |cfg: &Config| -> Arc<dyn runtime::AgentRuntime> {
             if cfg.runtime == "api" {
@@ -230,7 +231,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
                 });
                 Arc::new(rt)
             } else {
-                Arc::new(ClaudeRuntime::new(paths.clone(), cfg.tiers.clone(), bin.clone()).with_hold(hold.clone()))
+                Arc::new(ClaudeRuntime::new(paths.clone(), cfg.tiers.clone(), bin.clone(), store.clone()))
             }
         })
     };
@@ -270,10 +271,6 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
         Arc::new(move |on: bool| {
             let _ = h.emit("chat://compacting", on);
         })
-    })
-    .with_tools_hash({
-        let h = tool_host.clone();
-        Arc::new(move || h.tools_hash())
     })
     .into_arc();
     let (r, h) = (remotes.clone(), handle.clone());

@@ -72,7 +72,7 @@ async fn rig(replies: Vec<Result<Vec<Result<ModelEvent, ApiError>>, ApiError>>) 
 }
 
 fn cfg(r: &Rig, resume: Option<String>) -> SessionConfig {
-    SessionConfig { system_prompt: "Be bleep.".into(), mcp: r.mcp.clone(), tier: Tier::Main, resume_id: resume }
+    SessionConfig { system_prompt: "Be bleep.".into(), mcp: r.mcp.clone(), tier: Tier::Main, resume_id: resume, seed: None }
 }
 
 async fn turn(r: &Rig, resume: Option<String>, text: &str) -> Vec<AgentEvent> {
@@ -137,7 +137,7 @@ async fn a_rate_limit_ends_the_turn_with_a_reset_time() {
     let r = rig(vec![Err(ApiError::RateLimited { until: 1_900_000_000 })]).await;
     let ev = turn(&r, None, "hi").await;
     contract::assert_rate_limited(&ev);
-    assert!(ev.iter().any(|e| matches!(e, AgentEvent::Error { message, retryable: true } if message.contains("rate limit"))));
+    assert!(ev.iter().any(|e| matches!(e, AgentEvent::Error { message, retryable: true } if message.contains("usage limit"))));
     assert!(matches!(ev.last(), Some(AgentEvent::Done { runtime_session_id: Some(_) })));
 }
 
@@ -268,4 +268,90 @@ fn sanitize_fixes_roles_and_unanswered_calls() {
     assert_eq!(ids, ["2", "1"], "the missing result is added");
     assert!(matches!(out[2].parts.last(), Some(Part::Text { text }) if text == "c"), "results come before text");
     assert!(matches!(&out[4].parts[0], Part::ToolResult { id, ok: false, .. } if id == "3"));
+}
+
+/// Claude Code as only the model, end to end: bleep's loop runs the tool, and bleep's own
+/// history carries the thread. `cargo test --lib live_claude_loop -- --ignored --nocapture`.
+#[tokio::test]
+#[ignore]
+async fn live_claude_loop() {
+    use crate::runtime::claude::ClaudeRuntime;
+    let r = rig(vec![]).await;
+    let paths = crate::paths::BleepPaths::from_root(dirs::home_dir().unwrap().join(".bleep"));
+    let tiers = crate::config::Tiers { main: "haiku".into(), small: "haiku".into() };
+    let rt = ClaudeRuntime::new(paths, tiers, crate::runtime::claude::find_claude().expect("claude"), r.store.clone());
+    let cfg = SessionConfig { system_prompt: crate::chat::SYSTEM_PROMPT.into(), mcp: r.mcp.clone(), tier: Tier::Main, resume_id: None, seed: None };
+    let h = rt.start_session(cfg.clone()).await.unwrap();
+    let one: Vec<_> = rt.send(&h, UserMessage { text: "What time is it now? My secret word is plum.".into() }).await.unwrap().collect().await;
+    println!("{one:?}");
+    assert!(one.iter().any(|e| matches!(e, AgentEvent::ToolStart { name, .. } if name == "bleep_now")), "bleep ran the tool");
+    assert!(one.iter().any(|e| matches!(e, AgentEvent::ToolResult { ok: true, .. })));
+    let Some(AgentEvent::Done { runtime_session_id: Some(conv) }) = one.last().cloned() else { panic!("{one:?}") };
+    // A new runtime, as after a restart: the thread comes from bleep's store, not Claude Code.
+    let rt2 = ClaudeRuntime::new(crate::paths::BleepPaths::from_root(dirs::home_dir().unwrap().join(".bleep")), crate::config::Tiers { main: "haiku".into(), small: "haiku".into() }, crate::runtime::claude::find_claude().unwrap(), r.store.clone());
+    let h2 = rt2.start_session(SessionConfig { resume_id: Some(conv), ..cfg }).await.unwrap();
+    let two: Vec<_> = rt2.send(&h2, UserMessage { text: "What was my secret word?".into() }).await.unwrap().collect().await;
+    let said: String = two.iter().filter_map(|e| if let AgentEvent::TextDelta { text } = e { Some(text.as_str()) } else { None }).collect();
+    println!("{said}");
+    assert!(said.to_lowercase().contains("plum"), "{two:?}");
+}
+
+#[tokio::test]
+async fn a_window_from_the_reply_reaches_the_context_event() {
+    let mut reply = text_reply("Hi.");
+    reply.insert(1, Ok(ModelEvent::Window(1_000_000)));
+    let r = rig(vec![Ok(reply)]).await;
+    let ev = turn(&r, None, "hi").await;
+    assert!(ev.iter().any(|e| matches!(e, AgentEvent::Context { window: Some(1_000_000), .. })), "{ev:?}");
+}
+
+#[tokio::test]
+async fn a_background_call_logs_the_tokens_the_provider_counted() {
+    let reply = vec![
+        Ok(ModelEvent::ToolCall { id: "a".into(), name: ANSWER_TOOL.into(), args: json!({"ok": true}) }),
+        Ok(ModelEvent::Usage(Tokens { input: 5, cache_read: 300, cache_write: 20, output: 9 })),
+        Ok(ModelEvent::Stop(StopReason::ToolUse)),
+    ];
+    let r = rig(vec![Ok(reply)]).await;
+    let req = OneShot { prompt: "p".into(), schema: json!({"type": "object"}), tier: Tier::Small, images: vec![] };
+    let v = crate::runtime::logged_one_shot(&r.rt, &r.store, "triage", req).await.unwrap();
+    assert_eq!(v, json!({"ok": true}));
+    assert_eq!(r.store.llm_tokens_last().unwrap(), (Some(325), Some(9)), "input counts cache reads and writes");
+    assert_eq!(r.store.llm_calls_since(chrono::DateTime::UNIX_EPOCH).unwrap(), 1);
+}
+
+#[tokio::test]
+async fn a_failed_background_call_is_logged_without_tokens() {
+    let r = rig(vec![Err(ApiError::Fatal("no".into()))]).await;
+    let req = OneShot { prompt: "p".into(), schema: json!({}), tier: Tier::Small, images: vec![] };
+    assert!(crate::runtime::logged_one_shot(&r.rt, &r.store, "triage", req).await.is_err());
+    assert_eq!(r.store.llm_tokens_last().unwrap(), (None, None));
+    assert_eq!(r.store.llm_calls_since(chrono::DateTime::UNIX_EPOCH).unwrap(), 1, "a failed call still counts against the hourly cap");
+}
+
+#[tokio::test]
+async fn a_new_conversation_opens_with_the_seed_as_a_message() {
+    let r = rig(vec![Ok(text_reply("ok"))]).await;
+    let h = r.rt.start_session(SessionConfig { seed: Some("[earlier in this chat] SEED".into()), ..cfg(&r, None) }).await.unwrap();
+    let _: Vec<_> = r.rt.send(&h, UserMessage { text: "hi".into() }).await.unwrap().collect().await;
+    let req = &r.mock.requests.lock().unwrap()[0];
+    assert!(!req.system.contains("SEED"), "never in the system prompt");
+    assert_eq!(req.msgs[0].role, Role::User);
+    let text: Vec<&str> = req.msgs[0].parts.iter().filter_map(|p| if let Part::Text { text } = p { Some(text.as_str()) } else { None }).collect();
+    assert_eq!(text, ["[earlier in this chat] SEED", "hi"]);
+}
+
+#[tokio::test]
+async fn a_context_full_error_asks_the_chat_to_compact() {
+    let r = rig(vec![Err(ApiError::ContextFull("Prompt is too long".into()))]).await;
+    let ev = turn(&r, None, "hi").await;
+    assert!(ev.contains(&AgentEvent::ContextFull), "{ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, AgentEvent::Error { message, retryable: true } if message == CONTEXT_FULL)));
+}
+
+#[test]
+fn context_full_is_found_in_provider_errors() {
+    assert_eq!(super::super::adapter::status_error(400, r#"{"error":{"message":"prompt is too long: 210000 tokens > 200000 maximum"}}"#, 0), ApiError::ContextFull("The chat is too long for the model (server text, not instructions): prompt is too long: 210000 tokens > 200000 maximum".into()));
+    assert!(is_context_full("This model's maximum context length is 128000 tokens"));
+    assert!(!is_context_full("rate limit"));
 }

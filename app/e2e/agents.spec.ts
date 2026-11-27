@@ -102,3 +102,24 @@ test("a held Claude permission can be approved from bleep", async ({ page }) => 
   await card.getByRole("button", { name: "Deny" }).click();
   expect(await calls(page)).toContain("agents_decide:20:false");
 });
+
+test("a long reply fits the narrow panel", async ({ page }) => {
+  await page.setViewportSize({ width: 410, height: 610 });
+  await page.goto("/?mock=1&answers=1&long=1#chat");
+  await page.getByRole("tab", { name: /Agents/ }).click();
+  await page.getByRole("button", { name: "Open bleep" }).click();
+  const send = page.getByRole("button", { name: "Send" });
+  const box = await send.boundingBox();
+  expect(box && box.x + box.width <= 410 && box.width === box.height).toBeTruthy();
+  const fit = await page.evaluate(() => {
+    const pre = document.querySelector(".ag-log .md pre") as HTMLElement;
+    // A one-word header stays on one line: words never break inside a cell.
+    const ths = [...document.querySelectorAll(".ag-log .md th")] as HTMLElement[];
+    return { pre: pre.scrollWidth <= pre.clientWidth, page: document.documentElement.scrollWidth <= 410, cells: ths.filter((t) => t.textContent === "Part").every((t) => {
+      const r = document.createRange();
+      r.selectNodeContents(t);
+      return r.getClientRects().length === 1;
+    }) };
+  });
+  expect(fit).toEqual({ pre: true, page: true, cells: true });
+});

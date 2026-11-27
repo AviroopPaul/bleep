@@ -161,6 +161,8 @@ pub struct Message {
     pub created_at: String,
     /// Approval cards asked for during this turn.
     pub approvals: Vec<Approval>,
+    /// Why the reply failed, in plain words. Kept apart from the reply text.
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -373,6 +375,8 @@ CREATE TABLE reminders (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX reminders_status ON reminders(status);
+"#, r#"
+ALTER TABLE messages ADD COLUMN error TEXT;
 "#];
 
 pub struct Store {
@@ -392,6 +396,7 @@ fn row_to_message(r: &Row) -> rusqlite::Result<Message> {
         session_id: r.get(7)?,
         created_at: r.get(8)?,
         approvals: vec![],
+        error: r.get(9)?,
     })
 }
 
@@ -507,7 +512,7 @@ fn row_to_ask(r: &Row) -> rusqlite::Result<AgentAsk> {
     })
 }
 
-const MSG_COLS: &str = "id, role, kind, content, tool_steps, tokens, status, session_id, created_at";
+const MSG_COLS: &str = "id, role, kind, content, tool_steps, tokens, status, session_id, created_at, error";
 const SESSION_COLS: &str = "id, runtime, runtime_session_id, started_at, ended_at, seed, memory_known, context_used, tools_hash";
 
 impl Store {
@@ -539,6 +544,12 @@ impl Store {
             params![m.role.as_str(), m.kind.as_str(), m.content, m.status.as_str(), m.session_id],
         )?;
         Ok(db.last_insert_rowid())
+    }
+
+    /// Records why a reply failed. The reply text stays as it streamed.
+    pub fn set_message_error(&self, id: i64, error: &str) -> Result<()> {
+        self.db().execute("UPDATE messages SET error = ?2, status = 'error' WHERE id = ?1", params![id, error])?;
+        Ok(())
     }
 
     pub fn finish_message(&self, id: i64, content: &str, tool_steps: &Value, tokens: Option<i64>, status: MsgStatus) -> Result<()> {
@@ -931,6 +942,18 @@ impl Store {
     pub fn current_session(&self, runtime: &str) -> Result<Option<Session>> {
         let sql = format!("SELECT {SESSION_COLS} FROM sessions WHERE runtime = ?1 AND ended_at IS NULL ORDER BY id DESC LIMIT 1");
         Ok(self.db().query_row(&sql, params![runtime], row_to_session).optional()?)
+    }
+
+    /// The one chat thread: the newest open session, whichever backend started it.
+    pub fn current_thread(&self) -> Result<Option<Session>> {
+        let sql = format!("SELECT {SESSION_COLS} FROM sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1");
+        Ok(self.db().query_row(&sql, [], row_to_session).optional()?)
+    }
+
+    /// Ends every open session but `keep` (older data kept one per backend).
+    pub fn end_other_sessions(&self, keep: i64) -> Result<()> {
+        self.db().execute("UPDATE sessions SET ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE ended_at IS NULL AND id != ?1", params![keep])?;
+        Ok(())
     }
 
     pub fn create_session(&self, runtime: &str) -> Result<Session> {
