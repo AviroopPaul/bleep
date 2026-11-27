@@ -216,6 +216,7 @@ fn init(app: &tauri::App) -> anyhow::Result<Parts> {
     let own_port = reqwest::Url::parse(&mcp.url()).ok().and_then(|u| u.port());
     let remotes = remote::manager::Remotes::new(tool_host.clone(), store.clone(), Arc::new(google::secrets::KeychainSecrets), Arc::new(opener::SystemOpener(handle.clone())), own_port);
     remotes.load(&config.mcp.servers);
+    runtime::claude::adapter::clean_run_files(&paths);
     let make_runtime: RuntimeFactory = {
         let (paths, store) = (paths.clone(), store.clone());
         let bin = find_claude().unwrap_or_else(|| "claude".into());

@@ -115,6 +115,7 @@ mod tests {
             mcp: McpEndpoint { url: "http://127.0.0.1:1/mcp".into(), token: "t".into() },
             tier: Tier::Main,
             resume_id: None,
+            seed: None,
         }
     }
 

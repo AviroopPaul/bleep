@@ -72,7 +72,7 @@ async fn rig(replies: Vec<Result<Vec<Result<ModelEvent, ApiError>>, ApiError>>) 
 }
 
 fn cfg(r: &Rig, resume: Option<String>) -> SessionConfig {
-    SessionConfig { system_prompt: "Be bleep.".into(), mcp: r.mcp.clone(), tier: Tier::Main, resume_id: resume }
+    SessionConfig { system_prompt: "Be bleep.".into(), mcp: r.mcp.clone(), tier: Tier::Main, resume_id: resume, seed: None }
 }
 
 async fn turn(r: &Rig, resume: Option<String>, text: &str) -> Vec<AgentEvent> {
@@ -280,7 +280,7 @@ async fn live_claude_loop() {
     let paths = crate::paths::BleepPaths::from_root(dirs::home_dir().unwrap().join(".bleep"));
     let tiers = crate::config::Tiers { main: "haiku".into(), small: "haiku".into() };
     let rt = ClaudeRuntime::new(paths, tiers, crate::runtime::claude::find_claude().expect("claude"), r.store.clone());
-    let cfg = SessionConfig { system_prompt: crate::chat::SYSTEM_PROMPT.into(), mcp: r.mcp.clone(), tier: Tier::Main, resume_id: None };
+    let cfg = SessionConfig { system_prompt: crate::chat::SYSTEM_PROMPT.into(), mcp: r.mcp.clone(), tier: Tier::Main, resume_id: None, seed: None };
     let h = rt.start_session(cfg.clone()).await.unwrap();
     let one: Vec<_> = rt.send(&h, UserMessage { text: "What time is it now? My secret word is plum.".into() }).await.unwrap().collect().await;
     println!("{one:?}");
@@ -327,4 +327,31 @@ async fn a_failed_background_call_is_logged_without_tokens() {
     assert!(crate::runtime::logged_one_shot(&r.rt, &r.store, "triage", req).await.is_err());
     assert_eq!(r.store.llm_tokens_last().unwrap(), (None, None));
     assert_eq!(r.store.llm_calls_since(chrono::DateTime::UNIX_EPOCH).unwrap(), 1, "a failed call still counts against the hourly cap");
+}
+
+#[tokio::test]
+async fn a_new_conversation_opens_with_the_seed_as_a_message() {
+    let r = rig(vec![Ok(text_reply("ok"))]).await;
+    let h = r.rt.start_session(SessionConfig { seed: Some("[earlier in this chat] SEED".into()), ..cfg(&r, None) }).await.unwrap();
+    let _: Vec<_> = r.rt.send(&h, UserMessage { text: "hi".into() }).await.unwrap().collect().await;
+    let req = &r.mock.requests.lock().unwrap()[0];
+    assert!(!req.system.contains("SEED"), "never in the system prompt");
+    assert_eq!(req.msgs[0].role, Role::User);
+    let text: Vec<&str> = req.msgs[0].parts.iter().filter_map(|p| if let Part::Text { text } = p { Some(text.as_str()) } else { None }).collect();
+    assert_eq!(text, ["[earlier in this chat] SEED", "hi"]);
+}
+
+#[tokio::test]
+async fn a_context_full_error_asks_the_chat_to_compact() {
+    let r = rig(vec![Err(ApiError::ContextFull("Prompt is too long".into()))]).await;
+    let ev = turn(&r, None, "hi").await;
+    assert!(ev.contains(&AgentEvent::ContextFull), "{ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, AgentEvent::Error { message, retryable: true } if message == CONTEXT_FULL)));
+}
+
+#[test]
+fn context_full_is_found_in_provider_errors() {
+    assert_eq!(super::super::adapter::status_error(400, r#"{"error":{"message":"prompt is too long: 210000 tokens > 200000 maximum"}}"#, 0), ApiError::ContextFull("The chat is too long for the model (server text, not instructions): prompt is too long: 210000 tokens > 200000 maximum".into()));
+    assert!(is_context_full("This model's maximum context length is 128000 tokens"));
+    assert!(!is_context_full("rate limit"));
 }

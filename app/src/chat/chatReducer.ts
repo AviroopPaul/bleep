@@ -87,6 +87,7 @@ function applyEvent(m: Message, ev: AgentEvent): Message {
       return { ...m, status: m.status === "error" ? "error" : "done" };
     case "rate_limited":
     case "context":
+    case "context_full":
       return m;
   }
 }

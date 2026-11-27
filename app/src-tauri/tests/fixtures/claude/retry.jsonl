@@ -1,0 +1,5 @@
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","name":"StructuredOutput"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"text\": \"Hel"}}}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","name":"StructuredOutput"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"text\": \"Hi there.\", \"tool_calls\": []}"}}}
+{"type":"result","subtype":"success","is_error":false,"usage":{"input_tokens":3,"output_tokens":5},"structured_output":{"text":"Hi there.","tool_calls":[]}}

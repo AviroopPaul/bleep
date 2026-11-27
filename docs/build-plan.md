@@ -165,7 +165,7 @@ pub trait AgentRuntime: Send + Sync {
 - **Normalised events:** each backend parses its own stream into the same events. The chat UI shows tool calls as steps, like the landing page demo.
 - **Usage:** every turn reports input and output tokens. They feed the context meter and the compaction trigger.
 - **Plan limits:** a `RateLimited` event shows in the chat ("Limit reached, back at 4:10 PM") and pauses proactive model work until the reset. Rules-only reminders keep working.
-- **Switching:** settings has a runtime picker. Switching starts a fresh session seeded with the latest compaction summary plus the last 10 turns (the same path as compaction, section 8.6). The visible chat history does not change.
+- **Switching:** settings has a runtime picker. Every backend runs on bleep's loop and history (D13), so a switch continues the same thread: the new backend gets the same conversation. A carry-over (compaction summary plus the last turns) opens a new conversation as its first message, never in the system prompt, because it can quote mail and web text. A "prompt is too long" error compacts the chat after the turn.
 
 #### Claude Code backend (Phase 1, reworked 27 Nov 2026 under D13)
 

@@ -258,6 +258,8 @@ export function ChatPanel() {
       return;
     }
     setSending(true);
+    // The newest row before this send: a failed send shows its own error only if it saved no row.
+    const lastBefore = state.messages.length ? state.messages[state.messages.length - 1].id : 0;
     stick.current = true;
     setAway(false);
     void api.voiceStopSpeaking();
@@ -276,7 +278,8 @@ export function ChatPanel() {
         api.history(null, PAGE).then((messages) => {
           dispatch({ type: "history", messages, mode: "replace" });
           const last = messages[messages.length - 1];
-          if (!(last?.role === "assistant" && last.status === "error")) setSendError(msg);
+          const saved = last && last.id > lastBefore && last.role === "assistant" && last.status === "error";
+          if (!saved) setSendError(msg);
         }).catch(() => setSendError(msg));
       }
     } finally {

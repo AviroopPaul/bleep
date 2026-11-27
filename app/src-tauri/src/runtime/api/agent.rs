@@ -27,6 +27,7 @@ const ONE_SHOT_TIMEOUT: Duration = Duration::from_secs(120);
 /// A tool call can wait on an approval card, so it gets a long time.
 const TOOL_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const ANSWER_TOOL: &str = "answer";
+pub const CONTEXT_FULL: &str = "The chat got too long for the model, so bleep is making room. Send again to continue.";
 pub const KEY_REJECTED: &str = "The API key was rejected. Open Settings, then Model, to fix it.";
 
 type Live = RunningService<RoleClient, ClientConfig>;
@@ -326,6 +327,11 @@ impl Core {
             ApiError::Auth(d) => (format!("{KEY_REJECTED} {d}"), false),
             ApiError::Retryable(d) => (d.clone(), true),
             ApiError::Fatal(d) => (d.clone(), false),
+            ApiError::ContextFull(d) => {
+                eprintln!("bleep: context full: {d}");
+                out(AgentEvent::ContextFull).await;
+                (CONTEXT_FULL.into(), true)
+            }
         };
         out(AgentEvent::Error { message, retryable }).await;
         out(AgentEvent::Done { runtime_session_id: Some(conv.to_string()) }).await;
@@ -430,7 +436,13 @@ impl AgentRuntime for ApiRuntime {
         let conv = match &cfg.resume_id {
             Some(id) if self.store.api_conv_exists(id)? => id.clone(),
             Some(id) => return Err(StaleResume(format!("No saved conversation {id}.")).into()),
-            None => new_conv(),
+            None => {
+                let conv = new_conv();
+                if let Some(seed) = cfg.seed.as_deref().filter(|s| !s.trim().is_empty()) {
+                    self.save(&conv, &Msg::user_text(seed));
+                }
+                conv
+            }
         };
         *self.cfg.lock().unwrap() = Some(cfg);
         Ok(SessionHandle { resume_id: Some(conv) })

@@ -68,6 +68,8 @@ pub enum AgentEvent {
     /// Unix seconds when the limit resets.
     RateLimited { until: i64 },
     Done { runtime_session_id: Option<String> },
+    /// The conversation no longer fits the model. The chat compacts after this turn.
+    ContextFull,
     Error { message: String, retryable: bool },
 }
 
@@ -89,6 +91,9 @@ pub struct SessionConfig {
     pub mcp: McpEndpoint,
     pub tier: Tier,
     pub resume_id: Option<String>,
+    /// For a new conversation only: bleep's carry-over of the earlier chat, saved as its
+    /// first message (never in the system prompt).
+    pub seed: Option<String>,
 }
 
 /// The backend keeps its own state keyed by this.

@@ -155,6 +155,7 @@ pub async fn send(req: reqwest::RequestBuilder) -> Result<reqwest::Response, Api
 pub fn status_error(status: u16, body: &str, until: i64) -> ApiError {
     let detail = error_message(body);
     match status {
+        400 | 413 if is_context_full(&detail) => ApiError::ContextFull(format!("The chat is too long for the model {}", server_text(&detail))),
         429 => ApiError::RateLimited { until },
         402 => ApiError::Fatal(format!("The provider says the account is out of credits. Add credits, then try again. {}", server_text(&detail))),
         401 | 403 => ApiError::Auth(format!("The provider rejected the key (HTTP {status}) {}", server_text(&detail))),

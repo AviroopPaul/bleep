@@ -19,6 +19,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 pub const STALLED: &str = "Claude Code stopped responding. Send again to continue.";
 pub const EXITED: &str = "Claude Code stopped before it answered. Send again to continue.";
+pub const CONTEXT_FULL: &str = "The chat is too long for the model.";
 pub const SIGNED_OUT: &str = "Claude Code is signed out. Open Settings, then Model, to sign in.";
 /// No output for this long ends the call.
 const IDLE: Duration = Duration::from_secs(120);
@@ -94,6 +95,12 @@ pub fn system_prompt(req: &ModelRequest) -> String {
     }
 }
 
+/// A JSON line with `<` escaped, so text inside it can never look like the
+/// `<conversation>` frame (tool results may hold any text).
+fn frame_safe(v: &Value) -> String {
+    v.to_string().replace('<', "\\u003c")
+}
+
 /// One JSON line per message part, in order. Images are noted, not sent, inside a transcript.
 pub fn transcript(msgs: &[Msg]) -> String {
     let mut lines = vec![];
@@ -108,7 +115,7 @@ pub fn transcript(msgs: &[Msg]) -> String {
                 v["tool_calls"] = Value::Array(std::mem::take(calls));
             }
             text.clear();
-            lines.push(v.to_string());
+            lines.push(frame_safe(&v));
         };
         for p in &m.parts {
             match p {
@@ -117,7 +124,7 @@ pub fn transcript(msgs: &[Msg]) -> String {
                 Part::ToolCall { id, name, args } => calls.push(json!({"id": id, "name": name, "args": args})),
                 Part::ToolResult { id, ok, text: t } => {
                     flush(&mut text, &mut calls, &mut lines);
-                    lines.push(json!({"role": "tool_result", "id": id, "ok": ok, "result": t}).to_string());
+                    lines.push(frame_safe(&json!({"role": "tool_result", "id": id, "ok": ok, "result": t})));
                 }
             }
         }
@@ -193,41 +200,64 @@ pub fn partial_field(buf: &str, field: &str) -> Option<String> {
 }
 
 /// Decodes a JSON string from byte `start` (after the opening quote). Returns the text and
-/// the index of the closing quote, if it has arrived. A cut escape is left out.
+/// the index of the closing quote, if it has arrived. A cut escape is left out until the
+/// rest arrives; a broken surrogate pair becomes U+FFFD.
 fn read_string(buf: &str, start: usize) -> (String, Option<usize>) {
+    let b = &buf.as_bytes()[start..];
     let mut out = String::new();
-    let mut chars = buf[start..].char_indices();
-    while let Some((k, c)) = chars.next() {
-        match c {
-            '"' => return (out, Some(start + k)),
-            '\\' => match chars.next() {
-                Some((_, 'n')) => out.push('\n'),
-                Some((_, 't')) => out.push('\t'),
-                Some((_, 'r')) => out.push('\r'),
-                Some((_, 'b')) => out.push('\u{8}'),
-                Some((_, 'f')) => out.push('\u{c}'),
-                Some((_, 'u')) => {
-                    let hex: String = chars.by_ref().take(4).map(|(_, c)| c).collect();
-                    if hex.len() < 4 {
-                        return (out, None);
-                    }
-                    let Ok(n) = u32::from_str_radix(&hex, 16) else { return (out, None) };
-                    // A surrogate pair needs the next \uXXXX too.
-                    if (0xD800..0xDC00).contains(&n) {
-                        let rest: String = chars.by_ref().take(6).map(|(_, c)| c).collect();
-                        let lo = rest.strip_prefix("\\u").and_then(|h| u32::from_str_radix(h, 16).ok());
-                        match lo {
-                            Some(lo) if rest.len() == 6 => out.extend(char::from_u32(0x10000 + ((n - 0xD800) << 10) + (lo.wrapping_sub(0xDC00)))),
-                            _ => return (out, None),
+    let mut i = 0;
+    let hex4 = |at: usize| -> Option<u32> { std::str::from_utf8(b.get(at..at + 4)?).ok().and_then(|h| u32::from_str_radix(h, 16).ok()) };
+    while i < b.len() {
+        match b[i] {
+            b'"' => return (out, Some(start + i)),
+            b'\\' => {
+                let Some(&e) = b.get(i + 1) else { return (out, None) };
+                match e {
+                    b'n' => out.push('\n'),
+                    b't' => out.push('\t'),
+                    b'r' => out.push('\r'),
+                    b'b' => out.push('\u{8}'),
+                    b'f' => out.push('\u{c}'),
+                    b'u' => {
+                        if b.len() < i + 6 {
+                            return (out, None);
                         }
-                    } else {
-                        out.extend(char::from_u32(n));
+                        let Some(n) = hex4(i + 2) else {
+                            out.push('\u{FFFD}');
+                            i += 6;
+                            continue;
+                        };
+                        if (0xD800..0xDC00).contains(&n) {
+                            // A high surrogate needs `\\uXXXX` with a low one right after.
+                            if b.len() < i + 12 {
+                                return (out, None);
+                            }
+                            match (b[i + 6], b[i + 7], hex4(i + 8)) {
+                                (b'\\', b'u', Some(lo)) if (0xDC00..0xE000).contains(&lo) => {
+                                    out.extend(char::from_u32(0x10000 + ((n - 0xD800) << 10) + (lo - 0xDC00)));
+                                    i += 12;
+                                }
+                                _ => {
+                                    out.push('\u{FFFD}');
+                                    i += 6;
+                                }
+                            }
+                            continue;
+                        }
+                        out.push(char::from_u32(n).unwrap_or('\u{FFFD}'));
+                        i += 6;
+                        continue;
                     }
+                    c => out.push(c as char),
                 }
-                Some((_, c)) => out.push(c),
-                None => return (out, None),
-            },
-            c => out.push(c),
+                i += 2;
+            }
+            _ => {
+                // Copy one whole UTF-8 char.
+                let ch = buf[start + i..].chars().next().expect("char boundary");
+                out.push(ch);
+                i += ch.len_utf8();
+            }
         }
     }
     (out, None)
@@ -237,7 +267,9 @@ fn read_string(buf: &str, start: usize) -> (String, Option<usize>) {
 pub struct CallParser {
     shape: Shape,
     json: String,
-    sent: usize,
+    /// Text already sent as deltas. Only text that extends it is sent, so a retried
+    /// structured answer can never garble what the user sees.
+    streamed: String,
     rate_limited: Option<i64>,
     ids: String,
 }
@@ -248,7 +280,7 @@ fn u(v: &Value, k: &str) -> u64 {
 
 impl CallParser {
     fn new(shape: Shape) -> Self {
-        Self { shape, json: String::new(), sent: 0, rate_limited: None, ids: crate::mcp::new_token()[..10].to_string() }
+        Self { shape, json: String::new(), streamed: String::new(), rate_limited: None, ids: crate::mcp::new_token()[..10].to_string() }
     }
 
     fn text_so_far(&self) -> Option<String> {
@@ -256,13 +288,24 @@ impl CallParser {
     }
 
     fn more_text(&mut self, full: &str) -> Vec<Result<ModelEvent, ApiError>> {
-        let chars = full.chars().count();
-        if chars <= self.sent {
-            return vec![];
+        match full.strip_prefix(self.streamed.as_str()) {
+            Some(rest) if !rest.is_empty() => {
+                let t = rest.to_string();
+                self.streamed = full.to_string();
+                vec![Ok(ModelEvent::TextDelta(t))]
+            }
+            _ => vec![],
         }
-        let t: String = full.chars().skip(self.sent).collect();
-        self.sent = chars;
-        vec![Ok(ModelEvent::TextDelta(t))]
+    }
+
+    /// The final text. If a retried attempt changed what was already shown, the final
+    /// answer follows in full rather than being lost.
+    fn final_text(&mut self, full: &str) -> Vec<Result<ModelEvent, ApiError>> {
+        if full.is_empty() || full.starts_with(self.streamed.as_str()) {
+            return self.more_text(full);
+        }
+        self.streamed = full.to_string();
+        vec![Ok(ModelEvent::TextDelta(format!("\n\n{full}")))]
     }
 
     /// Events for one line. `Err` ends the call.
@@ -270,11 +313,15 @@ impl CallParser {
         let Ok(v) = serde_json::from_str::<Value>(line.trim()) else { return vec![] };
         match v.get("type").and_then(Value::as_str) {
             Some("stream_event") => {
+                // A new structured-output attempt starts its JSON from scratch.
+                if v.pointer("/event/type").and_then(Value::as_str) == Some("content_block_start") && v.pointer("/event/content_block/type").and_then(Value::as_str) == Some("tool_use") {
+                    self.json.clear();
+                }
                 let d = v.pointer("/event/delta");
                 match d.and_then(|d| d.get("type")).and_then(Value::as_str) {
                     Some("text_delta") if self.shape == Shape::Text => {
                         let t = d.and_then(|d| d.get("text")).and_then(Value::as_str).unwrap_or("").to_string();
-                        self.sent += t.chars().count();
+                        self.streamed.push_str(&t);
                         vec![Ok(ModelEvent::TextDelta(t))]
                     }
                     Some("input_json_delta") if self.shape == Shape::Step => {
@@ -311,13 +358,21 @@ impl CallParser {
         match &self.shape {
             Shape::Text => {
                 let full = v.get("result").and_then(Value::as_str).unwrap_or("").to_string();
-                out.extend(self.more_text(&full));
+                out.extend(self.final_text(&full));
             }
             Shape::Step => {
                 let Some(so) = v.get("structured_output").filter(|s| s.is_object()) else {
-                    return vec![Err(ApiError::Retryable("Claude Code gave no answer in the expected shape. Send again to continue.".into()))];
+                    // The model answered in plain prose: keep it as the reply, with no tool calls.
+                    let prose = v.get("result").and_then(Value::as_str).map(str::trim).unwrap_or("");
+                    if prose.is_empty() {
+                        return vec![Err(ApiError::Retryable("Claude Code gave no answer in the expected shape. Send again to continue.".into()))];
+                    }
+                    out.extend(self.final_text(prose));
+                    out.push(Ok(ModelEvent::Usage(tokens)));
+                    out.push(Ok(ModelEvent::Stop(StopReason::EndTurn)));
+                    return out;
                 };
-                out.extend(self.more_text(so.get("text").and_then(Value::as_str).unwrap_or("")));
+                out.extend(self.final_text(so.get("text").and_then(Value::as_str).unwrap_or("")));
                 for (i, c) in so.get("tool_calls").and_then(Value::as_array).into_iter().flatten().enumerate() {
                     let Some(name) = c.get("name").and_then(Value::as_str) else { continue };
                     let args = c.get("args").cloned().filter(Value::is_object).unwrap_or_else(|| json!({}));
@@ -343,6 +398,9 @@ impl CallParser {
         if let Some(until) = self.rate_limited {
             return ApiError::RateLimited { until };
         }
+        if is_context_full(detail) {
+            return ApiError::ContextFull(CONTEXT_FULL.into());
+        }
         let d = detail.to_lowercase();
         if d.contains("limit") && (d.contains("usage") || d.contains("rate")) {
             return ApiError::RateLimited { until: 0 };
@@ -352,6 +410,33 @@ impl CallParser {
         }
         eprintln!("bleep: claude call failed: {}", preview(detail, 300));
         ApiError::Retryable("Claude Code could not answer. Send again to continue.".into())
+    }
+}
+
+/// The prompt holds memory text: only this user may read it.
+fn write_private(path: &std::path::Path, body: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(path)?.write_all(body.as_bytes())
+}
+
+/// Largest `claude.log` kept at start; a bigger one starts over.
+const LOG_MAX: u64 = 5 * 1024 * 1024;
+
+/// At start: removes prompt files a crash left behind (and the old run files, which held
+/// the MCP token), and starts `claude.log` over when it grew too big.
+pub fn clean_run_files(paths: &BleepPaths) {
+    if let Ok(dir) = std::fs::read_dir(&paths.run) {
+        for e in dir.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if (name.starts_with("prompt-") && name.ends_with(".md")) || name == "mcp.json" || name == "system-prompt.md" {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+    }
+    let log = paths.logs.join("claude.log");
+    if std::fs::metadata(&log).is_ok_and(|m| m.len() > LOG_MAX) {
+        let _ = std::fs::write(&log, "");
     }
 }
 
@@ -374,7 +459,7 @@ impl ModelAdapter for ClaudeCodeAdapter {
             Shape::Forced(name) => Some(req.tools.iter().find(|t| &t.name == name).map(|t| t.schema.clone()).unwrap_or_else(|| json!({"type": "object"}))),
         };
         let file = TempFile(self.paths.run.join(format!("prompt-{}.md", &crate::mcp::new_token()[..16])));
-        std::fs::write(&file.0, system_prompt(req)).map_err(|e| ApiError::Fatal(format!("bleep could not write a file in its data folder: {e}")))?;
+        write_private(&file.0, &system_prompt(req)).map_err(|e| ApiError::Fatal(format!("bleep could not write a file in its data folder: {e}")))?;
         let log = std::fs::OpenOptions::new().create(true).append(true).open(self.paths.logs.join("claude.log")).map(Stdio::from).unwrap_or_else(|_| Stdio::null());
         let mut child = base_command(&self.bin, &self.paths)
             .args(call_args(&req.model, &file.0.display().to_string(), schema.as_ref()))

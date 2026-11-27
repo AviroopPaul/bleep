@@ -206,7 +206,8 @@ export type AgentEvent =
   | { type: "context"; used: number; window: number | null }
   | { type: "rate_limited"; until: number }
   | { type: "done"; runtime_session_id: string | null }
-  | { type: "error"; message: string; retryable: boolean };
+  | { type: "error"; message: string; retryable: boolean }
+  | { type: "context_full" };
 
 export interface MemoryFile {
   file: "USER.md" | "RULES.md" | "MEMORY.md";

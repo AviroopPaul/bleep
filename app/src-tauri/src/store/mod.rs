@@ -944,6 +944,18 @@ impl Store {
         Ok(self.db().query_row(&sql, params![runtime], row_to_session).optional()?)
     }
 
+    /// The one chat thread: the newest open session, whichever backend started it.
+    pub fn current_thread(&self) -> Result<Option<Session>> {
+        let sql = format!("SELECT {SESSION_COLS} FROM sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1");
+        Ok(self.db().query_row(&sql, [], row_to_session).optional()?)
+    }
+
+    /// Ends every open session but `keep` (older data kept one per backend).
+    pub fn end_other_sessions(&self, keep: i64) -> Result<()> {
+        self.db().execute("UPDATE sessions SET ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE ended_at IS NULL AND id != ?1", params![keep])?;
+        Ok(())
+    }
+
     pub fn create_session(&self, runtime: &str) -> Result<Session> {
         let db = self.db();
         db.execute("INSERT INTO sessions (runtime) VALUES (?1)", params![runtime])?;
